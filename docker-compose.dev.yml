@@ -1,0 +1,47 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:15
+    restart: always
+    environment:
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_USER=${DB_USERNAME}
+      - POSTGRES_DB=${DB_DATABASE}
+    container_name: postgres
+    volumes:
+      - ./postgresql.conf:/etc/postgresql.conf
+      - ./pg-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev  # 개발용 Dockerfile
+    volumes:
+      - ./frontend:/app          # 소스 코드 마운트
+      - /app/node_modules        # node_modules 볼륨
+    ports:
+      - "3011:3011"
+    environment:
+      - NODE_ENV=development     # 개발 환경
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+    depends_on:
+      - backend
+    restart: always
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev  # 개발용 Dockerfile
+    volumes:
+      - ./backend:/app           # 소스 코드 마운트
+      - /app/node_modules        # node_modules 볼륨
+    ports:
+      - "3010:3010"
+    environment:
+      - NODE_ENV=development     # 개발 환경
+    depends_on:
+      - db
+    restart: always
