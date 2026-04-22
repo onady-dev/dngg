@@ -1,3 +1,11 @@
+
+# # 이미지 빌드
+# $ docker-compose build
+# # 이미지 Push (frontend와 backend만)
+# $ docker-compose push
+# # 이미지 배포
+# $ F_V=1.0.1 B_V=1.0.1 docker-compose up -d
+
 version: "3.8"
 
 services:
