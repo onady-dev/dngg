@@ -1,0 +1,787 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DN.GG 사용 가이드</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --navy:   #0F172A;
+    --navy2:  #1E293B;
+    --blue:   #2563EB;
+    --blue-l: #EFF6FF;
+    --amber:  #F59E0B;
+    --bg:     #F1F5F9;
+    --card:   #FFFFFF;
+    --text:   #1E293B;
+    --muted:  #64748B;
+    --border: #E2E8F0;
+    --radius: 10px;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    font-size: 15px;
+  }
+
+  /* ── TOP HEADER ── */
+  .top-header {
+    background: var(--navy);
+    color: #fff;
+    padding: 0 2rem;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 12px rgba(0,0,0,.35);
+  }
+  .top-header .logo {
+    font-size: 1.2rem;
+    font-weight: 800;
+    letter-spacing: -.5px;
+    color: #fff;
+    text-decoration: none;
+  }
+  .top-header .logo span { color: var(--amber); }
+  .top-header .subtitle {
+    font-size: 0.8rem;
+    color: #94A3B8;
+    border-left: 1px solid #334155;
+    padding-left: 1rem;
+    margin-left: .25rem;
+  }
+  .top-header .back-btn {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.8rem;
+    background: rgba(255,255,255,0.1);
+    border-radius: 6px;
+    color: #fff;
+    text-decoration: none;
+    font-size: 0.82rem;
+    transition: background 0.2s;
+  }
+  .top-header .back-btn:hover { background: rgba(255,255,255,0.2); }
+
+  /* ── LAYOUT ── */
+  .layout {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    max-width: 1100px;
+    margin: 0 auto;
+    gap: 0;
+    padding: 2rem 1.5rem;
+    align-items: start;
+  }
+  @media (max-width: 768px) {
+    .layout { grid-template-columns: 1fr; padding: 1rem; }
+    .sidebar { display: none; }
+  }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    position: sticky;
+    top: 72px;
+    padding-right: 1.5rem;
+  }
+  .sidebar nav { display: flex; flex-direction: column; gap: 2px; }
+  .sidebar .nav-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 0 0.5rem;
+    margin-bottom: 4px;
+    margin-top: 12px;
+  }
+  .sidebar .nav-label:first-child { margin-top: 0; }
+  .sidebar a {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border-radius: 7px;
+    text-decoration: none;
+    color: var(--text);
+    font-size: 0.875rem;
+    transition: background 0.15s, color 0.15s;
+  }
+  .sidebar a:hover { background: var(--border); }
+  .sidebar a.active { background: var(--blue-l); color: var(--blue); font-weight: 600; }
+  .sidebar a .num {
+    font-size: 0.7rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    background: var(--amber);
+    color: #fff;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+
+  /* ── MAIN CONTENT ── */
+  .content {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+  }
+
+  /* ── HERO CARD ── */
+  .hero {
+    background: linear-gradient(135deg, var(--navy) 0%, #1E3A5F 100%);
+    border-radius: var(--radius);
+    padding: 2.5rem 2.5rem;
+    color: #fff;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    right: -40px; top: -60px;
+    width: 220px; height: 220px;
+    border-radius: 50%;
+    background: rgba(245,158,11,.12);
+    pointer-events: none;
+  }
+  .hero::after {
+    content: '';
+    position: absolute;
+    right: 60px; top: 60px;
+    width: 100px; height: 100px;
+    border-radius: 50%;
+    background: rgba(37,99,235,.2);
+    pointer-events: none;
+  }
+  .hero .tag {
+    display: inline-block;
+    background: rgba(245,158,11,.25);
+    color: var(--amber);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    padding: 3px 10px;
+    border-radius: 20px;
+    margin-bottom: .75rem;
+  }
+  .hero h1 {
+    font-size: clamp(1.5rem, 3vw, 2.1rem);
+    font-weight: 900;
+    letter-spacing: -.03em;
+    text-wrap: balance;
+    margin-bottom: .5rem;
+    line-height: 1.2;
+  }
+  .hero h1 em { color: var(--amber); font-style: normal; }
+  .hero p { color: #CBD5E1; font-size: .9rem; }
+
+  /* ── SECTION ── */
+  .section {
+    background: var(--card);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    background: #FAFBFC;
+    flex-wrap: wrap;
+  }
+  .section-num {
+    font-size: .75rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    background: var(--amber);
+    color: #fff;
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .section-num.blue { background: var(--blue); }
+  .section-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .section-url {
+    margin-left: auto;
+    font-size: .75rem;
+    font-family: 'Consolas', monospace;
+    color: var(--muted);
+    background: var(--border);
+    padding: 2px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+  .section-body { padding: 1.5rem; display: flex; flex-direction: column; gap: 1.25rem; }
+
+  /* ── MOBILE SCREENSHOT PAIR ── */
+  .mobile-pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    align-items: start;
+  }
+  @media (max-width: 600px) { .mobile-pair { grid-template-columns: 1fr; } }
+
+  /* ── SCREENSHOT ── */
+  .screenshot-wrap {
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    box-shadow: 0 4px 20px rgba(0,0,0,.10);
+    max-width: 390px;
+  }
+  .screenshot-wrap.full { max-width: 100%; border-radius: 8px; }
+  .screenshot-wrap img {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+  .screenshot-caption {
+    font-size: .78rem;
+    color: var(--muted);
+    text-align: center;
+    padding: .5rem;
+    background: #F8FAFC;
+    border-top: 1px solid var(--border);
+  }
+
+  /* ── STEPS ── */
+  .steps { display: flex; flex-direction: column; gap: .75rem; }
+  .step {
+    display: flex;
+    gap: .875rem;
+    align-items: flex-start;
+  }
+  .step-num {
+    font-size: .72rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    background: var(--blue);
+    color: #fff;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .step-text { font-size: .9rem; line-height: 1.55; }
+  .step-text strong { color: var(--text); font-weight: 700; }
+
+  /* ── TIP BOX ── */
+  .tip {
+    background: var(--blue-l);
+    border: 1px solid #BFDBFE;
+    border-left: 4px solid var(--blue);
+    border-radius: 8px;
+    padding: .875rem 1rem;
+    font-size: .85rem;
+    color: #1E40AF;
+    display: flex;
+    gap: .5rem;
+    align-items: flex-start;
+  }
+  .tip-icon { font-size: 1rem; flex-shrink: 0; margin-top: 1px; }
+
+  /* ── TABLE ── */
+  .table-wrap { overflow-x: auto; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .875rem;
+  }
+  th {
+    background: #F8FAFC;
+    font-weight: 700;
+    text-align: left;
+    padding: .6rem .875rem;
+    border-bottom: 2px solid var(--border);
+    white-space: nowrap;
+    font-size: .8rem;
+    letter-spacing: .03em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  td {
+    padding: .6rem .875rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #F8FAFC; }
+  .btn-tag {
+    display: inline-block;
+    background: var(--blue-l);
+    color: var(--blue);
+    font-size: .75rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+  .btn-tag.red { background: #FEF2F2; color: #DC2626; }
+  .btn-tag.yellow { background: #FFFBEB; color: #B45309; }
+  .btn-tag.green { background: #F0FDF4; color: #16A34A; }
+
+  /* ── CHECKLIST ── */
+  .checklist {
+    background: var(--navy);
+    border-radius: var(--radius);
+    padding: 1.5rem 1.75rem;
+    color: #fff;
+  }
+  .checklist h3 {
+    font-size: .8rem;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--amber);
+    margin-bottom: 1rem;
+  }
+  .check-items { display: flex; flex-direction: column; gap: .6rem; }
+  .check-item {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    font-size: .9rem;
+    color: #CBD5E1;
+    cursor: pointer;
+    user-select: none;
+  }
+  .check-box {
+    width: 20px; height: 20px;
+    border: 2px solid #334155;
+    border-radius: 5px;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    transition: background .15s, border-color .15s;
+  }
+  .check-box.checked { background: var(--amber); border-color: var(--amber); }
+  .check-box.checked::after { content: '✓'; font-size: .7rem; font-weight: 900; color: #fff; }
+  .check-item.done { color: #475569; text-decoration: line-through; }
+
+  /* ── AUTH NOTICE ── */
+  .auth-notice {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: #FFF7ED;
+    border: 1px solid #FED7AA;
+    color: #C2410C;
+    font-size: .78rem;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 20px;
+  }
+
+  hr { border: none; border-top: 1px solid var(--border); margin: .25rem 0; }
+
+  a:focus-visible, button:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 2px;
+  }
+
+  /* ── TAB ICON BADGE ── */
+  .ti {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #F1F5F9;
+    color: #334155;
+    border: 1.5px solid #CBD5E1;
+    border-radius: 7px;
+    padding: 2px 8px 2px 5px;
+    font-size: .78rem;
+    font-weight: 700;
+    vertical-align: middle;
+    white-space: nowrap;
+    line-height: 1.4;
+  }
+  .ti svg {
+    width: 13px; height: 13px;
+    flex-shrink: 0;
+    stroke: currentColor;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; scroll-behavior: auto !important; }
+  }
+</style>
+
+<!-- tab icon helpers reused via JS -->
+<template id="ti-daily"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><rect x="3" y="5" width="18" height="16" rx="2"/><path stroke-linecap="round" stroke-linejoin="round" d="M16 3v4M8 3v4M3 9h18"/></svg> daily</template>
+<template id="ti-rankings"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 18.75h-9m9 0a3 3 0 0 1 3 3h-15a3 3 0 0 1 3-3m9 0v-3.375c0-.621-.503-1.125-1.125-1.125h-.871M7.5 18.75v-3.375c0-.621.504-1.125 1.125-1.125h.872m5.007 0H9.497m5.007 0a7.454 7.454 0 0 1-.982-3.172M9.497 14.25a7.454 7.454 0 0 0 .981-3.172M5.25 4.236c-.982.143-1.954.317-2.916.52A6.003 6.003 0 0 0 7.73 9.728M5.25 4.236V4.5c0 2.108.966 3.99 2.48 5.228M5.25 4.236V2.721C7.456 2.41 9.71 2.25 12 2.25c2.291 0 4.545.16 6.75.47v1.516M7.73 9.728a6.726 6.726 0 0 0 2.748 1.35m8.272-6.842V4.5c0 2.108-.966 3.99-2.48 5.228m2.48-5.492a46.32 46.32 0 0 1 2.916.52 6.003 6.003 0 0 1-5.395 4.972m0 0a6.726 6.726 0 0 1-2.749 1.35m0 0a6.772 6.772 0 0 1-3.044 0"/></svg> rankings</template>
+<template id="ti-teams"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z"/></svg> teams</template>
+<template id="ti-games"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M14.25 6.087c0-.355.186-.676.401-.959.221-.29.349-.634.349-1.003 0-1.036-1.007-1.875-2.25-1.875s-2.25.84-2.25 1.875c0 .369.128.713.349 1.003.215.283.401.604.401.959v0a.64.64 0 0 1-.657.643 48.39 48.39 0 0 1-4.163-.3c.186 1.613.293 3.25.315 4.907a.656.656 0 0 1-.658.663v0c-.355 0-.676-.186-.959-.401a1.647 1.647 0 0 0-1.003-.349c-1.036 0-1.875 1.007-1.875 2.25s.84 2.25 1.875 2.25c.369 0 .713-.128 1.003-.349.283-.215.604-.401.959-.401v0c.31 0 .555.26.532.57a48.039 48.039 0 0 1-.642 5.056c1.518.19 3.058.309 4.616.354a.64.64 0 0 0 .657-.643v0c0-.355-.186-.676-.401-.959a1.647 1.647 0 0 1-.349-1.003c0-1.035 1.008-1.875 2.25-1.875 1.243 0 2.25.84 2.25 1.875 0 .369-.128.713-.349 1.003-.215.283-.4.604-.4.959v0c0 .333.277.599.61.58a48.1 48.1 0 0 0 5.427-.63 48.05 48.05 0 0 0 .582-4.717.532.532 0 0 0-.533-.57v0c-.355 0-.676.186-.959.401-.29.221-.634.349-1.003.349-1.035 0-1.875-1.007-1.875-2.25s.84-2.25 1.875-2.25c.37 0 .713.128 1.003.349.283.215.604.401.96.401v0a.656.656 0 0 0 .658-.663 48.422 48.422 0 0 0-.37-5.36c-1.886.342-3.81.574-5.766.689a.578.578 0 0 1-.61-.58v0Z"/></svg> games</template>
+<template id="ti-settings"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.01c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 0 0 1.01 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 0 0-1.01 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 0 0-2.572 1.01c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 0 0-2.573-1.01c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 0 0-1.01-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 0 0 1.01-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.573-1.01z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/></svg> settings</template>
+</head>
+<body>
+
+<header class="top-header" id="top">
+  <a class="logo" href="#top">DN<span>.</span>GG</a>
+  <span class="subtitle">사용 가이드</span>
+  <a class="back-btn" href="/">← 앱으로 돌아가기</a>
+</header>
+
+<div class="layout">
+
+  <aside class="sidebar">
+    <nav>
+      <div class="nav-label">빠른 시작 순서</div>
+      <a href="#login"><span class="num">1</span> 로그인</a>
+      <a href="#start"><span class="num">2</span> 그룹 선택</a>
+      <a href="#teams"><span class="num">3</span> 팀·선수 관리</a>
+      <a href="#games"><span class="num">4</span> 경기 만들기</a>
+      <a href="#record"><span class="num">5</span> 실시간 기록</a>
+      <div class="nav-label">통계 보기</div>
+      <a href="#daily"><span class="num">6</span> 일일 기록</a>
+      <a href="#rankings"><span class="num">7</span> 랭킹</a>
+      <a href="#home"><span class="num" style="background:var(--muted)">홈</span> 경기 요약</a>
+      <a href="#player"><span class="num" style="background:var(--muted)">+</span> 선수 기록</a>
+      <div class="nav-label">빠른 시작</div>
+      <a href="#checklist"><span class="num" style="background:var(--navy)">✓</span> 체크리스트</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+
+    <div class="hero">
+      <div class="tag">사용자 가이드</div>
+      <h1>DN.GG로<br><em>경기를 기록하세요</em></h1>
+      <p>농구 경기 기록·선수 통계·랭킹을 한 곳에서 관리합니다.</p>
+    </div>
+
+    <!-- 1. 로그인 -->
+    <section class="section" id="login">
+      <div class="section-header">
+        <div class="section-num">1</div>
+        <div class="section-title">로그인 / 회원가입</div>
+        <span class="section-url">/settings</span>
+      </div>
+      <div class="section-body">
+        <p>상단 메뉴의 <span class="ti" data-ti="settings"></span>를 탭합니다. 경기 생성·기록 입력·선수 관리 등 <strong>쓰기 기능은 모두 로그인이 필요</strong>합니다.</p>
+
+        <div class="mobile-pair">
+          <div>
+            <p style="font-size:.8rem; font-weight:700; color:var(--muted); margin-bottom:.5rem;">로그인 전</p>
+            <div class="screenshot-wrap">
+              <img src="screenshots/m-ann-login.png" alt="로그인 화면">
+              <div class="screenshot-caption">① ID &nbsp;|&nbsp; ② 비밀번호 &nbsp;|&nbsp; ③ Login &nbsp;|&nbsp; ④ Sign Up</div>
+            </div>
+          </div>
+          <div>
+            <p style="font-size:.8rem; font-weight:700; color:var(--muted); margin-bottom:.5rem;">로그인 후</p>
+            <div class="screenshot-wrap">
+              <img src="screenshots/m-ann-settings-loggedin.png" alt="로그인 후 settings">
+              <div class="screenshot-caption">로그인 성공 — 로그아웃 버튼만 표시됩니다.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="steps">
+          <div class="step"><div class="step-num">1</div><div class="step-text"><strong>① ID</strong>와 <strong>② 비밀번호</strong>를 입력합니다.</div></div>
+          <div class="step"><div class="step-num">2</div><div class="step-text"><strong>③ Login</strong> 버튼을 탭합니다.</div></div>
+          <div class="step"><div class="step-num">3</div><div class="step-text">계정이 없으면 <strong>④ Sign Up</strong>으로 회원가입 후 로그인합니다.</div></div>
+        </div>
+
+        <div class="tip">
+          <span class="tip-icon">💡</span>
+          로그인하면 상단 메뉴에 <span class="ti" data-ti="teams"></span>와 <span class="ti" data-ti="games"></span> 탭이 새로 나타납니다.
+        </div>
+
+        <div class="table-wrap"><table>
+          <thead><tr><th>탭</th><th>로그인 전</th><th>로그인 후</th></tr></thead>
+          <tbody>
+            <tr><td><span class="ti" data-ti="daily"></span></td><td>✅ 볼 수 있음</td><td>✅ 볼 수 있음</td></tr>
+            <tr><td><span class="ti" data-ti="rankings"></span></td><td>✅ 볼 수 있음</td><td>✅ 볼 수 있음</td></tr>
+            <tr><td><span class="ti" data-ti="settings"></span></td><td>✅ 볼 수 있음</td><td>✅ 볼 수 있음</td></tr>
+            <tr><td><span class="ti" data-ti="teams"></span></td><td>❌ 없음</td><td>✅ <span class="btn-tag green">새로 나타남</span></td></tr>
+            <tr><td><span class="ti" data-ti="games"></span></td><td>❌ 없음</td><td>✅ <span class="btn-tag green">새로 나타남</span></td></tr>
+          </tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <!-- 2. 그룹 선택 -->
+    <section class="section" id="start">
+      <div class="section-header">
+        <div class="section-num">2</div>
+        <div class="section-title">그룹 선택</div>
+      </div>
+      <div class="section-body">
+        <p>앱에 접속하면 <strong>오른쪽 상단 드롭다운에서 내 그룹을 선택</strong>합니다. 그룹을 선택해야 경기 기록, 랭킹 등 모든 데이터가 표시됩니다.</p>
+        <div class="screenshot-wrap">
+          <img src="screenshots/m-ann-home.png" alt="그룹 선택 화면">
+          <div class="screenshot-caption">① 오른쪽 상단 그룹 선택 드롭다운</div>
+        </div>
+        <div class="tip">
+          <span class="tip-icon">💡</span>
+          그룹을 선택하지 않으면 데이터가 표시되지 않습니다. 항상 먼저 선택하세요.
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. 팀·선수 관리 -->
+    <section class="section" id="teams">
+      <div class="section-header">
+        <div class="section-num blue">3</div>
+        <div class="section-title">팀·선수 관리</div>
+        <span class="section-url">/teams</span>
+        <span class="auth-notice">🔒 로그인 필요</span>
+      </div>
+      <div class="section-body">
+        <div class="screenshot-wrap">
+          <img src="screenshots/m-ann-teams.png" alt="팀 관리 페이지">
+          <div class="screenshot-caption">① 선수 추가 &nbsp;|&nbsp; ② 팀 추가 &nbsp;|&nbsp; ③ 팀 구성 초기화</div>
+        </div>
+        <div>
+          <p style="font-weight:700; margin-bottom:.75rem;">선수 추가하기</p>
+          <div class="steps">
+            <div class="step"><div class="step-num">1</div><div class="step-text"><strong>① 선수 추가</strong> 버튼을 탭합니다.</div></div>
+            <div class="step"><div class="step-num">2</div><div class="step-text">이름(필수)과 등번호(선택)를 입력하고 저장합니다.</div></div>
+          </div>
+        </div>
+        <hr>
+        <div>
+          <p style="font-weight:700; margin-bottom:.75rem;">팀 만들기</p>
+          <div class="steps">
+            <div class="step"><div class="step-num">1</div><div class="step-text"><strong>② 팀 추가</strong> 버튼을 탭하고 팀 이름을 입력합니다.</div></div>
+            <div class="step"><div class="step-num">2</div><div class="step-text">선수 목록에서 선수를 탭하면 해당 팀에 배정됩니다.</div></div>
+            <div class="step"><div class="step-num">3</div><div class="step-text">처음부터 다시 구성하려면 <strong>③ 팀 구성 초기화</strong>를 탭합니다.</div></div>
+          </div>
+        </div>
+        <div class="tip">
+          <span class="tip-icon">💡</span>
+          경기를 만들기 전에 팀 구성을 먼저 완료하세요. 팀이 없으면 경기를 생성할 수 없습니다.
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. 경기 만들기 -->
+    <section class="section" id="games">
+      <div class="section-header">
+        <div class="section-num blue">4</div>
+        <div class="section-title">경기 만들기</div>
+        <span class="section-url">/games</span>
+        <span class="auth-notice">🔒 로그인 필요</span>
+      </div>
+      <div class="section-body">
+        <div class="screenshot-wrap">
+          <img src="screenshots/m-ann-games.png" alt="게임 관리 페이지">
+          <div class="screenshot-caption">① 새 게임 생성 &nbsp;|&nbsp; ② 게임 종료 &nbsp;|&nbsp; ③ 삭제</div>
+        </div>
+        <div>
+          <p style="font-weight:700; margin-bottom:.75rem;">새 경기 만들기</p>
+          <div class="steps">
+            <div class="step"><div class="step-num">1</div><div class="step-text"><strong>① 새 게임 생성</strong> 버튼을 탭합니다.</div></div>
+            <div class="step"><div class="step-num">2</div><div class="step-text"><strong>① Home팀</strong>과 <strong>② Away팀</strong>을 각각 선택합니다.</div></div>
+            <div class="step"><div class="step-num">3</div><div class="step-text"><strong>③ 생성</strong>을 누르면 경기가 시작됩니다.</div></div>
+          </div>
+        </div>
+        <div class="screenshot-wrap">
+          <img src="screenshots/m-ann-games-modal.png" alt="새 게임 생성 모달">
+          <div class="screenshot-caption">① Home팀 &nbsp;|&nbsp; ② Away팀 &nbsp;|&nbsp; ③ 생성 &nbsp;|&nbsp; ④ 취소</div>
+        </div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>버튼</th><th>설명</th></tr></thead>
+          <tbody>
+            <tr><td>경기 카드 탭</td><td>실시간 기록 화면으로 이동</td></tr>
+            <tr><td><span class="btn-tag yellow">게임 종료</span></td><td>경기를 완료 처리합니다</td></tr>
+            <tr><td><span class="btn-tag">다시 진행하기</span></td><td>완료된 경기를 다시 진행 중으로 되돌립니다</td></tr>
+            <tr><td><span class="btn-tag red">삭제</span></td><td>경기를 영구 삭제합니다 (확인창 표시)</td></tr>
+          </tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <!-- 5. 실시간 기록 -->
+    <section class="section" id="record">
+      <div class="section-header">
+        <div class="section-num blue">5</div>
+        <div class="section-title">실시간 경기 기록</div>
+        <span class="section-url">/record/[id]</span>
+        <span class="auth-notice">🔒 로그인 필요</span>
+      </div>
+      <div class="section-body">
+        <p>진행 중인 경기 카드를 탭하면 기록 화면으로 이동합니다.</p>
+        <div class="screenshot-wrap">
+          <img src="screenshots/m-ann-record.png" alt="경기 기록 화면">
+          <div class="screenshot-caption">① 뒤로 가기 &nbsp;|&nbsp; ② 팀 위치 바꾸기 &nbsp;|&nbsp; ③ 되돌리기 &nbsp;|&nbsp; ④⑤ 선수 버튼</div>
+        </div>
+        <div>
+          <p style="font-weight:700; margin-bottom:.75rem;">기록 입력 방법</p>
+          <div class="steps">
+            <div class="step"><div class="step-num">1</div><div class="step-text">왼쪽(홈팀) 또는 오른쪽(어웨이팀)에서 <strong>선수 버튼</strong>을 탭합니다.</div></div>
+            <div class="step"><div class="step-num">2</div><div class="step-text">팝업에서 기록 항목을 선택합니다 <small style="color:var(--muted)">(2점, 3점, 어시, 리바운드 등)</small>.</div></div>
+            <div class="step"><div class="step-num">3</div><div class="step-text">중앙 피드에 기록이 추가되고 <strong>점수가 자동 계산</strong>됩니다.</div></div>
+            <div class="step"><div class="step-num">4</div><div class="step-text">잘못 입력했으면 <strong>③ 되돌리기</strong>(아이콘 버튼)로 취소합니다.</div></div>
+          </div>
+        </div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>버튼</th><th>설명</th></tr></thead>
+          <tbody>
+            <tr><td><span class="btn-tag">① 뒤로 가기</span></td><td>경기 목록으로 돌아갑니다</td></tr>
+            <tr><td><span class="btn-tag">② 팀 위치 바꾸기</span></td><td>홈팀·어웨이팀 좌우 위치를 전환합니다</td></tr>
+            <tr><td><span class="btn-tag">③ 되돌리기</span></td><td>직전 기록 1건을 취소합니다</td></tr>
+            <tr><td>선수 버튼 숫자</td><td>해당 선수의 현재 개인 득점입니다</td></tr>
+          </tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <!-- 6. 일일 기록 -->
+    <section class="section" id="daily">
+      <div class="section-header">
+        <div class="section-num">6</div>
+        <div class="section-title">일일 기록</div>
+        <span class="section-url">/daily</span>
+      </div>
+      <div class="section-body">
+        <p>상단 메뉴의 <span class="ti" data-ti="daily"></span>를 탭합니다. 특정 날짜에 진행된 모든 경기의 <strong>선수별 스탯 합계</strong>를 확인합니다.</p>
+        <div class="screenshot-wrap">
+          <img src="screenshots/m-ann-daily.png" alt="일일 기록 페이지">
+          <div class="screenshot-caption">① 날짜 선택 드롭다운 — 날짜를 바꾸면 해당 날짜 데이터로 즉시 갱신됩니다.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 7. 랭킹 -->
+    <section class="section" id="rankings">
+      <div class="section-header">
+        <div class="section-num">7</div>
+        <div class="section-title">랭킹</div>
+        <span class="section-url">/rankings</span>
+      </div>
+      <div class="section-body">
+        <p>상단 메뉴의 <span class="ti" data-ti="rankings"></span>를 탭합니다. 득점·어시·리바 등 카테고리별 <strong>상위 3명</strong>을 확인합니다.</p>
+        <div class="screenshot-wrap">
+          <img src="screenshots/m-ann-rankings.png" alt="랭킹 페이지">
+          <div class="screenshot-caption">① 전체 기록 탭 &nbsp;|&nbsp; ② 게임당 평균 탭</div>
+        </div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>탭</th><th>설명</th></tr></thead>
+          <tbody>
+            <tr><td><span class="btn-tag">① 전체 기록</span></td><td>시즌 누적 합산 순위</td></tr>
+            <tr><td><span class="btn-tag">② 게임당 평균</span></td><td>경기당 평균 순위 (소수점 1자리)</td></tr>
+          </tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <!-- 홈 경기 요약 -->
+    <section class="section" id="home">
+      <div class="section-header">
+        <div class="section-num" style="background:var(--muted)">홈</div>
+        <div class="section-title">홈 — 경기 요약</div>
+        <span class="section-url">/</span>
+      </div>
+      <div class="section-body">
+        <p>그룹을 선택하면 홈 화면에 <strong>지금까지 진행한 경기 목록</strong>이 최신순으로 표시됩니다.</p>
+        <div class="screenshot-wrap">
+          <img src="screenshots/m-01-home.png" alt="홈 화면 경기 목록">
+          <div class="screenshot-caption">각 경기 카드에서 날짜, 팀명, 최종 점수, 선수별 스탯을 확인합니다.</div>
+        </div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>요소</th><th>설명</th></tr></thead>
+          <tbody>
+            <tr><td>경기 카드</td><td>날짜, 팀명, 최종 점수(승·패·무) 표시</td></tr>
+            <tr><td>선수 이름 탭</td><td>해당 선수의 전체 기록 페이지로 이동</td></tr>
+            <tr><td><span class="btn-tag yellow">(진행중)</span></td><td>아직 종료되지 않은 경기에 표시됨</td></tr>
+          </tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <!-- 선수 기록 -->
+    <section class="section" id="player">
+      <div class="section-header">
+        <div class="section-num" style="background:var(--muted)">+</div>
+        <div class="section-title">선수 기록 조회</div>
+        <span class="section-url">/player/[id]</span>
+      </div>
+      <div class="section-body">
+        <p>홈 화면에서 <strong>선수 이름을 탭</strong>하면 해당 선수의 전체 기록 페이지로 이동합니다.</p>
+        <div class="screenshot-wrap">
+          <img src="screenshots/m-player-detail.png" alt="선수 상세 페이지">
+          <div class="screenshot-caption">전체 기록·게임당 평균·경기별 스탯을 한눈에 확인합니다.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CHECKLIST -->
+    <section class="section" id="checklist">
+      <div class="section-header">
+        <div class="section-num" style="background:var(--navy); font-size:.85rem;">✓</div>
+        <div class="section-title">빠른 시작 체크리스트</div>
+      </div>
+      <div class="section-body">
+        <div class="checklist">
+          <h3>처음 사용하는 경우 이 순서대로 따라하세요</h3>
+          <div class="check-items" id="cl">
+            <div class="check-item" onclick="toggle(0)"><div class="check-box" id="cb0"></div><span><span class="ti" data-ti="settings"></span>에서 로그인 (또는 회원가입)</span></div>
+            <div class="check-item" onclick="toggle(1)"><div class="check-box" id="cb1"></div><span>오른쪽 상단에서 <strong>그룹 선택</strong></span></div>
+            <div class="check-item" onclick="toggle(2)"><div class="check-box" id="cb2"></div><span><span class="ti" data-ti="teams"></span>에서 선수 추가 &amp; 팀 구성</span></div>
+            <div class="check-item" onclick="toggle(3)"><div class="check-box" id="cb3"></div><span><span class="ti" data-ti="games"></span>에서 새 게임 생성</span></div>
+            <div class="check-item" onclick="toggle(4)"><div class="check-box" id="cb4"></div><span>경기 카드 탭 → <strong>실시간 기록 입력</strong></span></div>
+            <div class="check-item" onclick="toggle(5)"><div class="check-box" id="cb5"></div><span>경기 종료 후 <span class="ti" data-ti="rankings"></span>·<span class="ti" data-ti="daily"></span>에서 통계 확인</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+  function toggle(i) {
+    const box  = document.getElementById('cb' + i);
+    const item = box.closest('.check-item');
+    const on   = box.classList.toggle('checked');
+    item.classList.toggle('done', on);
+  }
+
+  // tab icon 주입
+  document.querySelectorAll('.ti[data-ti]').forEach(el => {
+    const tmpl = document.getElementById('ti-' + el.dataset.ti);
+    if (tmpl) el.innerHTML = tmpl.innerHTML;
+  });
+
+  // 스크롤 시 사이드바 활성화
+  const sections = document.querySelectorAll('section[id]');
+  const links    = document.querySelectorAll('.sidebar a');
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const a = document.querySelector('.sidebar a[href="#' + e.target.id + '"]');
+        if (a) a.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-30% 0px -60% 0px' });
+  sections.forEach(s => obs.observe(s));
+</script>
+
+</body>
+</html>
