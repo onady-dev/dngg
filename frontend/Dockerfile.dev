@@ -1,0 +1,16 @@
+FROM node:18-alpine
+
+WORKDIR /app
+
+COPY package*.json ./
+
+RUN npm install
+
+# Enable polling for file watching
+ENV CHOKIDAR_USEPOLLING=true
+ENV WATCHPACK_POLLING=true
+
+# 소스 코드는 볼륨으로 마운트할 것이므로 COPY 불필요
+# COPY . .
+
+CMD ["npm", "run", "dev"]

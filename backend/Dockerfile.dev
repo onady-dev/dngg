@@ -1,0 +1,12 @@
+FROM node:18-alpine
+
+WORKDIR /app
+
+COPY package*.json ./
+
+RUN npm install
+
+# 소스 코드는 볼륨으로 마운트할 것이므로 COPY 불필요
+# COPY . .
+
+CMD ["npm", "run", "dev"]

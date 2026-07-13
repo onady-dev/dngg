@@ -1,0 +1,30 @@
+{
+  "name": "dn.gg-next",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3011",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.17.19",
+    "axios": "^1.6.7",
+    "next": "14.1.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-icons": "^5.5.0",
+    "styled-components": "^6.1.17",
+    "zustand": "^4.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.16",
+    "@types/react": "^18.2.52",
+    "@types/react-dom": "^18.2.18",
+    "@types/styled-components": "^5.1.34",
+    "eslint": "^8.56.0",
+    "eslint-config-next": "14.1.0",
+    "typescript": "^5.3.3"
+  }
+}

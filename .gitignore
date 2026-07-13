@@ -1,12 +1,10 @@
-# Subprojects (managed by separate git repos)
-backend/
-frontend/
-
 # Database
 pg-data/
 
 # Environment variables (contains secrets)
 .env
+.env.*
+!.env.example
 
 # AWS CLI
 aws/
