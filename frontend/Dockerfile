@@ -16,6 +16,11 @@ RUN pnpm install --frozen-lockfile
 # 소스 코드 복사
 COPY . .
 
+# NEXT_PUBLIC_* 값은 빌드 시점에 번들에 박히므로 build-arg로 주입받는다.
+# (CI에는 .env.production이 없으므로 이 값이 유일한 소스다)
+ARG NEXT_PUBLIC_API_URL=https://dngg.one/api
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
 # 빌드
 RUN pnpm run build
 

@@ -28,4 +28,4 @@ RUN pnpm install --frozen-lockfile --prod
 CMD ["node", "dist/main.js"]
 
 # 포트 노출
-EXPOSE 4000
+EXPOSE 3010
