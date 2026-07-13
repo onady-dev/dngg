@@ -7,7 +7,7 @@ export const HeaderContainer = styled.header`
   top: 0;
   left: 0;
   right: 0;
-  height: 60px;
+  height: var(--header-height);
   background: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid rgba(0, 0, 0, 0.1);
@@ -22,15 +22,25 @@ export const HeaderInner = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
+
+  /* 모바일: 1행(로고 + 그룹 선택) / 2행(네비게이션) 두 줄 배치 */
+  @media (max-width: 768px) {
+    flex-wrap: wrap;
+    align-content: center;
+    row-gap: 6px;
+    padding: 0 12px;
+  }
 `;
 
 export const LogoNavContainer = styled.div`
   display: flex;
   align-items: center;
   gap: 48px;
-  
+
+  /* 모바일: 로고와 네비게이션을 HeaderInner의 직접 자식처럼 풀어서
+     로고는 1행, 네비게이션은 2행으로 내린다 */
   @media (max-width: 768px) {
-    gap: 0;
+    display: contents;
   }
 `;
 
@@ -77,7 +87,10 @@ export const Navigation = styled.nav`
   }
 
   @media (max-width: 768px) {
-    gap: 6px;
+    order: 3;
+    width: 100%;
+    justify-content: space-between;
+    gap: 0;
 
     a {
       flex-direction: column;
@@ -98,9 +111,12 @@ export const GroupContainer = styled.div`
   display: flex;
   align-items: center;
   gap: 16px;
-  
+
   @media (max-width: 768px) {
+    order: 2;
+    margin-left: auto;
     gap: 8px;
+    min-width: 0;
   }
 `;
 
@@ -112,75 +128,13 @@ export const GroupSelect = styled.select`
   font-size: 14px;
   min-width: 140px;
   cursor: pointer;
-  
+
   @media (max-width: 768px) {
-    margin-left: 6px;
-    min-width: 84px;
-    max-width: 110px;
-    padding: 4px 6px;
+    min-width: 0;
+    max-width: 190px;
+    padding: 5px 8px;
     font-size: 13px;
     text-overflow: ellipsis;
-  }
-`;
-
-export const CreateGroupButton = styled.button`
-  padding: 8px 16px;
-  border-radius: 8px;
-  background-color: #007AFF;
-  color: white;
-  border: none;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 500;
-  
-  svg {
-    width: 18px;
-    height: 18px;
-  }
-  
-  &:hover {
-    background-color: #0056b3;
-    transform: translateY(-1px);
-  }
-  
-  &:active {
-    transform: translateY(0);
-  }
-  
-  @media (max-width: 768px) {
-    padding: 0;
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    font-size: 0;
-    justify-content: center;
-    align-items: center;
-    box-shadow: 0 2px 8px rgba(0, 122, 255, 0.25);
-    position: relative;
-    
-    svg {
-      width: 20px;
-      height: 20px;
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      transform: translate(-50%, -50%);
-    }
-    
-    &:hover {
-      background-color: #0056b3;
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
-    }
-    
-    &:active {
-      transform: translateY(0);
-      box-shadow: 0 2px 6px rgba(0, 122, 255, 0.2);
-    }
   }
 `;
 

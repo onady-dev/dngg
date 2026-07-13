@@ -21,7 +21,7 @@ const spin = keyframes`
 
 export const Container = styled.div`
   max-width: 1200px;
-  margin: 4rem auto 0;
+  margin: calc(var(--header-height) + 4px) auto 0;
   padding: 1rem;
 
   @media (min-width: 768px) {
@@ -140,6 +140,7 @@ export const LoadingContainer = styled.div`
   justify-content: center;
   align-items: center;
   min-height: 200px;
+  margin-top: var(--header-height);
 `;
 
 export const LoadingSpinner = styled.div`
@@ -163,6 +164,7 @@ export const LoadingSpinner = styled.div`
 export const ErrorContainer = styled.div`
   text-align: center;
   padding: 2rem;
+  margin-top: var(--header-height);
   color: #dc2626;
 `;
 
@@ -411,7 +413,8 @@ export const BadgeCount = styled.span`
 `;
 
 export const NoGroupContainer = styled.div`
-  min-height: calc(100vh - 4rem);
+  min-height: calc(100vh - var(--header-height));
+  margin-top: var(--header-height);
   display: flex;
   align-items: center;
   justify-content: center;

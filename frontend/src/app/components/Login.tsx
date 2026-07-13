@@ -7,7 +7,7 @@ import api from "@/lib/axios";
 import { useToast } from "./ui/Toast";
 
 export const AuthContainer = styled.div`
-  min-height: calc(100vh - 60px);
+  min-height: calc(100vh - var(--header-height));
   display: flex;
   justify-content: center;
   align-items: center;

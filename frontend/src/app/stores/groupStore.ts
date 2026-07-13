@@ -14,7 +14,6 @@ interface GroupState {
   setSelectedGroup: (groupId: number | null) => void;
   setGroups: (groups: Group[]) => void;
   loadGroups: () => Promise<void>;
-  createGroup: (name: string) => Promise<void>;
   deleteGroup: (groupId: number) => Promise<void>;
 }
 
@@ -48,27 +47,6 @@ export const useGroupStore = create<GroupState>((set) => ({
       set({ groups });
     } catch (error) {
       console.error("그룹 목록을 불러오는데 실패했습니다:", error);
-    }
-  },
-  createGroup: async (name: string) => {
-    try {
-      const user = useAuthStore.getState().user;
-      const response = await api.post("/group", { name }, {
-        headers: {
-          Authorization: `Bearer ${user?.accessToken}`,
-        },
-      });
-      const newGroup = response.data;
-      set((state) => ({
-        groups: [...state.groups, newGroup],
-        selectedGroup: newGroup.id
-      }));
-      if (typeof window !== "undefined") {
-        localStorage.setItem(STORAGE_KEY, String(newGroup.id));
-      }
-    } catch (error) {
-      console.error("그룹 생성에 실패했습니다:", error);
-      throw error;
     }
   },
   deleteGroup: async (groupId: number) => {

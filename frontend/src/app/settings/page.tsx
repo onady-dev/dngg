@@ -12,7 +12,7 @@ import { useMounted } from "@/app/lib/useMounted";
 
 const AccountContainer = styled.div`
   max-width: 480px;
-  margin: 5.5rem auto 0;
+  margin: calc(var(--header-height) + 28px) auto 0;
   padding: 0 1rem;
 `;
 

@@ -5,12 +5,12 @@ import styled from "styled-components";
 export const Container = styled.div`
   max-width: 1200px;
   margin: 0 auto;
-  padding: 5rem 1rem 2rem;
+  padding: calc(var(--header-height) + 20px) 1rem 2rem;
   min-height: 100vh;
   background-color: #f8fafc;
 
   @media (max-width: 640px) {
-    padding: 4rem 0.5rem 1rem;
+    padding: calc(var(--header-height) + 4px) 0.5rem 1rem;
   }
 `;
 

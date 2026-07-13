@@ -1,20 +1,18 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import Link from "next/link";
 import { useGroupStore } from "../stores/groupStore";
 import * as S from "../styles/HeaderStyles";
 import { useAuthStore } from "@/app/stores/useAuthStore";
 import { useRouter } from "next/navigation";
 import { useToast } from "./ui/Toast";
-import CreateGroupModal from "./CreateGroupModal";
 
 export default function Header() {
   const router = useRouter();
   const { user } = useAuthStore((state) => state);
   const { selectedGroup, setSelectedGroup, groups, loadGroups } = useGroupStore();
   const { showToast } = useToast();
-  const [isCreateGroupModalOpen, setIsCreateGroupModalOpen] = useState(false);
 
   const canManage = !!user && user.groupId === selectedGroup;
 
@@ -119,17 +117,8 @@ export default function Header() {
           ) : (
             <S.EmptyStateText>등록된 그룹이 없습니다</S.EmptyStateText>
           )}
-          {user && (
-            <S.CreateGroupButton onClick={() => setIsCreateGroupModalOpen(true)} aria-label="그룹 생성">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-              </svg>
-              그룹 생성
-            </S.CreateGroupButton>
-          )}
         </S.GroupContainer>
       </S.HeaderInner>
-      <CreateGroupModal isOpen={isCreateGroupModalOpen} onClose={() => setIsCreateGroupModalOpen(false)} />
     </S.HeaderContainer>
   );
 }

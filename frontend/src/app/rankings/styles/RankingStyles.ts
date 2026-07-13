@@ -4,9 +4,9 @@ import styled from "styled-components";
 
 export const Container = styled.div`
   max-width: 1200px;
-  margin: 4rem auto 0;
+  margin: calc(var(--header-height) + 4px) auto 0;
   padding: 1rem;
-  min-height: calc(100vh - 4rem);
+  min-height: calc(100vh - var(--header-height) - 4px);
   background-color: #f8fafc;
 
   @media (min-width: 768px) {

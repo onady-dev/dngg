@@ -217,7 +217,7 @@ const Container = styled.div`
   max-width: 1200px;
   margin: 0 auto;
   padding: 1.5rem;
-  margin-top: 4rem;
+  margin-top: calc(var(--header-height) + 4px);
 `;
 
 const Header = styled.div`

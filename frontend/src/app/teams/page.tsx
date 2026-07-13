@@ -654,7 +654,7 @@ export default TeamsPage;
 
 const Container = styled.div<{ $hasSelection?: boolean }>`
   padding: 1rem;
-  margin-top: 4rem;
+  margin-top: calc(var(--header-height) + 4px);
   /* 하단 고정 배정 바에 콘텐츠가 가리지 않도록 여백 확보 */
   padding-bottom: ${(props) => (props.$hasSelection ? "6rem" : "1rem")};
 

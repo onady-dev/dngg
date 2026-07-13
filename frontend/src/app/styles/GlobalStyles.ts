@@ -9,6 +9,14 @@ const GlobalStyles = createGlobalStyle`
     --text-color: #333333;
     --border-color: #E5E5E5;
     --hover-color: #0056b3;
+    --header-height: 60px;
+  }
+
+  /* 모바일: 헤더가 두 줄(로고+그룹 선택 / 네비게이션)로 표시됨 */
+  @media (max-width: 768px) {
+    :root {
+      --header-height: 98px;
+    }
   }
 
   * {

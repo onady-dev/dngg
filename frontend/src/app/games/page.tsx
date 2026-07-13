@@ -19,7 +19,7 @@ const FINISHED_PAGE_SIZE = 10;
 
 const Container = styled.div`
   padding: 1rem;
-  margin-top: 4rem;
+  margin-top: calc(var(--header-height) + 4px);
 
   @media (min-width: 768px) {
     padding: 1.5rem;
