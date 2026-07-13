@@ -36,7 +36,8 @@
   - `expired`: 유예 기간 내 결제 실패로 만료됨
 - `currentPeriodStart` / `currentPeriodEnd`: timestamp
 - `cancelAtPeriodEnd`: boolean (해지 예약)
-- `billingKey`, `customerKey`: 토스 발급값 — **어떤 API 응답에도 포함 금지**
+- `billingKey`: 토스 발급값 — **어떤 API 응답에도 포함 금지**
+- `customerKey`: 무작위 UUID (토스 권고: 예측 가능한 값 금지). Group에 저장해 재사용하며, 프론트 SDK 호출에 필요하므로 status 응답에는 포함한다
 
 ### Payment (결제 이력)
 
@@ -62,7 +63,7 @@ Frontend: `NEXT_PUBLIC_TOSS_CLIENT_KEY` (빌드 시점에 박히므로 배포 �
 
 ## 결제 플로우 (신규 `subscription` 모듈)
 
-1. **카드 등록**: `/subscription` 페이지에서 토스 SDK `requestBillingAuth()` 호출 (`customerKey = group-{groupId}`) → 성공 리다이렉트로 `authKey` 수신 → `POST /subscription/billing-key` → 백엔드가 토스 `/v1/billing/authorizations/issue`로 빌링키 발급·저장
+1. **카드 등록**: `/subscription` 페이지에서 토스 SDK `requestBillingAuth()` 호출 (`customerKey`는 서버가 생성해 Group에 저장한 무작위 UUID) → 성공 리다이렉트로 `authKey` 수신 → `POST /subscription/billing-key` → 백엔드가 토스 `/v1/billing/authorizations/issue`로 빌링키 발급·저장
 2. **첫 결제**: 빌링키 발급 직후 즉시 결제 → 성공 시 `active`, 기간 설정 (월 +1개월 / 연 +1년). 금액은 항상 서버 설정값 — 클라이언트는 주기(`billingCycle`)만 전달하고 금액은 전달할 수 없다
 3. **자동 갱신**: `@nestjs/schedule` 크론(매일 새벽 1회)이 `currentPeriodEnd`가 지난 `active` 구독과 유예 중인 `past_due` 구독을 빌링키로 결제
    - 성공: 기간 연장 (`currentPeriodEnd` 기준으로 +1주기)
@@ -102,7 +103,7 @@ Frontend: `NEXT_PUBLIC_TOSS_CLIENT_KEY` (빌드 시점에 박히므로 배포 �
 
 ## 에러 처리 & 보안
 
-- `TOSS_SECRET_KEY`는 backend `.env`에만 존재. `billingKey`/`customerKey`는 API 응답에서 제외
+- `TOSS_SECRET_KEY`는 backend `.env`에만 존재. `billingKey`는 API 응답에서 제외 (`customerKey`는 SDK 호출용으로 status 응답에만 포함)
 - 모든 구독 API는 JWT 가드, groupId는 토큰 값만 신뢰 (기존 `assertSameGroup` 패턴)
 - 결제 금액은 서버 설정값만 사용 — 클라이언트가 금액을 조작할 수 없음
 - `orderId` unique 제약으로 중복 결제 방지, 크론은 기간 체크로 멱등
