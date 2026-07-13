@@ -1,4 +1,19 @@
 {
+  "scripts": {
+    "dev": "pm2 start ecosystem.config.cjs",
+    "dev:stop": "pm2 delete ecosystem.config.cjs",
+    "db:up": "docker compose up -d db",
+    "deploy:build": "docker compose build frontend backend",
+    "deploy:push": "docker compose push frontend backend",
+    "deploy": "npm run deploy:build && npm run deploy:push",
+    "deploy:pull": "docker compose pull frontend backend",
+    "deploy:up": "docker compose up -d",
+    "deploy:update": "npm run deploy:pull && npm run deploy:up",
+    "deploy:down": "docker compose down",
+    "deploy:logs": "docker compose logs -f",
+    "server:start": "sh start-dngg.sh",
+    "server:stop": "sh stop-dngg.sh"
+  },
   "dependencies": {
     "@nestjs/jwt": "^11.0.0",
     "@nestjs/passport": "^11.0.5",
