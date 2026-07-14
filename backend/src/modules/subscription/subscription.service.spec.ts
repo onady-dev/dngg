@@ -125,3 +125,56 @@ describe('SubscriptionService.subscribe', () => {
     );
   });
 });
+
+describe('SubscriptionService.cancel/resume', () => {
+  const { NotFoundException } = require('@nestjs/common');
+
+  const makeWithActive = (cancelAtPeriodEnd: boolean) => {
+    const sub = { id: 5, cancelAtPeriodEnd };
+    const subRepo = {
+      count: jest.fn(),
+      findOne: jest.fn().mockResolvedValue(sub),
+      update: jest.fn(async () => ({ affected: 1 })),
+    };
+    const service = new SubscriptionService(
+      subRepo as any,
+      { save: jest.fn() } as any,
+      { findOne: jest.fn(), update: jest.fn() } as any,
+      {} as any,
+      {} as any,
+    );
+    return { service, subRepo, sub };
+  };
+
+  test('cancel은 활성 구독의 cancelAtPeriodEnd를 true로 만든다', async () => {
+    const { service, subRepo } = makeWithActive(false);
+    const result = await service.cancel(1);
+    expect(subRepo.update).toHaveBeenCalledWith(5, {
+      cancelAtPeriodEnd: true,
+    });
+    expect(result.cancelAtPeriodEnd).toBe(true);
+  });
+
+  test('활성 구독이 없으면 cancel은 NotFoundException', async () => {
+    const subRepo = {
+      findOne: jest.fn().mockResolvedValue(null),
+    };
+    const service = new SubscriptionService(
+      subRepo as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
+    await expect(service.cancel(1)).rejects.toThrow(NotFoundException);
+  });
+
+  test('resume은 cancelAtPeriodEnd를 false로 되돌린다', async () => {
+    const { service, subRepo } = makeWithActive(true);
+    const result = await service.resume(1);
+    expect(subRepo.update).toHaveBeenCalledWith(5, {
+      cancelAtPeriodEnd: false,
+    });
+    expect(result.cancelAtPeriodEnd).toBe(false);
+  });
+});

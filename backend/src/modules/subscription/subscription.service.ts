@@ -3,6 +3,7 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
@@ -192,6 +193,39 @@ export class SubscriptionService {
     }
 
     return { status: 'active', currentPeriodEnd };
+  }
+
+  async cancel(groupId: number): Promise<{ cancelAtPeriodEnd: true }> {
+    const active = await this.findActiveSubscription(groupId);
+    if (!active) {
+      throw new NotFoundException('해지할 구독이 없습니다.');
+    }
+    await this.subRepo.update(active.id, { cancelAtPeriodEnd: true });
+    return { cancelAtPeriodEnd: true };
+  }
+
+  async resume(groupId: number): Promise<{ cancelAtPeriodEnd: false }> {
+    const active = await this.findActiveSubscription(groupId);
+    if (!active) {
+      throw new NotFoundException('재활성화할 구독이 없습니다.');
+    }
+    await this.subRepo.update(active.id, { cancelAtPeriodEnd: false });
+    return { cancelAtPeriodEnd: false };
+  }
+
+  async getPayments(
+    groupId: number,
+    page = 1,
+  ): Promise<{ items: Payment[]; page: number; hasMore: boolean }> {
+    const limit = 20;
+    const items = await this.payRepo.find({
+      where: { group: { id: groupId } },
+      order: { id: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit + 1,
+    });
+    const hasMore = items.length > limit;
+    return { items: hasMore ? items.slice(0, limit) : items, page, hasMore };
   }
 }
 
