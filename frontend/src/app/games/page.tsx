@@ -1,7 +1,5 @@
 "use client";
 
-export const dynamic = "force-dynamic";
-
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import styled from "styled-components";
 import Link from "next/link";
@@ -462,7 +460,7 @@ const GamesPage = () => {
   }>({
     queryKey: ["subscription", "status"],
     queryFn: async () => (await api.get("/subscription/status")).data,
-    enabled: mounted,
+    enabled: mounted && !!user,
   });
 
   const finishedPageRef = useRef(0);
