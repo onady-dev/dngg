@@ -178,3 +178,33 @@ describe('SubscriptionService.cancel/resume', () => {
     expect(result.cancelAtPeriodEnd).toBe(false);
   });
 });
+
+describe('SubscriptionService.cancelForGroup', () => {
+  test('groupId FK로 유효 구독을 canceled 처리하는 쿼리를 실행한다', async () => {
+    const execute = jest.fn().mockResolvedValue({ affected: 1 });
+    const where = jest.fn().mockReturnValue({ execute });
+    const set = jest.fn().mockReturnValue({ where });
+    const update = jest.fn().mockReturnValue({ set });
+    const subRepo = {
+      createQueryBuilder: jest.fn().mockReturnValue({ update }),
+    };
+    const service = new SubscriptionService(
+      subRepo as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
+    await service.cancelForGroup(1);
+    expect(set).toHaveBeenCalledWith({
+      status: 'canceled',
+      cancelAtPeriodEnd: true,
+    });
+    // 중첩 relation이 아닌 FK 컬럼 조건이어야 한다.
+    expect(where).toHaveBeenCalledWith(
+      expect.stringContaining('"groupId" = :groupId'),
+      expect.objectContaining({ groupId: 1 }),
+    );
+    expect(execute).toHaveBeenCalled();
+  });
+});

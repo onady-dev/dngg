@@ -8,6 +8,7 @@ import { GroupController } from "./group.controller";
 import { GroupService } from "./group.service";
 import { Logitem } from "src/entities/Logitem.entity";
 import { GroupRepository } from "src/repository/group.repository";
+import { SubscriptionModule } from "../subscription/subscription.module";
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { GroupRepository } from "src/repository/group.repository";
         Player,
         Group,
     ]),
+    SubscriptionModule,
   ],
   controllers: [GroupController],
   providers: [GroupService, GroupRepository],

@@ -216,6 +216,22 @@ export class SubscriptionService {
     return { cancelAtPeriodEnd: false };
   }
 
+  // 그룹 삭제 시 호출 — 유효 구독을 즉시 종료하고 자동결제를 중단한다.
+  // 주의: repository.update()의 중첩 relation where({ group: { id } })는
+  // TypeORM에서 신뢰할 수 없어(조용히 no-op 되면 삭제된 그룹에 크론이 계속
+  // 청구) QueryBuilder로 FK 컬럼(groupId)을 직접 지정한다.
+  async cancelForGroup(groupId: number): Promise<void> {
+    await this.subRepo
+      .createQueryBuilder()
+      .update(Subscription)
+      .set({ status: 'canceled', cancelAtPeriodEnd: true })
+      .where('"groupId" = :groupId AND status IN (:...statuses)', {
+        groupId,
+        statuses: ACTIVE_STATUSES,
+      })
+      .execute();
+  }
+
   async getPayments(
     groupId: number,
     page = 1,
