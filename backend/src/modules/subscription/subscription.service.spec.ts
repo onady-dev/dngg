@@ -124,6 +124,30 @@ describe('SubscriptionService.subscribe', () => {
       expect.objectContaining({ status: 'success', failReason: expect.any(String) }),
     );
   });
+
+  test('유니크 위반이 아닌 persist 오류는 성공 Payment를 보정 기록하고 원본 오류를 그대로 던진다', async () => {
+    const dbError = new Error('connection terminated unexpectedly');
+    const dataSource = {
+      transaction: jest.fn().mockRejectedValue(dbError),
+    } as any;
+    const { service, payRepo } = makeService({ dataSource });
+
+    await expect(
+      service.subscribe(GROUP_ID, USER_ID, {
+        authKey: 'a',
+        billingCycle: 'monthly',
+      }),
+    ).rejects.toBe(dbError);
+
+    // 결제는 이미 성공했으므로 반영 실패로 유실되지 않도록 성공 Payment가
+    // 보정 기록되어야 한다(확인 필요 메모 포함).
+    expect(payRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'success',
+        failReason: expect.stringContaining('확인 필요'),
+      }),
+    );
+  });
 });
 
 describe('SubscriptionService.cancel/resume', () => {

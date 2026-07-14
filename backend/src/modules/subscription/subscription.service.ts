@@ -192,6 +192,31 @@ export class SubscriptionService {
           '이미 진행 중인 구독이 있습니다. 중복 결제는 확인 후 환불됩니다.',
         );
       }
+      // 유니크 위반이 아닌 다른 persist 오류 — 원인이 무엇이든 토스 결제는
+      // 이미 성공했으므로 반영 실패로 기록이 유실되면 안 된다. best-effort로
+      // 성공 Payment를 남겨 나중에 확인/조치할 수 있게 하고, 원본 오류는
+      // 그대로 rethrow한다(보정 기록 실패가 원본 오류를 가려서는 안 된다).
+      try {
+        await this.payRepo.save(
+          this.payRepo.create({
+            group: { id: groupId } as Group,
+            user: { id: userId } as any,
+            amount,
+            orderId,
+            externalPaymentId: payment.paymentKey,
+            status: 'success',
+            paidAt: now,
+            failReason: '결제 성공했으나 구독 반영 실패 — 확인 필요',
+          }),
+        );
+      } catch (compensationError) {
+        this.logger.error(
+          `그룹 ${groupId} 구독 신청: 결제 성공(orderId=${orderId}) 후 보정 Payment 기록에도 실패했습니다.`,
+          compensationError instanceof Error
+            ? compensationError.stack
+            : String(compensationError),
+        );
+      }
       throw error;
     }
 

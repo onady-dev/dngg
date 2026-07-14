@@ -46,4 +46,32 @@ describe('TossBillingClient', () => {
       }),
     ).rejects.toThrow('카드 한도 초과');
   });
+
+  test('requestBillingPayment는 orderId를 Idempotency-Key 헤더로 보낸다 (재시도 시 토스가 원래 성공 응답을 반환하도록)', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        paymentKey: 'pk_1',
+        orderId: 'ord_1',
+        approvedAt: '2026-07-14T00:00:00Z',
+      }),
+    }) as any;
+
+    const client = new TossBillingClient();
+    await client.requestBillingPayment({
+      billingKey: 'bk_1',
+      customerKey: 'cust_1',
+      amount: 9900,
+      orderId: 'ord_1',
+      orderName: '월 구독',
+    });
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      'https://api.tosspayments.com/v1/billing/bk_1',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({ 'Idempotency-Key': 'ord_1' }),
+      }),
+    );
+  });
 });
