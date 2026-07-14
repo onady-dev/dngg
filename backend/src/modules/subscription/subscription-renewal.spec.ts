@@ -1,5 +1,7 @@
 import { SubscriptionService } from './subscription.service';
 import { addBillingPeriod } from './subscription.util';
+import { Payment } from 'src/entities/Payment.entity';
+import { Subscription } from 'src/entities/Subscription.entity';
 
 const NOW = new Date('2026-07-14T00:00:00Z');
 
@@ -12,7 +14,13 @@ const makeService = (
     find: jest.fn().mockResolvedValue([sub]),
     update: jest.fn(async () => ({ affected: 1 })),
   };
-  const payRepo = { save: jest.fn(async (o: any) => o), create: (o: any) => o };
+  const payRepo = {
+    save: jest.fn(async (o: any) => o),
+    create: (o: any) => o,
+    // 기본은 insert 경로(기존 행 없음) — 특정 테스트에서 override한다.
+    findOne: jest.fn().mockResolvedValue(null),
+    update: jest.fn(async () => ({ affected: 1 })),
+  };
   const groupRepo = {};
   const toss = {
     requestBillingPayment: jest.fn().mockResolvedValue({
@@ -24,6 +32,8 @@ const makeService = (
   };
   // 성공 갱신은 dataSource.transaction 안에서 manager.update/save로 처리한다.
   const manager = {
+    // 기본은 insert 경로(기존 행 없음) — 특정 테스트에서 override한다.
+    findOne: jest.fn().mockResolvedValue(null),
     update: jest.fn(async () => ({ affected: 1 })),
     save: jest.fn(async (_e: any, o: any) => o),
   };
@@ -132,6 +142,96 @@ describe('SubscriptionService.renewDueSubscriptions', () => {
     expect(subRepo.update).toHaveBeenCalledWith(
       1,
       expect.objectContaining({ status: 'expired' }),
+    );
+  });
+
+  test('거절 후 재결제 성공 시 기존 실패 Payment 행을 success로 갱신한다 (충돌 없음)', async () => {
+    // 이전 크론에서 같은 orderId로 실패 Payment 행(id=42)이 이미 존재하는 상황을
+    // manager.findOne이 반환하도록 세팅 — success 경로가 insert가 아니라
+    // update를 호출해야 orderId 유니크 제약과 충돌하지 않는다.
+    const { service, manager } = makeService({ ...baseSub });
+    manager.findOne.mockResolvedValue({ id: 42, status: 'failed' });
+
+    await service.renewDueSubscriptions(NOW);
+
+    expect(manager.update).toHaveBeenCalledWith(
+      Payment,
+      42,
+      expect.objectContaining({ status: 'success' }),
+    );
+    expect(manager.save).not.toHaveBeenCalled();
+    expect(manager.update).toHaveBeenCalledWith(
+      Subscription,
+      1,
+      expect.objectContaining({ status: 'active' }),
+    );
+  });
+
+  test('여러 구독 처리 중 하나가 실패해도 나머지 구독은 격리되어 계속 처리된다', async () => {
+    // sub1은 해지 예약 상태 — canceled 전환 update가 예상치 못하게 실패한다
+    // (예: DB 순간 장애). per-sub try/catch로 격리되어 sub2는 정상 처리되어야 한다.
+    const sub1 = {
+      ...baseSub,
+      id: 1,
+      group: { id: 1, customerKey: 'cust_1' },
+      cancelAtPeriodEnd: true,
+    };
+    const sub2 = {
+      ...baseSub,
+      id: 2,
+      group: { id: 2, customerKey: 'cust_2' },
+      cancelAtPeriodEnd: false,
+    };
+    const subRepo = {
+      find: jest.fn().mockResolvedValue([sub1, sub2]),
+      // sub1의 canceled 상태 업데이트에서 예상치 못한 오류 발생 — 예: DB 순간 장애
+      update: jest
+        .fn()
+        .mockRejectedValueOnce(new Error('unexpected db error for sub1'))
+        .mockResolvedValue({ affected: 1 }),
+    };
+    const payRepo = {
+      save: jest.fn(async (o: any) => o),
+      create: (o: any) => o,
+      findOne: jest.fn().mockResolvedValue(null),
+      update: jest.fn(async () => ({ affected: 1 })),
+    };
+    const groupRepo = {};
+    const toss = {
+      requestBillingPayment: jest.fn().mockResolvedValue({
+        paymentKey: 'pk',
+        orderId: 'ord',
+        approvedAt: NOW.toISOString(),
+      }),
+    };
+    const manager = {
+      findOne: jest.fn().mockResolvedValue(null),
+      update: jest.fn(async () => ({ affected: 1 })),
+      save: jest.fn(async (_e: any, o: any) => o),
+    };
+    const dataSource = {
+      transaction: jest.fn(async (cb: any) => cb(manager)),
+    };
+    const service = new SubscriptionService(
+      subRepo as any,
+      payRepo as any,
+      groupRepo as any,
+      toss as any,
+      dataSource as any,
+    );
+
+    await service.renewDueSubscriptions(NOW);
+
+    // sub1은 canceled 전환 subRepo.update 호출에서 예외가 나지만(toss 호출 전 단계),
+    // per-sub try/catch로 격리되어 sub2는 정상적으로 계속 처리되어야 한다.
+    expect(toss.requestBillingPayment).toHaveBeenCalledTimes(1);
+    expect(toss.requestBillingPayment).toHaveBeenCalledWith(
+      expect.objectContaining({ customerKey: 'cust_2' }),
+    );
+    expect(manager.update).toHaveBeenCalledWith(
+      Subscription,
+      2,
+      expect.objectContaining({ status: 'active' }),
     );
   });
 });

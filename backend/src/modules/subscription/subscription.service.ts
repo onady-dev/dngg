@@ -272,16 +272,31 @@ export class SubscriptionService {
           const graceEnd = computeGraceEnd(sub.currentPeriodEnd);
           const nextStatus = now > graceEnd ? 'expired' : 'past_due';
           await this.subRepo.update(sub.id, { status: nextStatus });
-          await this.payRepo.save(
-            this.payRepo.create({
-              subscription: { id: sub.id } as Subscription,
-              group: { id: sub.group.id } as Group,
-              amount,
-              orderId,
+          // orderId는 (구독, 주기)당 결정적 — 이전 실패 기록이 있으면 갱신,
+          // 없으면 새로 생성한다. 이렇게 해야 나중에 결제가 성공했을 때
+          // 같은 orderId로 success 전환이 가능하다(유니크 제약 충돌 방지).
+          const failReason =
+            error instanceof Error ? error.message : '갱신 실패';
+          const existingFailed = await this.payRepo.findOne({
+            where: { orderId },
+          });
+          if (existingFailed) {
+            await this.payRepo.update(existingFailed.id, {
               status: 'failed',
-              failReason: error instanceof Error ? error.message : '갱신 실패',
-            }),
-          );
+              failReason,
+            });
+          } else {
+            await this.payRepo.save(
+              this.payRepo.create({
+                subscription: { id: sub.id } as Subscription,
+                group: { id: sub.group.id } as Group,
+                amount,
+                orderId,
+                status: 'failed',
+                failReason,
+              }),
+            );
+          }
           continue;
         }
 
@@ -296,20 +311,34 @@ export class SubscriptionService {
           );
           // 기간 연장과 결제 기록은 한 트랜잭션 — 하나만 커밋되어
           // "기간은 늘었는데 결제 기록이 없음" 또는 그 반대가 생기지 않게 한다.
+          // Payment는 orderId로 upsert한다 — 이전 시도(예: 거절 후 재시도)가
+          // 남긴 failed 행이 있으면 success로 전환하고, 없으면 새로 삽입한다.
+          // (같은 orderId로 insert하면 유니크 제약 충돌 → 영구 past_due 발생)
           await this.dataSource.transaction(async (manager) => {
+            const existing = await manager.findOne(Payment, {
+              where: { orderId },
+            });
+            if (existing) {
+              await manager.update(Payment, existing.id, {
+                status: 'success',
+                externalPaymentId: payment.paymentKey,
+                paidAt: now,
+              });
+            } else {
+              await manager.save(Payment, {
+                subscription: { id: sub.id } as Subscription,
+                group: { id: sub.group.id } as Group,
+                amount,
+                orderId,
+                externalPaymentId: payment.paymentKey,
+                status: 'success',
+                paidAt: now,
+              });
+            }
             await manager.update(Subscription, sub.id, {
               status: 'active',
               currentPeriodStart: sub.currentPeriodEnd,
               currentPeriodEnd: nextEnd,
-            });
-            await manager.save(Payment, {
-              subscription: { id: sub.id } as Subscription,
-              group: { id: sub.group.id } as Group,
-              amount,
-              orderId,
-              externalPaymentId: payment.paymentKey,
-              status: 'success',
-              paidAt: now,
             });
           });
         } catch (error) {
