@@ -1,8 +1,13 @@
 import { SubscriptionService } from './subscription.service';
+import { addBillingPeriod } from './subscription.util';
 
 const NOW = new Date('2026-07-14T00:00:00Z');
 
-const makeService = (sub: any, tossOverrides: any = {}) => {
+const makeService = (
+  sub: any,
+  tossOverrides: any = {},
+  dataSourceOverrides: any = {},
+) => {
   const subRepo = {
     find: jest.fn().mockResolvedValue([sub]),
     update: jest.fn(async () => ({ affected: 1 })),
@@ -22,7 +27,10 @@ const makeService = (sub: any, tossOverrides: any = {}) => {
     update: jest.fn(async () => ({ affected: 1 })),
     save: jest.fn(async (_e: any, o: any) => o),
   };
-  const dataSource = { transaction: jest.fn(async (cb: any) => cb(manager)) };
+  const dataSource = {
+    transaction: jest.fn(async (cb: any) => cb(manager)),
+    ...dataSourceOverrides,
+  };
   const service = new SubscriptionService(
     subRepo as any,
     payRepo as any,
@@ -30,7 +38,7 @@ const makeService = (sub: any, tossOverrides: any = {}) => {
     toss as any,
     dataSource as any,
   );
-  return { service, subRepo, toss, manager };
+  return { service, subRepo, payRepo, toss, manager, dataSource };
 };
 
 describe('SubscriptionService.renewDueSubscriptions', () => {
@@ -51,7 +59,45 @@ describe('SubscriptionService.renewDueSubscriptions', () => {
     expect(manager.update).toHaveBeenCalledWith(
       expect.anything(),
       1,
-      expect.objectContaining({ status: 'active' }),
+      expect.objectContaining({
+        status: 'active',
+        // 드리프트 방지: 이전 종료일(2026-07-13) 기준으로 계산되어야 한다.
+        currentPeriodStart: baseSub.currentPeriodEnd,
+        currentPeriodEnd: addBillingPeriod(baseSub.currentPeriodEnd, 'monthly'),
+      }),
+    );
+  });
+
+  test('결제 요청 시 결정적인 orderId(renew_{id}_{periodEnd})를 사용한다', async () => {
+    const { service, toss } = makeService({ ...baseSub });
+    await service.renewDueSubscriptions(NOW);
+    expect(toss.requestBillingPayment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderId: 'renew_1_2026-07-13T00:00:00.000Z',
+      }),
+    );
+  });
+
+  test('결제는 성공했지만 DB persist가 실패하면 실패로 오분류하지 않는다', async () => {
+    const { service, toss, subRepo, payRepo, dataSource } = makeService(
+      { ...baseSub },
+      undefined,
+      { transaction: jest.fn().mockRejectedValue(new Error('db down')) },
+    );
+    await service.renewDueSubscriptions(NOW);
+
+    expect(toss.requestBillingPayment).toHaveBeenCalled();
+    expect(dataSource.transaction).toHaveBeenCalled();
+    expect(subRepo.update).not.toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({ status: 'past_due' }),
+    );
+    expect(subRepo.update).not.toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({ status: 'expired' }),
+    );
+    expect(payRepo.save).not.toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'failed' }),
     );
   });
 

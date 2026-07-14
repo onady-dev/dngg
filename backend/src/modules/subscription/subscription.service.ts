@@ -3,6 +3,7 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -36,6 +37,8 @@ export interface SubscriptionStatusResponse {
 
 @Injectable()
 export class SubscriptionService {
+  private readonly logger = new Logger(SubscriptionService.name);
+
   constructor(
     @InjectRepository(Subscription)
     private readonly subRepo: Repository<Subscription>,
@@ -239,58 +242,88 @@ export class SubscriptionService {
     });
 
     for (const sub of due) {
-      // 해지 예약된 구독은 기간 만료 시 결제 없이 종료
-      if (sub.cancelAtPeriodEnd) {
-        await this.subRepo.update(sub.id, { status: 'canceled' });
-        continue;
-      }
-
-      const amount = getPrice(sub.billingCycle);
-      const orderId = randomUUID();
-      const orderName =
-        sub.billingCycle === 'yearly' ? 'DNGG 연 구독 갱신' : 'DNGG 월 구독 갱신';
-
       try {
-        const payment = await this.toss.requestBillingPayment({
-          billingKey: sub.billingKey,
-          customerKey: sub.group.customerKey,
-          amount,
-          orderId,
-          orderName,
-        });
-        // 드리프트 방지: 이전 종료일 기준으로 다음 주기 계산
-        const nextEnd = addBillingPeriod(sub.currentPeriodEnd, sub.billingCycle);
-        // 기간 연장과 결제 기록은 한 트랜잭션 — 하나만 커밋되어
-        // "기간은 늘었는데 결제 기록이 없음" 또는 그 반대가 생기지 않게 한다.
-        await this.dataSource.transaction(async (manager) => {
-          await manager.update(Subscription, sub.id, {
-            status: 'active',
-            currentPeriodStart: sub.currentPeriodEnd,
-            currentPeriodEnd: nextEnd,
-          });
-          await manager.save(Payment, {
-            subscription: { id: sub.id } as Subscription,
-            group: { id: sub.group.id } as Group,
+        // 해지 예약된 구독은 기간 만료 시 결제 없이 종료
+        if (sub.cancelAtPeriodEnd) {
+          await this.subRepo.update(sub.id, { status: 'canceled' });
+          continue;
+        }
+
+        const amount = getPrice(sub.billingCycle);
+        // (구독, 주기) 단위로 결정적인 orderId — 재시도 시 동일한 값이 재사용된다.
+        // Toss의 멱등성 처리와 Payment.orderId 유니크 제약이 함께 이중 결제를 막는다.
+        const orderId = `renew_${sub.id}_${sub.currentPeriodEnd.toISOString()}`;
+        const orderName =
+          sub.billingCycle === 'yearly'
+            ? 'DNGG 연 구독 갱신'
+            : 'DNGG 월 구독 갱신';
+
+        let payment: { paymentKey: string };
+        try {
+          payment = await this.toss.requestBillingPayment({
+            billingKey: sub.billingKey,
+            customerKey: sub.group.customerKey,
             amount,
             orderId,
-            externalPaymentId: payment.paymentKey,
-            status: 'success',
-            paidAt: now,
+            orderName,
           });
-        });
+        } catch (error) {
+          // 실제 결제 실패 — 유예 기간 계산 후 상태 전환, 실패 이력 기록(best-effort)
+          const graceEnd = computeGraceEnd(sub.currentPeriodEnd);
+          const nextStatus = now > graceEnd ? 'expired' : 'past_due';
+          await this.subRepo.update(sub.id, { status: nextStatus });
+          await this.payRepo.save(
+            this.payRepo.create({
+              subscription: { id: sub.id } as Subscription,
+              group: { id: sub.group.id } as Group,
+              amount,
+              orderId,
+              status: 'failed',
+              failReason: error instanceof Error ? error.message : '갱신 실패',
+            }),
+          );
+          continue;
+        }
+
+        // 결제는 성공했다 — 이제 기간 연장 + 결제 기록 persist를 시도한다.
+        // 여기서 실패해도 결제는 이미 완료된 것이므로 실패로 오분류하면 안 된다.
+        // (트랜잭션 롤백으로 기간이 늘지 않으므로 다음 크론이 동일 orderId로 재시도한다.)
+        try {
+          // 드리프트 방지: 이전 종료일 기준으로 다음 주기 계산
+          const nextEnd = addBillingPeriod(
+            sub.currentPeriodEnd,
+            sub.billingCycle,
+          );
+          // 기간 연장과 결제 기록은 한 트랜잭션 — 하나만 커밋되어
+          // "기간은 늘었는데 결제 기록이 없음" 또는 그 반대가 생기지 않게 한다.
+          await this.dataSource.transaction(async (manager) => {
+            await manager.update(Subscription, sub.id, {
+              status: 'active',
+              currentPeriodStart: sub.currentPeriodEnd,
+              currentPeriodEnd: nextEnd,
+            });
+            await manager.save(Payment, {
+              subscription: { id: sub.id } as Subscription,
+              group: { id: sub.group.id } as Group,
+              amount,
+              orderId,
+              externalPaymentId: payment.paymentKey,
+              status: 'success',
+              paidAt: now,
+            });
+          });
+        } catch (error) {
+          this.logger.error(
+            `구독 ${sub.id} 갱신: Toss 결제(orderId=${orderId})는 성공했지만 DB 반영에 실패했습니다. ` +
+              '구독 상태는 변경하지 않으며, 다음 크론 실행 시 동일 orderId로 재시도됩니다.',
+            error instanceof Error ? error.stack : String(error),
+          );
+        }
       } catch (error) {
-        const graceEnd = computeGraceEnd(sub.currentPeriodEnd);
-        const nextStatus = now > graceEnd ? 'expired' : 'past_due';
-        await this.subRepo.update(sub.id, { status: nextStatus });
-        await this.payRepo.save(
-          this.payRepo.create({
-            subscription: { id: sub.id } as Subscription,
-            group: { id: sub.group.id } as Group,
-            amount,
-            orderId,
-            status: 'failed',
-            failReason: error instanceof Error ? error.message : '갱신 실패',
-          }),
+        // 예상치 못한 오류 — 다른 구독 처리에 영향을 주지 않도록 격리
+        this.logger.error(
+          `구독 ${sub.id} 갱신 처리 중 예상치 못한 오류가 발생했습니다.`,
+          error instanceof Error ? error.stack : String(error),
         );
       }
     }
