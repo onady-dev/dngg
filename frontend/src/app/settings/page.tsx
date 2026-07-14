@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import styled from "styled-components";
 import Signup from "../components/Signup";
 import Login from "../components/Login";
@@ -107,7 +108,23 @@ const ManualLink = styled.a`
   }
 `;
 
+const SubscriptionButton = styled.button`
+  width: 100%;
+  margin-top: 0.75rem;
+  padding: 0.625rem;
+  border-radius: 0.375rem;
+  background: var(--primary-color);
+  color: white;
+  font-weight: 600;
+  font-size: 0.9375rem;
+
+  &:hover {
+    background: var(--hover-color);
+  }
+`;
+
 const SettingsPage = () => {
+  const router = useRouter();
   const { user, logout } = useAuthStore((state) => state);
   const { groups, deleteGroup } = useGroupStore();
   const [isSignup, setIsSignup] = useState(false);
@@ -170,6 +187,9 @@ const SettingsPage = () => {
           </LogoutButton>
           <ManualLink href="/manual/index.html">사용 가이드 보기</ManualLink>
         </ButtonRow>
+        <SubscriptionButton onClick={() => router.push("/subscription")}>
+          구독 관리
+        </SubscriptionButton>
         {myGroup && (
           <DeleteGroupButton onClick={handleDeleteGroup} disabled={isDeleting}>
             {isDeleting ? "삭제 중..." : "그룹 삭제"}
