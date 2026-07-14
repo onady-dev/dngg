@@ -6,14 +6,14 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, Repository } from 'typeorm';
+import { DataSource, In, LessThanOrEqual, Repository } from 'typeorm';
 import { randomUUID } from 'crypto';
 import { Subscription } from 'src/entities/Subscription.entity';
 import { Payment } from 'src/entities/Payment.entity';
 import { Group } from 'src/entities/Group.entity';
 import { TossBillingClient } from './toss-billing.client';
 import { getFreeGameLimit, getPrice } from './subscription.config';
-import { addBillingPeriod } from './subscription.util';
+import { addBillingPeriod, computeGraceEnd } from './subscription.util';
 import {
   ACTIVE_STATUSES,
   BillingCycle,
@@ -226,6 +226,74 @@ export class SubscriptionService {
     });
     const hasMore = items.length > limit;
     return { items: hasMore ? items.slice(0, limit) : items, page, hasMore };
+  }
+
+  // 크론이 매일 호출. currentPeriodEnd가 지난 유효 구독을 빌링키로 갱신한다.
+  async renewDueSubscriptions(now: Date): Promise<void> {
+    const due = await this.subRepo.find({
+      where: {
+        status: In(ACTIVE_STATUSES),
+        currentPeriodEnd: LessThanOrEqual(now),
+      },
+      relations: ['group'],
+    });
+
+    for (const sub of due) {
+      // 해지 예약된 구독은 기간 만료 시 결제 없이 종료
+      if (sub.cancelAtPeriodEnd) {
+        await this.subRepo.update(sub.id, { status: 'canceled' });
+        continue;
+      }
+
+      const amount = getPrice(sub.billingCycle);
+      const orderId = randomUUID();
+      const orderName =
+        sub.billingCycle === 'yearly' ? 'DNGG 연 구독 갱신' : 'DNGG 월 구독 갱신';
+
+      try {
+        const payment = await this.toss.requestBillingPayment({
+          billingKey: sub.billingKey,
+          customerKey: sub.group.customerKey,
+          amount,
+          orderId,
+          orderName,
+        });
+        // 드리프트 방지: 이전 종료일 기준으로 다음 주기 계산
+        const nextEnd = addBillingPeriod(sub.currentPeriodEnd, sub.billingCycle);
+        // 기간 연장과 결제 기록은 한 트랜잭션 — 하나만 커밋되어
+        // "기간은 늘었는데 결제 기록이 없음" 또는 그 반대가 생기지 않게 한다.
+        await this.dataSource.transaction(async (manager) => {
+          await manager.update(Subscription, sub.id, {
+            status: 'active',
+            currentPeriodStart: sub.currentPeriodEnd,
+            currentPeriodEnd: nextEnd,
+          });
+          await manager.save(Payment, {
+            subscription: { id: sub.id } as Subscription,
+            group: { id: sub.group.id } as Group,
+            amount,
+            orderId,
+            externalPaymentId: payment.paymentKey,
+            status: 'success',
+            paidAt: now,
+          });
+        });
+      } catch (error) {
+        const graceEnd = computeGraceEnd(sub.currentPeriodEnd);
+        const nextStatus = now > graceEnd ? 'expired' : 'past_due';
+        await this.subRepo.update(sub.id, { status: nextStatus });
+        await this.payRepo.save(
+          this.payRepo.create({
+            subscription: { id: sub.id } as Subscription,
+            group: { id: sub.group.id } as Group,
+            amount,
+            orderId,
+            status: 'failed',
+            failReason: error instanceof Error ? error.message : '갱신 실패',
+          }),
+        );
+      }
+    }
   }
 }
 
