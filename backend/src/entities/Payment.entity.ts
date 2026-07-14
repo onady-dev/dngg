@@ -1,35 +1,48 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn, UpdateDateColumn } from "typeorm";
-import { User } from "./User.entity";
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  CreateDateColumn,
+} from 'typeorm';
+import { Group } from './Group.entity';
+import { User } from './User.entity';
+import { Subscription } from './Subscription.entity';
 
 @Entity()
 export class Payment {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ManyToOne(() => User, (user) => user.id)
+  @ManyToOne(() => Subscription, { nullable: true })
+  subscription: Subscription;
+
+  @ManyToOne(() => Group)
+  group: Group;
+
+  @ManyToOne(() => User, { nullable: true })
   user: User;
 
   @Column('int')
   amount: number;
 
-  @Column('varchar')
-  currency: string; // 예: KRW, USD
+  // 멱등성 보장 — 토스 결제 요청 orderId
+  @Column('varchar', { unique: true })
+  orderId: string;
+
+  // 토스 paymentKey (성공 시)
+  @Column('varchar', { nullable: true })
+  externalPaymentId: string;
 
   @Column('varchar')
-  status: string; // 예: success, failed, pending, refunded 등
+  status: 'success' | 'failed';
 
-  @Column('varchar')
-  method: string; // 예: card, paypal, toss 등
+  @Column('varchar', { nullable: true })
+  failReason: string;
 
-  @Column('varchar')
-  externalPaymentId: string; // 외부 결제 시스템의 결제 고유 ID
-
-  @Column('timestamp')
+  @Column('timestamp', { nullable: true })
   paidAt: Date;
 
   @CreateDateColumn()
   createdAt: Date;
-
-  @UpdateDateColumn()
-  updatedAt: Date;
-} 
+}
