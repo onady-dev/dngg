@@ -1,4 +1,4 @@
-import { ConflictException, HttpException } from '@nestjs/common';
+import { ConflictException, HttpException, HttpStatus } from '@nestjs/common';
 import { SubscriptionService } from './subscription.service';
 
 const GROUP_ID = 1;
@@ -82,14 +82,28 @@ describe('SubscriptionService.subscribe', () => {
       issueBillingKey: jest.fn().mockResolvedValue({ billingKey: 'bk_1' }),
       requestBillingPayment: jest.fn().mockRejectedValue(new Error('카드 거절')),
     };
-    const { service } = makeService({ toss });
-    await expect(
-      service.subscribe(GROUP_ID, USER_ID, {
+    const dataSource = makeDataSource();
+    const { service, payRepo } = makeService({ toss, dataSource });
+
+    try {
+      await service.subscribe(GROUP_ID, USER_ID, {
         authKey: 'a',
         billingCycle: 'monthly',
-      }),
-    ).rejects.toBeInstanceOf(HttpException);
-    // 구독 생성 트랜잭션에 진입하지 않았어야 한다 (billingKey 미저장)
+      });
+      fail('Should have thrown HttpException');
+    } catch (e) {
+      // Assert: 402 PAYMENT_REQUIRED
+      expect(e).toBeInstanceOf(HttpException);
+      expect((e as HttpException).getStatus()).toBe(HttpStatus.PAYMENT_REQUIRED);
+
+      // Assert: Payment recorded with status='failed'
+      expect(payRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'failed' }),
+      );
+
+      // Assert: transaction was NOT entered
+      expect(dataSource.transaction).not.toHaveBeenCalled();
+    }
   });
 
   test('동시 요청 레이스로 유니크 위반 시 409 + 환불 대상 Payment 기록', async () => {
