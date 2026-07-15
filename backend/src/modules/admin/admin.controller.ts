@@ -1,4 +1,12 @@
-import { Controller, Get, Post, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  ParseIntPipe,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { AdminGuard } from './admin.guard';
 import { AdminService } from './admin.service';
@@ -16,5 +24,26 @@ export class AdminController {
   @Post('monetization/start')
   startMonetization() {
     return this.adminService.startMonetization(new Date());
+  }
+
+  @Get('groups')
+  getGroups() {
+    return this.adminService.getGroups();
+  }
+
+  @Get('subscriptions')
+  getSubscriptionOverview() {
+    return this.adminService.getSubscriptionOverview();
+  }
+
+  @Post('switch-group/:groupId')
+  switchGroup(
+    @Req() req: any,
+    @Param('groupId', ParseIntPipe) groupId: number,
+  ) {
+    return this.adminService.switchGroup(
+      { userId: req.user.userId, email: req.user.email },
+      groupId,
+    );
   }
 }

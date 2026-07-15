@@ -1,4 +1,4 @@
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { MONETIZATION_STARTED_KEY } from './admin.constants';
 
@@ -76,5 +76,143 @@ describe('AdminService — 유료화 시작', () => {
     await expect(
       service.startMonetization(new Date()),
     ).rejects.toBeInstanceOf(ConflictException);
+  });
+});
+
+describe('AdminService — 현황/그룹 전환', () => {
+  test('getGroups는 그룹별 게임 수·무료 사용량·구독 상태를 합성한다', async () => {
+    const groupRepo = {
+      find: jest.fn().mockResolvedValue([
+        { id: 1, name: '알파', freeGamesUsed: 3 },
+        { id: 2, name: '베타', freeGamesUsed: 12 },
+      ]),
+    };
+    const dataSource = {
+      query: jest.fn().mockResolvedValue([{ groupId: 1, count: 5 }]),
+    };
+    const subRepo = {
+      find: jest.fn().mockResolvedValue([
+        { status: 'active', group: { id: 2 } },
+      ]),
+    };
+    const service = new AdminService(
+      {} as any,
+      groupRepo as any,
+      subRepo as any,
+      {} as any,
+      dataSource as any,
+      {} as any,
+    );
+
+    const rows = await service.getGroups();
+
+    expect(rows).toEqual([
+      {
+        id: 1,
+        name: '알파',
+        gameCount: 5,
+        freeGamesUsed: 3,
+        subscriptionStatus: 'none',
+      },
+      {
+        id: 2,
+        name: '베타',
+        gameCount: 0,
+        freeGamesUsed: 12,
+        subscriptionStatus: 'active',
+      },
+    ]);
+  });
+
+  test('getSubscriptionOverview의 결제 목록에 billingKey가 없다', async () => {
+    const subRepo = {
+      createQueryBuilder: jest.fn().mockReturnValue({
+        select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        groupBy: jest.fn().mockReturnThis(),
+        getRawMany: jest
+          .fn()
+          .mockResolvedValue([{ status: 'active', count: 2 }]),
+      }),
+    };
+    const payRepo = {
+      find: jest.fn().mockResolvedValue([
+        {
+          id: 10,
+          amount: 9900,
+          status: 'success',
+          orderId: 'ord_1',
+          paidAt: new Date('2026-07-15T00:00:00.000Z'),
+          failReason: null,
+          group: { id: 1, name: '알파' },
+          subscription: { billingKey: 'MUST_NOT_LEAK' },
+        },
+      ]),
+    };
+    const service = new AdminService(
+      {} as any,
+      {} as any,
+      subRepo as any,
+      payRepo as any,
+      {} as any,
+      {} as any,
+    );
+
+    const result = await service.getSubscriptionOverview();
+
+    expect(result.statusCounts).toEqual([{ status: 'active', count: 2 }]);
+    expect(result.recentPayments[0]).toEqual({
+      id: 10,
+      groupName: '알파',
+      amount: 9900,
+      status: 'success',
+      orderId: 'ord_1',
+      paidAt: new Date('2026-07-15T00:00:00.000Z'),
+      failReason: null,
+    });
+    expect(JSON.stringify(result)).not.toContain('MUST_NOT_LEAK');
+  });
+
+  test('switchGroup은 대상 groupId와 role=admin을 담은 토큰을 발급한다', async () => {
+    const groupRepo = {
+      findOne: jest.fn().mockResolvedValue({ id: 5, isDeleted: false }),
+    };
+    const jwtService = { sign: jest.fn().mockReturnValue('scoped-token') };
+    const service = new AdminService(
+      {} as any,
+      groupRepo as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      jwtService as any,
+    );
+
+    const result = await service.switchGroup(
+      { userId: 1, email: 'admin@test.com' },
+      5,
+    );
+
+    expect(jwtService.sign).toHaveBeenCalledWith({
+      userId: 1,
+      email: 'admin@test.com',
+      groupId: 5,
+      role: 'admin',
+    });
+    expect(result).toEqual({ accessToken: 'scoped-token', groupId: 5 });
+  });
+
+  test('switchGroup은 없는 그룹이면 404를 던진다', async () => {
+    const groupRepo = { findOne: jest.fn().mockResolvedValue(null) };
+    const service = new AdminService(
+      {} as any,
+      groupRepo as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
+    await expect(
+      service.switchGroup({ userId: 1, email: 'a@b.c' }, 99),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 });
