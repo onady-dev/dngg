@@ -427,7 +427,8 @@ export class SubscriptionService {
 // Postgres 유니크 제약 위반(23505) 판별. TypeORM QueryFailedError는
 // driverError.code에 SQLSTATE를 담는다.
 function isUniqueViolation(error: unknown): boolean {
-  const code = (error as { driverError?: { code?: string }; code?: string })
-    ?.driverError?.code ?? (error as { code?: string })?.code;
+  const code =
+    (error as { driverError?: { code?: string }; code?: string })?.driverError
+      ?.code ?? (error as { code?: string })?.code;
   return code === '23505';
 }

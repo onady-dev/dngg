@@ -21,9 +21,9 @@ const makeService = () => {
 describe('GroupService.deleteGroup', () => {
   test('다른 그룹을 삭제하려 하면 ForbiddenException', async () => {
     const { service, groupRepository } = makeService();
-    await expect(
-      service.deleteGroup(OTHER_GROUP, OWN_GROUP),
-    ).rejects.toThrow(ForbiddenException);
+    await expect(service.deleteGroup(OTHER_GROUP, OWN_GROUP)).rejects.toThrow(
+      ForbiddenException,
+    );
     expect(groupRepository.softDeleteById).not.toHaveBeenCalled();
   });
 

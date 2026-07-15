@@ -27,7 +27,9 @@ const makeService = (opts: {
       update: jest.fn().mockReturnThis(),
       set: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
-      execute: jest.fn().mockResolvedValue({ affected: opts.incrementAffected }),
+      execute: jest
+        .fn()
+        .mockResolvedValue({ affected: opts.incrementAffected }),
     }),
     getRepository: jest.fn().mockReturnValue({
       findOne: jest.fn().mockResolvedValue({ id: 55 }),
