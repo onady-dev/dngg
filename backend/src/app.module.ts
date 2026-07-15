@@ -14,6 +14,7 @@ import { LogModule } from './modules/log/log.module';
 import { UserModule } from './modules/user/user.module';
 import { TeamModule } from './modules/team/team.module';
 import { SubscriptionModule } from './modules/subscription/subscription.module';
+import { AdminModule } from './modules/admin/admin.module';
 import * as winston from 'winston';
 
 const { combine, timestamp, printf, colorize } = winston.format;
@@ -66,6 +67,7 @@ const { combine, timestamp, printf, colorize } = winston.format;
     UserModule,
     TeamModule,
     SubscriptionModule,
+    AdminModule,
   ],
   controllers: [],
   providers: [
