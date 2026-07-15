@@ -47,7 +47,7 @@ export class AdminService {
         // 각 그룹의 현재 게임 수를 무료 사용량으로 스냅샷.
         // GREATEST로 기존 값을 절대 줄이지 않는다.
         await manager.query(
-          'UPDATE "group" g SET "freeGamesUsed" = GREATEST(g."freeGamesUsed", (SELECT COUNT(*)::int FROM "game" WHERE "game"."groupId" = g.id))',
+          'UPDATE "group" g SET "freeGamesUsed" = GREATEST(g."freeGamesUsed", (SELECT COUNT(*)::int FROM "game" WHERE "game"."groupId" = g.id AND "game"."status" != \'DELETED\'))',
         );
         await manager.insert(AppSetting, {
           key: MONETIZATION_STARTED_KEY,
@@ -78,7 +78,7 @@ export class AdminService {
     });
     const counts: { groupId: number; count: number }[] =
       await this.dataSource.query(
-        'SELECT "groupId", COUNT(*)::int AS count FROM "game" GROUP BY "groupId"',
+        'SELECT "groupId", COUNT(*)::int AS count FROM "game" WHERE "status" != \'DELETED\' GROUP BY "groupId"',
       );
     const countMap = new Map(
       counts.map((row) => [Number(row.groupId), Number(row.count)]),

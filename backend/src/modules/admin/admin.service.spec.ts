@@ -63,6 +63,10 @@ describe('AdminService — 유료화 시작', () => {
     expect(manager.query).toHaveBeenCalledWith(
       expect.stringContaining('GREATEST'),
     );
+    // 삭제된(soft-delete) 게임은 backfill 카운트에서 제외되어야 한다
+    expect(manager.query).toHaveBeenCalledWith(
+      expect.stringContaining(`"game"."status" != 'DELETED'`),
+    );
     expect(manager.insert).toHaveBeenCalledWith(expect.anything(), {
       key: MONETIZATION_STARTED_KEY,
       value: '2026-07-15T09:00:00.000Z',
@@ -105,6 +109,11 @@ describe('AdminService — 현황/그룹 전환', () => {
     );
 
     const rows = await service.getGroups();
+
+    // 삭제된(soft-delete) 게임은 그룹별 게임 수 집계에서 제외되어야 한다
+    expect(dataSource.query).toHaveBeenCalledWith(
+      expect.stringContaining(`"status" != 'DELETED'`),
+    );
 
     expect(rows).toEqual([
       {
