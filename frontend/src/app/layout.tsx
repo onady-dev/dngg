@@ -7,6 +7,7 @@ import GlobalStyles from "./styles/GlobalStyles";
 import InstallPrompt from "./components/InstallPrompt";
 import { ToastProvider } from "./components/ui/Toast";
 import { ConfirmProvider } from "./components/ui/ConfirmDialog";
+import { Providers } from "./providers";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -35,16 +36,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="ko">
       <body className={inter.className}>
-        <StyledComponentsRegistry>
-          <GlobalStyles />
-          <ToastProvider>
-            <ConfirmProvider>
-              <Header />
-              <main>{children}</main>
-              <InstallPrompt />
-            </ConfirmProvider>
-          </ToastProvider>
-        </StyledComponentsRegistry>
+        <Providers>
+          <StyledComponentsRegistry>
+            <GlobalStyles />
+            <ToastProvider>
+              <ConfirmProvider>
+                <Header />
+                <main>{children}</main>
+                <InstallPrompt />
+              </ConfirmProvider>
+            </ToastProvider>
+          </StyledComponentsRegistry>
+        </Providers>
       </body>
     </html>
   );

@@ -79,7 +79,12 @@ export class UserService {
     if (!isMatch) {
       throw new HttpException('Invalid password', HttpStatus.UNAUTHORIZED);
     }
-    const payload = { userId: user.id, email: user.email, groupId: user.groupId };
+    const payload = {
+      userId: user.id,
+      email: user.email,
+      groupId: user.groupId,
+      role: user.role,
+    };
     const accessToken = this.jwtService.sign(payload);
     return { user, accessToken };
   }

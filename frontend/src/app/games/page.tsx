@@ -14,6 +14,7 @@ import { useConfirm } from "../components/ui/ConfirmDialog";
 import { useMounted } from "../lib/useMounted";
 import NoGroupSelected from "../components/NoGroupSelected";
 import { fetchTeams } from "@/lib/teamApi";
+import { useQuery } from "@tanstack/react-query";
 
 const FINISHED_PAGE_SIZE = 10;
 
@@ -453,6 +454,16 @@ const GamesPage = () => {
   const [selectedTeams, setSelectedTeams] = useState<{ teamA?: Team; teamB?: Team }>({});
   const [loading, setLoading] = useState(true);
 
+  const { data: subStatus } = useQuery<{
+    subscribed: boolean;
+    remainingFreeGames: number;
+    monetizationStarted: boolean;
+  }>({
+    queryKey: ["subscription", "status"],
+    queryFn: async () => (await api.get("/subscription/status")).data,
+    enabled: mounted && !!user,
+  });
+
   const finishedPageRef = useRef(0);
   const finishedLoadingRef = useRef(false);
   const finishedSentinelRef = useRef<HTMLDivElement>(null);
@@ -609,7 +620,16 @@ const GamesPage = () => {
       showToast("게임이 생성되었습니다. 카드를 눌러 기록을 시작하세요.", "success");
     } catch (error) {
       console.error("게임 생성에 실패했습니다:", error);
-      showToast("게임 생성에 실패했습니다. 다시 시도해주세요.", "error");
+      // 402(SUBSCRIPTION_REQUIRED)는 axios 인터셉터가 이미 토스트 + 리다이렉트를
+      // 처리하므로 여기서 중복 토스트를 띄우지 않는다.
+      const isAxiosLikeError =
+        typeof error === "object" && error !== null && "response" in error;
+      const status = isAxiosLikeError
+        ? (error as { response?: { status?: number } }).response?.status
+        : undefined;
+      if (status !== 402) {
+        showToast("게임 생성에 실패했습니다. 다시 시도해주세요.", "error");
+      }
     }
   };
 
@@ -730,6 +750,12 @@ const GamesPage = () => {
           새 게임 생성
         </CreateGameButton>
       </Header>
+
+      {subStatus && subStatus.monetizationStarted && !subStatus.subscribed && subStatus.remainingFreeGames <= 3 && (
+        <span style={{ fontSize: "0.85rem", color: "#b45309", display: "block", padding: "0 1rem 1rem 1rem" }}>
+          무료 경기 생성 {subStatus.remainingFreeGames}회 남음
+        </span>
+      )}
 
       {!canManage && (
         <LoginBanner>

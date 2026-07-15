@@ -3,6 +3,7 @@
 import { useState } from "react";
 import styled from "styled-components";
 import { useAuthStore } from "../stores/useAuthStore";
+import { useGroupStore } from "../stores/groupStore";
 import api from "@/lib/axios";
 import { useToast } from "./ui/Toast";
 
@@ -80,18 +81,24 @@ const Login = ({ setIsSignup }: { setIsSignup: (isLogin: boolean) => void }) => 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const setUser = useAuthStore((state) => state.setUser);
+  const setSelectedGroup = useGroupStore((state) => state.setSelectedGroup);
   const { showToast } = useToast();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       const response = await api.post(`/user/login`, { email, password });
+      // axios 인터셉터가 localStorage.token을 읽어 Authorization을 붙이므로 로그인 시 저장한다.
+      localStorage.setItem("token", response.data.accessToken);
       setUser({
         id: response.data.user.id,
         email: response.data.user.email,
         groupId: response.data.user.groupId,
         accessToken: response.data.accessToken,
+        role: response.data.user.role,
       });
+      // 그룹 자동 선택은 로그인 성공 시점 1회만 수행한다 (이후에는 사용자의 선택/해제를 존중).
+      setSelectedGroup(response.data.user.groupId ?? null);
       showToast("로그인되었습니다.", "success");
     } catch (error: any) {
       const status = error?.response?.status;

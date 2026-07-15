@@ -1,7 +1,5 @@
-import { Column, Entity, OneToMany, OneToOne, PrimaryGeneratedColumn } from "typeorm";
-import { Group } from "./Group.entity";
-import { Subscription } from "./Subscription.entity";
-import { Payment } from "./Payment.entity";
+import { Column, Entity, OneToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { Group } from './Group.entity';
 @Entity()
 export class User {
   @PrimaryGeneratedColumn()
@@ -16,11 +14,11 @@ export class User {
   phoneNumber: string;
   @Column('timestamp', { default: () => 'CURRENT_TIMESTAMP' })
   createdAt: Date;
-  
+
+  // 'user' | 'admin' — 최초 관리자는 DB 수동 지정 (UPDATE "user" SET role='admin' WHERE email='...')
+  @Column('varchar', { default: 'user' })
+  role: string;
+
   @OneToOne(() => Group, (group) => group.id)
   group: Group;
-  @OneToMany(() => Subscription, (subscription) => subscription.user)
-  subscriptions: Subscription[];
-  @OneToMany(() => Payment, (payment) => payment.user)
-  payments: Payment[];
 }

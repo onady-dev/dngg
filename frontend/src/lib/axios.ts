@@ -49,6 +49,21 @@ api.interceptors.response.use(
         window.location.href = "/settings";
       }
     }
+
+    // 무료 한도 초과 — 백엔드가 402 + code로 알린다.
+    const isSubscriptionRequired =
+      error.response?.status === 402 &&
+      error.response?.data?.code === "SUBSCRIPTION_REQUIRED";
+    if (isBrowser() && isSubscriptionRequired) {
+      const message = "무료 횟수를 모두 사용했어요. 구독 후 계속 이용하세요.";
+      if (window.location.pathname === "/subscription") {
+        showGlobalToast(message, "info");
+      } else {
+        setPendingToast(message, "info");
+        window.location.href = "/subscription";
+      }
+    }
+
     return Promise.reject(error);
   }
 );

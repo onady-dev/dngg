@@ -25,3 +25,6 @@ Thumbs.db
 
 # Playwright MCP session artifacts
 .playwright-mcp/
+
+# Claude Code personal overrides
+.claude/settings.local.json

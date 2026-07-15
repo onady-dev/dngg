@@ -1,11 +1,13 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { useGroupStore } from './groupStore';
 
 interface User {
   id: string;
   email: string;
   groupId: number;
   accessToken: string;
+  role?: string;
 }
 
 interface AuthState {
@@ -24,6 +26,8 @@ export const useAuthStore = create<AuthState>()(
       logout: () => {
         localStorage.removeItem('token');
         set({ user: null, isAuthenticated: false });
+        // 로그아웃은 그룹 선택도 초기화한다 (selectedGroupId 저장값 포함).
+        useGroupStore.getState().setSelectedGroup(null);
       },
     }),
     {

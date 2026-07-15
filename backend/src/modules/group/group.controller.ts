@@ -7,6 +7,7 @@ import {
   ParseIntPipe,
   Post,
   Query,
+  Request,
   ValidationPipe,
   UseGuards,
 } from '@nestjs/common';
@@ -36,7 +37,7 @@ export class GroupController {
 
   @Delete('/:id')
   @UseGuards(AuthGuard('jwt'))
-  async deleteGroup(@Param('id', ParseIntPipe) id: number) {
-    return this.groupService.deleteGroup(id);
+  async deleteGroup(@Request() req, @Param('id', ParseIntPipe) id: number) {
+    return this.groupService.deleteGroup(id, req.user.groupId);
   }
 }
