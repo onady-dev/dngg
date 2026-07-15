@@ -12,6 +12,10 @@ DNGG (dn.gg) — 스포츠 경기 기록/랭킹 앱. 이 저장소에는 두 개
 
 루트의 `PROJECT_CONTEXT.md`에 상세한 운영 이력(FK 제거, mixed-content 디버깅, 배포 주의사항)이 있다 — 배포나 Player/Log 데이터 모델을 수정하기 전에 반드시 읽을 것.
 
+## 커밋 규칙
+
+- 커밋 메시지의 설명(제목·본문)은 **한글로 작성**한다. conventional commit 타입 접두어(`feat:`, `fix:`, `docs:` 등)는 영문 그대로 사용한다. 예: `fix: 크론 갱신 재시도를 영속화된 실패 횟수 기반 멱등키로 변경`
+
 ## 명령어
 
 패키지 매니저는 **pnpm**. 각 앱에 별도의 `package.json`이 있으므로 `frontend/` 또는 `backend/` 디렉토리 안에서 명령을 실행한다.
