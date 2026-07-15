@@ -66,6 +66,10 @@ export class GameController {
     @Body(ValidationPipe) dto: PostGameAndLogsRequestDto,
   ) {
     assertSameGroup(req.user.groupId, dto.groupId);
-    return this.gameService.saveGameAndLogs(dto, req.user.groupId);
+    return this.gameService.saveGameAndLogs(
+      dto,
+      req.user.groupId,
+      req.user.role,
+    );
   }
 }

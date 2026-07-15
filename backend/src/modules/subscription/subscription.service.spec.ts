@@ -212,6 +212,19 @@ describe('SubscriptionService.cancel/resume', () => {
   });
 });
 
+describe('SubscriptionService.getStatus', () => {
+  test('getStatus는 유료화 시작 여부를 포함한다', async () => {
+    const dataSource = makeDataSource();
+    const settingRepoMock = { findOne: jest.fn().mockResolvedValue(null) };
+    dataSource.getRepository = jest.fn().mockReturnValue(settingRepoMock);
+    const { service } = makeService({ dataSource });
+
+    const status = await service.getStatus(GROUP_ID);
+
+    expect(status.monetizationStarted).toBe(false);
+  });
+});
+
 describe('SubscriptionService.cancelForGroup', () => {
   test('groupId FK로 유효 구독을 canceled 처리하는 쿼리를 실행한다', async () => {
     const execute = jest.fn().mockResolvedValue({ affected: 1 });

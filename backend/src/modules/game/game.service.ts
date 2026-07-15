@@ -25,6 +25,8 @@ import {
   SUBSCRIPTION_REQUIRED_CODE,
 } from '../subscription/subscription.constants';
 import { getFreeGameLimit } from '../subscription/subscription.config';
+import { AppSetting } from '../../entities/AppSetting.entity';
+import { MONETIZATION_STARTED_KEY } from '../admin/admin.constants';
 
 @Injectable()
 export class GameService {
@@ -132,7 +134,11 @@ export class GameService {
     return await this.gameRepository.deleteGame(id);
   }
 
-  async saveGameAndLogs(dto: PostGameAndLogsRequestDto, userGroupId: number) {
+  async saveGameAndLogs(
+    dto: PostGameAndLogsRequestDto,
+    userGroupId: number,
+    userRole?: string,
+  ) {
     // 기존 게임 id로 덮어쓰는 경우, 그 게임이 요청자 그룹 소유인지 확인한다.
     if (dto.id) {
       await this.assertGameInGroup(dto.id, userGroupId);
@@ -168,30 +174,38 @@ export class GameService {
         // 세는데 게임은 dto.groupId로 저장되므로, 둘이 다르면 A 그룹 한도를
         // 소비하고 B 그룹에 게임을 만드는 우회가 가능하다. 신규 생성 시 일치 강제.
         assertSameGroup(userGroupId, dto.groupId);
-        const activeSubs = await queryRunner.manager.count(Subscription, {
-          where: { group: { id: userGroupId }, status: In(ACTIVE_STATUSES) },
-        });
-        if (activeSubs === 0) {
-          const limit = getFreeGameLimit();
-          // 원자적 증가 + 한도 재확인 (동시 요청 레이스 방지)
-          const result = await queryRunner.manager
-            .createQueryBuilder()
-            .update(Group)
-            .set({ freeGamesUsed: () => '"freeGamesUsed" + 1' })
-            .where('id = :id AND "freeGamesUsed" < :limit', {
-              id: userGroupId,
-              limit,
-            })
-            .execute();
-          if (!result.affected) {
-            throw new HttpException(
-              {
-                message:
-                  '무료 경기 생성 횟수를 모두 사용했습니다. 구독 후 계속 이용하세요.',
-                code: SUBSCRIPTION_REQUIRED_CODE,
-              },
-              HttpStatus.PAYMENT_REQUIRED,
-            );
+        // 유료화 시작 전에는 게이팅·카운터 완전 비활성 (무제한 무료 생성).
+        // 관리자는 시작 후에도 우회 (운영 지원 입력, 카운터 미증가).
+        const monetizationStarted = await queryRunner.manager.findOne(
+          AppSetting,
+          { where: { key: MONETIZATION_STARTED_KEY } },
+        );
+        if (monetizationStarted && userRole !== 'admin') {
+          const activeSubs = await queryRunner.manager.count(Subscription, {
+            where: { group: { id: userGroupId }, status: In(ACTIVE_STATUSES) },
+          });
+          if (activeSubs === 0) {
+            const limit = getFreeGameLimit();
+            // 원자적 증가 + 한도 재확인 (동시 요청 레이스 방지)
+            const result = await queryRunner.manager
+              .createQueryBuilder()
+              .update(Group)
+              .set({ freeGamesUsed: () => '"freeGamesUsed" + 1' })
+              .where('id = :id AND "freeGamesUsed" < :limit', {
+                id: userGroupId,
+                limit,
+              })
+              .execute();
+            if (!result.affected) {
+              throw new HttpException(
+                {
+                  message:
+                    '무료 경기 생성 횟수를 모두 사용했습니다. 구독 후 계속 이용하세요.',
+                  code: SUBSCRIPTION_REQUIRED_CODE,
+                },
+                HttpStatus.PAYMENT_REQUIRED,
+              );
+            }
           }
         }
       }

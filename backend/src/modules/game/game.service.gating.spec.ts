@@ -1,5 +1,6 @@
 import { ForbiddenException, HttpException } from '@nestjs/common';
 import { GameService } from './game.service';
+import { AppSetting } from '../../entities/AppSetting.entity';
 
 // saveGameAndLogs 게이팅 경로만 검증. 소유권/저장 로직은 group-access.spec에서 커버.
 const OWN_GROUP = 1;
@@ -19,7 +20,21 @@ const makeService = (opts: {
   activeSubCount: number;
   incrementAffected: number;
 }) => {
+  // 카운터 원자적 증가 QB의 execute — 개별 참조로 노출해 호출 여부를 단언한다.
+  const counterUpdateExecute = jest
+    .fn()
+    .mockResolvedValue({ affected: opts.incrementAffected });
   const manager = {
+    // 유료화 시작 여부(AppSetting) 조회 — 기본은 "시작됨" 행을 반환해
+    // 기존 게이팅 테스트들의 전제(유료화 시작 후)를 유지한다.
+    findOne: jest.fn().mockImplementation((entity: any) =>
+      entity === AppSetting
+        ? Promise.resolve({
+            key: 'monetizationStartedAt',
+            value: '2026-07-15T00:00:00.000Z',
+          })
+        : Promise.resolve(null),
+    ),
     // 구독 존재 여부 count
     count: jest.fn().mockResolvedValue(opts.activeSubCount),
     // 원자적 UPDATE ... WHERE freeGamesUsed < limit
@@ -27,9 +42,7 @@ const makeService = (opts: {
       update: jest.fn().mockReturnThis(),
       set: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
-      execute: jest
-        .fn()
-        .mockResolvedValue({ affected: opts.incrementAffected }),
+      execute: counterUpdateExecute,
     }),
     getRepository: jest.fn().mockReturnValue({
       findOne: jest.fn().mockResolvedValue({ id: 55 }),
@@ -64,7 +77,7 @@ const makeService = (opts: {
     logRepository as any,
     dataSource as any,
   );
-  return { service, queryRunner, manager };
+  return { service, queryRunner, manager, counterUpdateExecute };
 };
 
 describe('GameService 게이팅', () => {
@@ -115,5 +128,33 @@ describe('GameService 게이팅', () => {
     ).rejects.toThrow(ForbiddenException);
     // 불일치는 카운터 소비 전에 차단되어야 한다.
     expect(manager.count).not.toHaveBeenCalled();
+  });
+
+  test('유료화 시작 전에는 구독 없이도 게이팅 없이 통과하고 카운터가 증가하지 않는다', async () => {
+    const { service, manager, counterUpdateExecute } = makeService({
+      activeSubCount: 0,
+      incrementAffected: 0,
+    });
+    // AppSetting 조회가 null을 반환하도록 설정 (유료화 시작 전)
+    manager.findOne = jest.fn().mockResolvedValue(null);
+
+    await service.saveGameAndLogs(makeDto(), OWN_GROUP);
+
+    // 구독 조회도, 원자적 증가도 호출되지 않는다
+    expect(manager.count).not.toHaveBeenCalled();
+    expect(counterUpdateExecute).not.toHaveBeenCalled();
+  });
+
+  test('관리자는 유료화 시작 후에도 게이팅 없이 통과하고 카운터가 증가하지 않는다', async () => {
+    const { service, manager, counterUpdateExecute } = makeService({
+      activeSubCount: 0,
+      incrementAffected: 0,
+    });
+    // AppSetting은 시작됨 상태 유지 (makeService 기본 mock)
+
+    await service.saveGameAndLogs(makeDto(), OWN_GROUP, 'admin');
+
+    expect(manager.count).not.toHaveBeenCalled();
+    expect(counterUpdateExecute).not.toHaveBeenCalled();
   });
 });

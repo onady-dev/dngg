@@ -21,6 +21,8 @@ import {
   SubscriptionStatus,
 } from './subscription.constants';
 import { BillingKeyRequestDto } from './subscription.request.dto';
+import { AppSetting } from 'src/entities/AppSetting.entity';
+import { MONETIZATION_STARTED_KEY } from '../admin/admin.constants';
 
 export interface SubscriptionStatusResponse {
   subscribed: boolean;
@@ -33,6 +35,7 @@ export interface SubscriptionStatusResponse {
   remainingFreeGames: number;
   customerKey: string;
   prices: { monthly: number; yearly: number };
+  monetizationStarted: boolean;
 }
 
 @Injectable()
@@ -73,6 +76,9 @@ export class SubscriptionService {
     const freeGameLimit = getFreeGameLimit();
     const customerKey = group ? await this.ensureCustomerKey(group) : '';
     const active = await this.findActiveSubscription(groupId);
+    const monetizationStarted = !!(await this.dataSource
+      .getRepository(AppSetting)
+      .findOne({ where: { key: MONETIZATION_STARTED_KEY } }));
 
     return {
       subscribed: !!active,
@@ -85,6 +91,7 @@ export class SubscriptionService {
       remainingFreeGames: Math.max(0, freeGameLimit - freeGamesUsed),
       customerKey,
       prices: { monthly: getPrice('monthly'), yearly: getPrice('yearly') },
+      monetizationStarted,
     };
   }
 
