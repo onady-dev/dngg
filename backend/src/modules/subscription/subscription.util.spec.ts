@@ -3,12 +3,18 @@ import { addBillingPeriod, computeGraceEnd } from './subscription.util';
 describe('subscription.util', () => {
   describe('addBillingPeriod', () => {
     test('monthly는 한 달을 더한다', () => {
-      const result = addBillingPeriod(new Date('2026-01-15T00:00:00Z'), 'monthly');
+      const result = addBillingPeriod(
+        new Date('2026-01-15T00:00:00Z'),
+        'monthly',
+      );
       expect(result.toISOString()).toBe('2026-02-15T00:00:00.000Z');
     });
 
     test('yearly는 일 년을 더한다', () => {
-      const result = addBillingPeriod(new Date('2026-01-15T00:00:00Z'), 'yearly');
+      const result = addBillingPeriod(
+        new Date('2026-01-15T00:00:00Z'),
+        'yearly',
+      );
       expect(result.toISOString()).toBe('2027-01-15T00:00:00.000Z');
     });
 
