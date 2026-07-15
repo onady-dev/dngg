@@ -20,6 +20,7 @@ interface StatusResponse {
   freeGamesUsed: number;
   freeGameLimit: number;
   remainingFreeGames: number;
+  monetizationStarted: boolean;
   customerKey: string;
   prices: { monthly: number; yearly: number };
 }
@@ -160,8 +161,9 @@ function SubscriptionContent() {
         ) : (
           <>
             <S.StatusLine>
-              무료 잔여 경기 생성 {status.remainingFreeGames}회 /{" "}
-              {status.freeGameLimit}회
+              {status.monetizationStarted
+                ? `무료 잔여 경기 생성 ${status.remainingFreeGames}회 / ${status.freeGameLimit}회`
+                : "유료화 시작 전 — 경기 생성 무제한"}
             </S.StatusLine>
             <S.PlanRow>
               <S.PlanButton

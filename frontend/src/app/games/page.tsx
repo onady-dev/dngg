@@ -457,6 +457,7 @@ const GamesPage = () => {
   const { data: subStatus } = useQuery<{
     subscribed: boolean;
     remainingFreeGames: number;
+    monetizationStarted: boolean;
   }>({
     queryKey: ["subscription", "status"],
     queryFn: async () => (await api.get("/subscription/status")).data,
@@ -750,7 +751,7 @@ const GamesPage = () => {
         </CreateGameButton>
       </Header>
 
-      {subStatus && !subStatus.subscribed && subStatus.remainingFreeGames <= 3 && (
+      {subStatus && subStatus.monetizationStarted && !subStatus.subscribed && subStatus.remainingFreeGames <= 3 && (
         <span style={{ fontSize: "0.85rem", color: "#b45309", display: "block", padding: "0 1rem 1rem 1rem" }}>
           무료 경기 생성 {subStatus.remainingFreeGames}회 남음
         </span>

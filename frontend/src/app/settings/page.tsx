@@ -190,6 +190,11 @@ const SettingsPage = () => {
         <SubscriptionButton onClick={() => router.push("/subscription")}>
           구독 관리
         </SubscriptionButton>
+        {user?.role === "admin" && (
+          <SubscriptionButton onClick={() => router.push("/admin")}>
+            관리자 페이지
+          </SubscriptionButton>
+        )}
         {myGroup && (
           <DeleteGroupButton onClick={handleDeleteGroup} disabled={isDeleting}>
             {isDeleting ? "삭제 중..." : "그룹 삭제"}
