@@ -6,6 +6,7 @@ interface User {
   email: string;
   groupId: number;
   accessToken: string;
+  role?: string;
 }
 
 interface AuthState {

@@ -91,6 +91,7 @@ const Login = ({ setIsSignup }: { setIsSignup: (isLogin: boolean) => void }) => 
         email: response.data.user.email,
         groupId: response.data.user.groupId,
         accessToken: response.data.accessToken,
+        role: response.data.user.role,
       });
       showToast("로그인되었습니다.", "success");
     } catch (error: any) {

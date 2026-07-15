@@ -7,12 +7,16 @@ import * as S from "../styles/HeaderStyles";
 import { useAuthStore } from "@/app/stores/useAuthStore";
 import { useRouter } from "next/navigation";
 import { useToast } from "./ui/Toast";
+import { api } from "@/lib/axios";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function Header() {
   const router = useRouter();
   const { user } = useAuthStore((state) => state);
+  const setUser = useAuthStore((state) => state.setUser);
   const { selectedGroup, setSelectedGroup, groups, loadGroups } = useGroupStore();
   const { showToast } = useToast();
+  const queryClient = useQueryClient();
 
   const canManage = !!user && user.groupId === selectedGroup;
 
@@ -26,8 +30,26 @@ export default function Header() {
     }
   }, [user]);
 
-  const onChangeGroup = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedGroup(Number(e.target.value));
+  const onChangeGroup = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const groupId = Number(e.target.value);
+    // 관리자는 그룹 전환 시 해당 그룹 스코프의 토큰을 재발급받아
+    // 그 그룹의 데이터 입력 권한(canManage)을 얻는다.
+    if (user?.role === "admin" && groupId && groupId !== user.groupId) {
+      try {
+        const response = await api.post(`/admin/switch-group/${groupId}`);
+        localStorage.setItem("token", response.data.accessToken);
+        setUser({
+          ...user,
+          groupId: response.data.groupId,
+          accessToken: response.data.accessToken,
+        });
+        queryClient.clear();
+      } catch {
+        showToast("그룹 전환에 실패했습니다.", "error");
+        return;
+      }
+    }
+    setSelectedGroup(groupId);
     router.push("/");
   };
 
