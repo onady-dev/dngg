@@ -302,16 +302,19 @@ export class SubscriptionService {
         // 이 orderId로 이전에 남은 failed Payment 행 유무로 Idempotency-Key를 구분한다:
         // (A) failed 행 없음 — 성공 후 DB persist 실패로 인한 재시도일 수 있으므로
         //     결정적인 orderId를 그대로 써서 토스의 원래 성공 응답을 재수신한다.
-        // (B) failed 행 있음 — 진짜 카드 거절 후 재시도. 결정적인 orderId를
-        //     그대로 쓰면 토스가 예전 거절 응답을 그대로 캐시해 반환할 수 있어
-        //     카드 문제를 해결한 사용자도 영원히 거절을 재현받는다. 날짜별로
-        //     신선한 키를 사용해 진짜 재시도가 가능하게 하되, 같은 날 중복 실행은
-        //     여전히 같은 키로 dedupe된다.
+        // (B) failed 행 있음 — 영속화된 실패 횟수(attemptCount)를 키에 포함한다.
+        //     날짜 기반 키는 잔여 이중결제 창이 있었다: 토스 성공 + DB persist 실패
+        //     시에는 실패 행이 그대로 남아 있는데(카운트 불변), 다음날 크론이 새
+        //     날짜로 신선한 키를 만들어 토스에 재청구하면 실제로 두 번 결제된다.
+        //     attemptCount는 거절이 DB에 기록될 때만 증가하므로:
+        //     - 토스 성공 + persist 실패 → count 불변 → 다음날도 같은 키 →
+        //       토스가 이전 성공을 그대로 replay → 정상적으로 성공 처리된다.
+        //     - 진짜 거절 → count 증가 → 다음날은 새 키 → 실제 재시도가 된다.
         const previousFailure = await this.payRepo.findOne({
           where: { orderId, status: 'failed' },
         });
         const idempotencyKey = previousFailure
-          ? `${orderId}_retry_${now.toISOString().slice(0, 10)}`
+          ? `${orderId}_retry_${previousFailure.attemptCount}`
           : undefined;
 
         let payment: { paymentKey: string };
@@ -341,6 +344,7 @@ export class SubscriptionService {
             await this.payRepo.update(existingFailed.id, {
               status: 'failed',
               failReason,
+              attemptCount: (existingFailed.attemptCount ?? 0) + 1,
             });
           } else {
             await this.payRepo.save(
@@ -351,6 +355,7 @@ export class SubscriptionService {
                 orderId,
                 status: 'failed',
                 failReason,
+                attemptCount: 1,
               }),
             );
           }
@@ -380,6 +385,9 @@ export class SubscriptionService {
                 status: 'success',
                 externalPaymentId: payment.paymentKey,
                 paidAt: now,
+                // 이전 실패 사유가 success 행에 잔존하지 않도록 초기화
+                // (attemptCount는 이력으로 그대로 둔다).
+                failReason: null,
               });
             } else {
               await manager.save(Payment, {

@@ -38,7 +38,11 @@ export class Payment {
   status: 'success' | 'failed';
 
   @Column('varchar', { nullable: true })
-  failReason: string;
+  failReason: string | null;
+
+  // 이 orderId로 DB에 영속화된 실패 횟수 — 크론 갱신 재시도의 Idempotency-Key 산출에 사용된다.
+  @Column({ type: 'int', default: 0 })
+  attemptCount: number;
 
   @Column('timestamp', { nullable: true })
   paidAt: Date;

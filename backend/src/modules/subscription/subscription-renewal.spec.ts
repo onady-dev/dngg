@@ -157,7 +157,7 @@ describe('SubscriptionService.renewDueSubscriptions', () => {
     expect(manager.update).toHaveBeenCalledWith(
       Payment,
       42,
-      expect.objectContaining({ status: 'success' }),
+      expect.objectContaining({ status: 'success', failReason: null }),
     );
     expect(manager.save).not.toHaveBeenCalled();
     expect(manager.update).toHaveBeenCalledWith(
@@ -167,12 +167,13 @@ describe('SubscriptionService.renewDueSubscriptions', () => {
     );
   });
 
-  test('이전 실패(failed) Payment 행이 있으면 재시도 시 신선한 일자별 idempotencyKey를 사용한다', async () => {
+  test('이전 실패(failed) Payment 행이 있으면 재시도 시 attemptCount 기반 idempotencyKey를 사용한다', async () => {
     const { service, payRepo, toss } = makeService({ ...baseSub });
     payRepo.findOne.mockResolvedValue({
       id: 99,
       orderId: 'renew_1_2026-07-13T00:00:00.000Z',
       status: 'failed',
+      attemptCount: 1,
     });
 
     await service.renewDueSubscriptions(NOW);
@@ -182,7 +183,7 @@ describe('SubscriptionService.renewDueSubscriptions', () => {
     });
     expect(toss.requestBillingPayment).toHaveBeenCalledWith(
       expect.objectContaining({
-        idempotencyKey: 'renew_1_2026-07-13T00:00:00.000Z_retry_2026-07-14',
+        idempotencyKey: 'renew_1_2026-07-13T00:00:00.000Z_retry_1',
       }),
     );
   });
@@ -195,6 +196,39 @@ describe('SubscriptionService.renewDueSubscriptions', () => {
     expect(
       toss.requestBillingPayment.mock.calls[0][0].idempotencyKey,
     ).toBeUndefined();
+  });
+
+  test('결제 실패 시 기존 failed 행이 있으면 attemptCount를 1 증가시켜 update한다', async () => {
+    const { service, payRepo } = makeService(
+      { ...baseSub },
+      { requestBillingPayment: jest.fn().mockRejectedValue(new Error('실패')) },
+    );
+    payRepo.findOne.mockResolvedValue({
+      id: 99,
+      orderId: 'renew_1_2026-07-13T00:00:00.000Z',
+      status: 'failed',
+      attemptCount: 1,
+    });
+
+    await service.renewDueSubscriptions(NOW);
+
+    expect(payRepo.update).toHaveBeenCalledWith(
+      99,
+      expect.objectContaining({ status: 'failed', attemptCount: 2 }),
+    );
+  });
+
+  test('결제 실패 시 기존 failed 행이 없으면 attemptCount: 1로 insert한다', async () => {
+    const { service, payRepo } = makeService(
+      { ...baseSub },
+      { requestBillingPayment: jest.fn().mockRejectedValue(new Error('실패')) },
+    );
+
+    await service.renewDueSubscriptions(NOW);
+
+    expect(payRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'failed', attemptCount: 1 }),
+    );
   });
 
   test('여러 구독 처리 중 하나가 실패해도 나머지 구독은 격리되어 계속 처리된다', async () => {
