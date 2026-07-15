@@ -24,14 +24,8 @@ export default function Header() {
     loadGroups();
   }, []);
 
-  useEffect(() => {
-    if (user) {
-      setSelectedGroup(user.groupId);
-    }
-  }, [user]);
-
   const onChangeGroup = async (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const groupId = Number(e.target.value);
+    const groupId = e.target.value ? Number(e.target.value) : null;
     // 관리자는 그룹 전환 시 해당 그룹 스코프의 토큰을 재발급받아
     // 그 그룹의 데이터 입력 권한(canManage)을 얻는다.
     if (user?.role === "admin" && groupId && groupId !== user.groupId) {
