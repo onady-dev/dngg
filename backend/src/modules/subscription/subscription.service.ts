@@ -299,6 +299,21 @@ export class SubscriptionService {
             ? 'DNGG 연 구독 갱신'
             : 'DNGG 월 구독 갱신';
 
+        // 이 orderId로 이전에 남은 failed Payment 행 유무로 Idempotency-Key를 구분한다:
+        // (A) failed 행 없음 — 성공 후 DB persist 실패로 인한 재시도일 수 있으므로
+        //     결정적인 orderId를 그대로 써서 토스의 원래 성공 응답을 재수신한다.
+        // (B) failed 행 있음 — 진짜 카드 거절 후 재시도. 결정적인 orderId를
+        //     그대로 쓰면 토스가 예전 거절 응답을 그대로 캐시해 반환할 수 있어
+        //     카드 문제를 해결한 사용자도 영원히 거절을 재현받는다. 날짜별로
+        //     신선한 키를 사용해 진짜 재시도가 가능하게 하되, 같은 날 중복 실행은
+        //     여전히 같은 키로 dedupe된다.
+        const previousFailure = await this.payRepo.findOne({
+          where: { orderId, status: 'failed' },
+        });
+        const idempotencyKey = previousFailure
+          ? `${orderId}_retry_${now.toISOString().slice(0, 10)}`
+          : undefined;
+
         let payment: { paymentKey: string };
         try {
           payment = await this.toss.requestBillingPayment({
@@ -307,6 +322,7 @@ export class SubscriptionService {
             amount,
             orderId,
             orderName,
+            ...(idempotencyKey ? { idempotencyKey } : {}),
           });
         } catch (error) {
           // 실제 결제 실패 — 유예 기간 계산 후 상태 전환, 실패 이력 기록(best-effort)

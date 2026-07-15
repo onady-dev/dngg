@@ -167,6 +167,36 @@ describe('SubscriptionService.renewDueSubscriptions', () => {
     );
   });
 
+  test('이전 실패(failed) Payment 행이 있으면 재시도 시 신선한 일자별 idempotencyKey를 사용한다', async () => {
+    const { service, payRepo, toss } = makeService({ ...baseSub });
+    payRepo.findOne.mockResolvedValue({
+      id: 99,
+      orderId: 'renew_1_2026-07-13T00:00:00.000Z',
+      status: 'failed',
+    });
+
+    await service.renewDueSubscriptions(NOW);
+
+    expect(payRepo.findOne).toHaveBeenCalledWith({
+      where: { orderId: 'renew_1_2026-07-13T00:00:00.000Z', status: 'failed' },
+    });
+    expect(toss.requestBillingPayment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        idempotencyKey: 'renew_1_2026-07-13T00:00:00.000Z_retry_2026-07-14',
+      }),
+    );
+  });
+
+  test('이전 실패(failed) Payment 행이 없으면 idempotencyKey를 전달하지 않는다(기본 orderId 유지)', async () => {
+    const { service, toss } = makeService({ ...baseSub });
+
+    await service.renewDueSubscriptions(NOW);
+
+    expect(
+      toss.requestBillingPayment.mock.calls[0][0].idempotencyKey,
+    ).toBeUndefined();
+  });
+
   test('여러 구독 처리 중 하나가 실패해도 나머지 구독은 격리되어 계속 처리된다', async () => {
     // sub1은 해지 예약 상태 — canceled 전환 update가 예상치 못하게 실패한다
     // (예: DB 순간 장애). per-sub try/catch로 격리되어 sub2는 정상 처리되어야 한다.
