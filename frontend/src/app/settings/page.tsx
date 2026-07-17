@@ -6,6 +6,7 @@ import styled from "styled-components";
 import Signup from "../components/Signup";
 import type { AuthView } from "../components/Signup";
 import Login from "../components/Login";
+import PasswordReset from "../components/PasswordReset";
 import { useAuthStore } from "@/app/stores/useAuthStore";
 import { useGroupStore } from "@/app/stores/groupStore";
 import { useToast } from "../components/ui/Toast";
@@ -138,6 +139,7 @@ const SettingsPage = () => {
 
   if (!user) {
     if (view === "signup") return <Signup setView={setView} />;
+    if (view === "reset") return <PasswordReset setView={setView} />;
     return <Login setView={setView} />;
   }
 
