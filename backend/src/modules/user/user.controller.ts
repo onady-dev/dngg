@@ -7,6 +7,8 @@ import {
   Delete,
   ValidationPipe,
   UseGuards,
+  Request,
+  ForbiddenException,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import {
@@ -18,6 +20,11 @@ import {
 } from './user.request.dto';
 import { EmailVerificationService } from './email-verification.service';
 import { AuthGuard } from '@nestjs/passport';
+
+// AuthGuard('jwt') 통과 후 req.user는 jwt.strategy.ts validate()의 반환값
+interface RequestWithUser {
+  user?: { userId?: number };
+}
 
 @Controller('user')
 export class UserController {
@@ -52,15 +59,18 @@ export class UserController {
   @Put(':id')
   @UseGuards(AuthGuard('jwt'))
   async updateUser(
+    @Request() req: RequestWithUser,
     @Param('id') id: number,
     @Body(ValidationPipe) dto: UpdateUserDto,
   ) {
+    this.assertOwnUser(req, Number(id));
     return this.userService.updateUser(Number(id), dto);
   }
 
   @Delete(':id')
   @UseGuards(AuthGuard('jwt'))
-  async deleteUser(@Param('id') id: number) {
+  async deleteUser(@Request() req: RequestWithUser, @Param('id') id: number) {
+    this.assertOwnUser(req, Number(id));
     await this.userService.deleteUser(Number(id));
     return { message: 'User deleted successfully' };
   }
@@ -79,5 +89,12 @@ export class UserController {
       dto.verificationToken,
       dto.newPassword,
     );
+  }
+
+  // 본인 계정만 수정/삭제할 수 있다 (JWT payload의 userId 기준)
+  private assertOwnUser(req: RequestWithUser, id: number) {
+    if (Number(req.user?.userId) !== Number(id)) {
+      throw new ForbiddenException('Cannot manage another user account');
+    }
   }
 }
