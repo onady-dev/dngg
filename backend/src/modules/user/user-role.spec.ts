@@ -20,6 +20,7 @@ describe('User role JWT 전파', () => {
       {} as any,
       {} as any,
       jwtService as any,
+      {} as any,
     );
 
     await service.loginUser('admin@test.com', 'pw1234');

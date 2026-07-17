@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsString,
   Length,
+  MinLength,
 } from 'class-validator';
 import {
   VERIFICATION_PURPOSES,
@@ -12,25 +13,31 @@ import {
 } from './email-verification.constants';
 
 export class CreateUserDto {
-  @IsNotEmpty()
-  @IsString()
+  @IsEmail()
   email: string;
-  @IsNotEmpty()
   @IsString()
+  @MinLength(8)
   password: string;
+  @IsString()
+  @Length(1, 30)
+  name: string;
   @IsNotEmpty()
   @IsString()
   groupName: string;
-  @IsOptional()
+  @IsNotEmpty()
   @IsString()
-  phoneNumber: string;
+  verificationToken: string;
 }
 
 export class UpdateUserDto {
-  email?: string;
+  @IsOptional()
+  @IsString()
+  @MinLength(8)
   password?: string;
-  phoneNumber?: string;
-  groupId?: number;
+  @IsOptional()
+  @IsString()
+  @Length(1, 30)
+  name?: string;
 }
 
 export class RequestEmailVerificationDto {
@@ -48,4 +55,4 @@ export class ConfirmEmailVerificationDto {
   code: string;
   @IsIn(VERIFICATION_PURPOSES)
   purpose: VerificationPurpose;
-} 
+}

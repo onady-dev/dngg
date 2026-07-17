@@ -5,10 +5,10 @@ import { User } from '../../entities/User.entity';
 import { CreateUserDto, UpdateUserDto } from './user.request.dto';
 import { Group } from 'src/entities/Group.entity';
 import * as bcrypt from 'bcrypt';
-import { encrypt } from './crypto.util';
 import { JwtService } from '@nestjs/jwt';
 import { UserRepository } from '../../repository/user.repository';
 import { GroupRepository } from 'src/repository/group.repository';
+import { EmailVerificationService } from './email-verification.service';
 
 @Injectable()
 export class UserService {
@@ -18,35 +18,56 @@ export class UserService {
     private readonly groupRepository: GroupRepository,
     private readonly dataSource: DataSource,
     private readonly jwtService: JwtService,
+    private readonly emailVerificationService: EmailVerificationService,
   ) {}
 
   async createUser(dto: CreateUserDto): Promise<User> {
+    // 이메일 인증을 통과한 요청만 가입 가능 — 토큰의 email과 가입 email이 일치해야 한다
+    const { email: verifiedEmail, verificationId } =
+      await this.emailVerificationService.assertVerified(
+        dto.verificationToken,
+        'signup',
+      );
+    if (verifiedEmail !== dto.email) {
+      throw new HttpException(
+        '이메일 인증이 유효하지 않습니다. 다시 인증해주세요.',
+        HttpStatus.UNAUTHORIZED,
+      );
+    }
+
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
-      const { groupName, ...userData } = dto;
-      const group = queryRunner.manager.create(Group, { name: groupName });
+      const group = queryRunner.manager.create(Group, { name: dto.groupName });
       const savedGroup = await queryRunner.manager.save(Group, group);
-      const { id: groupId } = savedGroup;
       const hashedPassword = await bcrypt.hash(dto.password, 10);
-      const encryptedPhone = encrypt(dto.phoneNumber);
       const user = queryRunner.manager.create(User, {
-        ...userData,
-        groupId,
+        email: dto.email,
+        name: dto.name,
+        groupId: savedGroup.id,
         password: hashedPassword,
-        phoneNumber: encryptedPhone,
       });
       const savedUser = await queryRunner.manager.save(User, user);
+      await this.emailVerificationService.markConsumed(
+        verificationId,
+        queryRunner.manager,
+      );
       await queryRunner.commitTransaction();
       return savedUser;
     } catch (error) {
       await queryRunner.rollbackTransaction();
-      if(error.code === '23505') {
-        if(error.table === 'user') {
-          throw new HttpException('Email already exists', HttpStatus.BAD_REQUEST);
+      if (error.code === '23505') {
+        if (error.table === 'user') {
+          throw new HttpException(
+            'Email already exists',
+            HttpStatus.BAD_REQUEST,
+          );
         }
-        throw new HttpException('Group name already exists', HttpStatus.BAD_REQUEST);
+        throw new HttpException(
+          'Group name already exists',
+          HttpStatus.BAD_REQUEST,
+        );
       }
       throw error;
     } finally {
@@ -59,9 +80,6 @@ export class UserService {
     if (dto.password) {
       updateData.password = await bcrypt.hash(dto.password, 10);
     }
-    if (dto.phoneNumber) {
-      updateData.phoneNumber = encrypt(dto.phoneNumber);
-    }
     await this.userRepository.update(id, updateData);
     return await this.userRepository.findOneOrFail({ where: { id } });
   }
@@ -70,7 +88,10 @@ export class UserService {
     await this.userRepository.delete(id);
   }
 
-  async loginUser(email: string, password: string): Promise<{ user: User; accessToken: string }> {
+  async loginUser(
+    email: string,
+    password: string,
+  ): Promise<{ user: User; accessToken: string }> {
     const user = await this.userRepository.findOne({ where: { email } });
     if (!user) {
       throw new HttpException('User not found', HttpStatus.NOT_FOUND);
@@ -88,4 +109,4 @@ export class UserService {
     const accessToken = this.jwtService.sign(payload);
     return { user, accessToken };
   }
-} 
+}

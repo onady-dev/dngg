@@ -10,8 +10,9 @@ export class User {
   email: string;
   @Column('varchar')
   password: string;
-  @Column('varchar')
-  phoneNumber: string;
+  // 표시용 이름 — 신규 가입은 필수(DTO에서 강제), 기존 유저는 null이라 nullable
+  @Column('varchar', { length: 30, nullable: true })
+  name: string | null;
   @Column('timestamp', { default: () => 'CURRENT_TIMESTAMP' })
   createdAt: Date;
 
