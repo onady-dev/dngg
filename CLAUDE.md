@@ -42,11 +42,47 @@ pnpm lint                # next lint
 
 ### 로컬에서 전체 스택 실행
 
+**최초 세팅 (한 번만)**
+
+1. Docker 엔진 준비. Mac은 Docker Desktop 대안으로 Colima 권장:
+   ```bash
+   brew install colima docker docker-compose
+   colima start                             # Linux VM + dockerd 부팅
+   ```
+2. 각 앱 의존성 설치. `bcrypt`·`@nestjs/core`·`@swc/core`·`unrs-resolver`의 postinstall은 `pnpm-workspace.yaml`의 `allowBuilds`로 자동 승인됨:
+   ```bash
+   cd backend && pnpm install
+   cd ../frontend && pnpm install
+   ```
+3. 로컬 env 파일 준비:
+   - `backend/.env.dev` — 팀 시크릿에서 받아서 배치 (`pnpm dev`가 `NODE_ENV=dev`로 로드)
+   - `frontend/.env.dev`를 `frontend/.env.development`로 복사 (next dev가 자동 로드하는 이름)
+   - 루트 `.env` — docker compose가 읽는 `DB_USERNAME/DB_PASSWORD/DB_DATABASE` 등
+4. (선택) 운영 DB에서 로컬 Postgres로 스냅샷 복사. 로컬 컨테이너를 먼저 띄운 뒤 실행:
+   ```bash
+   ssh dngg 'docker exec -e PGPASSWORD=<PW> postgres pg_dump -U postgres -d dngg \
+       --clean --if-exists --no-owner --no-privileges' \
+   | docker exec -i -e PGPASSWORD=<PW> postgres psql -U postgres -d dngg
+   ```
+
+**매번 개발 시작할 때**
+
 ```bash
-docker compose up -d db                    # Postgres만 실행 (개발 시 가장 일반적)
-pm2 start ecosystem.config.cjs            # backend :3010 + frontend :3011 watch 모드
-docker compose -f docker-compose.dev.yml up  # 전부 컨테이너로 실행
+colima start                                    # Mac: docker 데몬 켜기 (재부팅 후만 필요)
+docker compose up -d db                         # Postgres 컨테이너 (개발 시 가장 일반적)
+
+# 방식 A — 터미널 2개로 실행 (권장, 로그 분리)
+cd backend  && pnpm dev                         # :3010
+cd frontend && pnpm dev                         # :3011
+
+# 방식 B — 한 번에 백그라운드 실행
+pm2 start ecosystem.config.cjs                  # backend + frontend watch 모드; pm2 logs로 로그 확인
+
+# 방식 C — 전부 컨테이너로
+docker compose -f docker-compose.dev.yml up
 ```
+
+접속: 프론트 `http://localhost:3011`, API `http://localhost:3010`, DB `localhost:5432`.
 
 운영 배포는 루트 `docker-compose.yaml` 기준(frontend :3000, backend :3010, db :5432)이며 이미지는 `onady/dngg-frontend` / `onady/dngg-backend`를 사용한다. `start-dngg.sh` / `stop-dngg.sh`는 EC2 인스턴스를 시작/중지한다.
 

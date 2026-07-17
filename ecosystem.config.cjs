@@ -5,7 +5,6 @@ module.exports = {
       cwd: './backend',
       script: 'node_modules/@nestjs/cli/bin/nest.js',
       args: 'start --watch',
-      interpreter: 'C:/Program Files/nodejs/node.exe',
       env: { NODE_ENV: 'dev' },
     },
     {
@@ -13,7 +12,6 @@ module.exports = {
       cwd: './frontend',
       script: 'node_modules/next/dist/bin/next',
       args: 'dev -p 3011',
-      interpreter: 'C:/Program Files/nodejs/node.exe',
       env: { NODE_ENV: 'development' },
     },
   ],
