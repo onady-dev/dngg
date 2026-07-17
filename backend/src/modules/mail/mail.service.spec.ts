@@ -34,5 +34,30 @@ describe('MailService', () => {
       expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('123456'));
       expect((service as any).client).toBeNull();
     });
+
+    test('MAIL_FROM 설정 시 SES로 올바른 파라미터의 SendEmailCommand를 보낸다', async () => {
+      process.env.MAIL_FROM = 'no-reply@dngg.one';
+      const service = new MailService();
+      const send = jest.fn().mockResolvedValue({});
+      (service as any).client = { send };
+
+      await service.sendVerificationCode('a@b.c', '123456', 'signup');
+
+      expect(send).toHaveBeenCalledTimes(1);
+      const command = send.mock.calls[0][0];
+      expect(command.input).toEqual({
+        Source: 'no-reply@dngg.one',
+        Destination: { ToAddresses: ['a@b.c'] },
+        Message: {
+          Subject: { Data: '[dn.gg] 회원가입 인증 코드', Charset: 'UTF-8' },
+          Body: {
+            Text: {
+              Data: 'dn.gg 회원가입 인증 코드는 123456 입니다.\n10분 안에 입력해주세요.',
+              Charset: 'UTF-8',
+            },
+          },
+        },
+      });
+    });
   });
 });
