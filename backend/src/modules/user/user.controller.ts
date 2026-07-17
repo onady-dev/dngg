@@ -4,6 +4,7 @@ import {
   ConfirmEmailVerificationDto,
   CreateUserDto,
   RequestEmailVerificationDto,
+  ResetPasswordDto,
   UpdateUserDto,
 } from './user.request.dto';
 import { EmailVerificationService } from './email-verification.service';
@@ -61,5 +62,10 @@ export class UserController {
     @Body('password') password: string,
   ) {
     return this.userService.loginUser(email, password);
+  }
+
+  @Post('password-reset')
+  async resetPassword(@Body(ValidationPipe) dto: ResetPasswordDto) {
+    return this.userService.resetPassword(dto.verificationToken, dto.newPassword);
   }
 }

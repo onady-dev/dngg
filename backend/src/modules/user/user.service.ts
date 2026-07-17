@@ -109,4 +109,23 @@ export class UserService {
     const accessToken = this.jwtService.sign(payload);
     return { user, accessToken };
   }
+
+  async resetPassword(
+    verificationToken: string,
+    newPassword: string,
+  ): Promise<{ message: string }> {
+    const { email, verificationId } =
+      await this.emailVerificationService.assertVerified(
+        verificationToken,
+        'password_reset',
+      );
+    const user = await this.userRepository.findOne({ where: { email } });
+    if (!user) {
+      throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+    }
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await this.userRepository.update(user.id, { password: hashedPassword });
+    await this.emailVerificationService.markConsumed(verificationId);
+    return { message: '비밀번호가 변경되었습니다.' };
+  }
 }

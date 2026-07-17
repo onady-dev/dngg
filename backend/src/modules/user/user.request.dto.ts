@@ -56,3 +56,12 @@ export class ConfirmEmailVerificationDto {
   @IsIn(VERIFICATION_PURPOSES)
   purpose: VerificationPurpose;
 }
+
+export class ResetPasswordDto {
+  @IsNotEmpty()
+  @IsString()
+  verificationToken: string;
+  @IsString()
+  @MinLength(8)
+  newPassword: string;
+}
