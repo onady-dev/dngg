@@ -88,7 +88,7 @@ docker compose -f docker-compose.dev.yml up
 
 ## 환경 변수
 
-- 백엔드는 `.env.${NODE_ENV}`를 로드한다 (`backend/`의 `.env.dev`, `.env.development`, `.env.prod`). 키: `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_DATABASE`, `PORT`, `JWT_SECRET`.
+- 백엔드는 `.env.${NODE_ENV}`를 로드한다 (`backend/`의 `.env.dev`, `.env.development`, `.env.prod`). 키: `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_DATABASE`, `PORT`, `JWT_SECRET`, `MAIL_FROM`, `AWS_REGION`. `MAIL_FROM`이 없으면 인증 메일은 실발송 대신 콘솔 로그로 대체된다(dev 폴백) — 운영에는 반드시 설정할 것. SES 자격증명은 EC2 IAM Role을 사용한다.
 - 프론트엔드는 `NEXT_PUBLIC_API_URL`을 사용하며 — **빌드 시점에 값이 박힌다**. 서버에서 `.env`만 바꾸고 프론트엔드 이미지를 재빌드하지 않으면 아무 효과가 없다; 브라우저는 계속 예전 API 주소로 호출한다.
 - 허용 CORS origin은 `backend/src/main.ts`에 하드코딩되어 있다 (dngg.one, localhost:3011). 새 origin은 여기에 추가한다.
 
