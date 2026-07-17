@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from '../../entities/User.entity';
+import { EmailVerification } from '../../entities/EmailVerification.entity';
 import { UserService } from './user.service';
 import { UserController } from './user.controller';
 import { UserRepository } from '../../repository/user.repository';
@@ -9,6 +10,8 @@ import { JwtStrategy } from './jwt.strategy';
 import { GroupRepository } from 'src/repository/group.repository';
 import { Group } from 'src/entities/Group.entity';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { MailModule } from '../mail/mail.module';
+import { EmailVerificationService } from './email-verification.service';
 
 @Module({
   imports: [
@@ -20,9 +23,16 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
         signOptions: { expiresIn: '1d' },
       }),
     }),
-    TypeOrmModule.forFeature([User, Group]),
+    TypeOrmModule.forFeature([User, Group, EmailVerification]),
+    MailModule,
   ],
   controllers: [UserController],
-  providers: [UserService, JwtStrategy, UserRepository, GroupRepository],
+  providers: [
+    UserService,
+    EmailVerificationService,
+    JwtStrategy,
+    UserRepository,
+    GroupRepository,
+  ],
 })
-export class UserModule {} 
+export class UserModule {}
