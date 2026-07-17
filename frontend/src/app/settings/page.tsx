@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import styled from "styled-components";
 import Signup from "../components/Signup";
+import type { AuthView } from "../components/Signup";
 import Login from "../components/Login";
 import { useAuthStore } from "@/app/stores/useAuthStore";
 import { useGroupStore } from "@/app/stores/groupStore";
@@ -127,7 +128,7 @@ const SettingsPage = () => {
   const router = useRouter();
   const { user, logout } = useAuthStore((state) => state);
   const { groups, deleteGroup } = useGroupStore();
-  const [isSignup, setIsSignup] = useState(false);
+  const [view, setView] = useState<AuthView>("login");
   const [isDeleting, setIsDeleting] = useState(false);
   const { showToast } = useToast();
   const confirm = useConfirm();
@@ -136,7 +137,8 @@ const SettingsPage = () => {
   if (!mounted) return null;
 
   if (!user) {
-    return isSignup ? <Signup setIsSignup={setIsSignup} /> : <Login setIsSignup={setIsSignup} />;
+    if (view === "signup") return <Signup setView={setView} />;
+    return <Login setView={setView} />;
   }
 
   const myGroup = groups.find((group) => group.id === user.groupId);
@@ -179,7 +181,7 @@ const SettingsPage = () => {
           <LogoutButton
             onClick={() => {
               logout();
-              setIsSignup(false);
+              setView("login");
               showToast("로그아웃되었습니다.", "info");
             }}
           >
