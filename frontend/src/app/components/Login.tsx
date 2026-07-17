@@ -97,6 +97,7 @@ const Login = ({ setView }: { setView: (view: AuthView) => void }) => {
         groupId: response.data.user.groupId,
         accessToken: response.data.accessToken,
         role: response.data.user.role,
+        name: response.data.user.name ?? null,
       });
       // 그룹 자동 선택은 로그인 성공 시점 1회만 수행한다 (이후에는 사용자의 선택/해제를 존중).
       setSelectedGroup(response.data.user.groupId ?? null);
