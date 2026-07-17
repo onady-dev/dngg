@@ -10,6 +10,12 @@ import { UserRepository } from '../../repository/user.repository';
 import { GroupRepository } from 'src/repository/group.repository';
 import { EmailVerificationService } from './email-verification.service';
 
+// bcrypt 패키지에 타입 선언이 없어 호출부가 `any`로 추론된다 — 신규 코드에서는
+// 타입을 명시해 unsafe-* 린트를 피한다. 기존 호출부는 out-of-scope로 남겨둔다.
+const typedBcrypt = bcrypt as unknown as {
+  hash: (data: string, saltOrRounds: number) => Promise<string>;
+};
+
 @Injectable()
 export class UserService {
   constructor(
@@ -128,7 +134,7 @@ export class UserService {
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
-      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      const hashedPassword = await typedBcrypt.hash(newPassword, 10);
       await queryRunner.manager.update(User, user.id, {
         password: hashedPassword,
       });

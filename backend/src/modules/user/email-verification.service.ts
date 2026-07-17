@@ -19,7 +19,8 @@ export function hashCode(email: string, code: string): string {
   return crypto.createHash('sha256').update(`${email}:${code}`).digest('hex');
 }
 
-const INVALID_VERIFICATION = '이메일 인증이 유효하지 않습니다. 다시 인증해주세요.';
+const INVALID_VERIFICATION =
+  '이메일 인증이 유효하지 않습니다. 다시 인증해주세요.';
 
 @Injectable()
 export class EmailVerificationService {
@@ -36,7 +37,9 @@ export class EmailVerificationService {
     email: string,
     purpose: VerificationPurpose,
   ): Promise<{ message: string }> {
-    const existingUser = await this.userRepository.findOne({ where: { email } });
+    const existingUser = await this.userRepository.findOne({
+      where: { email },
+    });
     if (purpose === 'signup' && existingUser) {
       throw new HttpException('이미 가입된 이메일입니다.', HttpStatus.CONFLICT);
     }
@@ -135,13 +138,22 @@ export class EmailVerificationService {
     } catch {
       throw new HttpException(INVALID_VERIFICATION, HttpStatus.UNAUTHORIZED);
     }
-    if (payload.purpose !== purpose || !payload.verificationId || !payload.email) {
+    if (
+      payload.purpose !== purpose ||
+      !payload.verificationId ||
+      !payload.email
+    ) {
       throw new HttpException(INVALID_VERIFICATION, HttpStatus.UNAUTHORIZED);
     }
     const row = await this.verificationRepository.findOne({
       where: { id: payload.verificationId },
     });
-    if (!row || !row.verifiedAt || row.consumedAt || row.email !== payload.email) {
+    if (
+      !row ||
+      !row.verifiedAt ||
+      row.consumedAt ||
+      row.email !== payload.email
+    ) {
       throw new HttpException(INVALID_VERIFICATION, HttpStatus.UNAUTHORIZED);
     }
     return { email: payload.email, verificationId: payload.verificationId };

@@ -1,4 +1,14 @@
+import { SendEmailCommand } from '@aws-sdk/client-ses';
 import { buildVerificationMail, MailService } from './mail.service';
+
+interface MailServiceInternals {
+  logger: { warn: (message: string) => void };
+  client: { send: jest.Mock } | null;
+}
+
+function internals(service: MailService): MailServiceInternals {
+  return service as unknown as MailServiceInternals;
+}
 
 describe('MailService', () => {
   describe('buildVerificationMail', () => {
@@ -9,7 +19,10 @@ describe('MailService', () => {
     });
 
     test('password_reset 템플릿에 코드와 무시 안내가 포함된다', () => {
-      const { subject, body } = buildVerificationMail('password_reset', '654321');
+      const { subject, body } = buildVerificationMail(
+        'password_reset',
+        '654321',
+      );
       expect(subject).toContain('비밀번호');
       expect(body).toContain('654321');
       expect(body).toContain('무시');
@@ -26,20 +39,23 @@ describe('MailService', () => {
       delete process.env.MAIL_FROM;
       const service = new MailService();
       const warnSpy = jest
-        .spyOn((service as any).logger, 'warn')
+        .spyOn(internals(service).logger, 'warn')
         .mockImplementation(() => undefined);
 
       await service.sendVerificationCode('a@b.c', '123456', 'signup');
 
       expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('123456'));
-      expect((service as any).client).toBeNull();
+      expect(internals(service).client).toBeNull();
     });
 
     test('MAIL_FROM 설정 시 SES로 올바른 파라미터의 SendEmailCommand를 보낸다', async () => {
       process.env.MAIL_FROM = 'no-reply@dngg.one';
       const service = new MailService();
-      const send = jest.fn().mockResolvedValue({});
-      (service as any).client = { send };
+      const send = jest.fn((command: SendEmailCommand) => {
+        void command;
+        return Promise.resolve({});
+      });
+      internals(service).client = { send };
 
       await service.sendVerificationCode('a@b.c', '123456', 'signup');
 

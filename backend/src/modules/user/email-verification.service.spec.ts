@@ -1,10 +1,18 @@
-import { EmailVerificationService, hashCode } from './email-verification.service';
+import { Repository } from 'typeorm';
+import { JwtService } from '@nestjs/jwt';
+import {
+  EmailVerificationService,
+  hashCode,
+} from './email-verification.service';
+import { EmailVerification } from '../../entities/EmailVerification.entity';
+import { User } from '../../entities/User.entity';
+import { MailService } from '../mail/mail.service';
 
 const createVerificationRepoMock = () => ({
   findOne: jest.fn(),
   count: jest.fn(),
-  create: jest.fn((v: any) => v),
-  save: jest.fn(),
+  create: jest.fn((v: Record<string, unknown>) => v),
+  save: jest.fn((v: Record<string, unknown>) => Promise.resolve(v)),
   update: jest.fn(),
 });
 
@@ -24,17 +32,19 @@ describe('EmailVerificationService', () => {
       verify: jest.fn(),
     };
     service = new EmailVerificationService(
-      verificationRepo as any,
-      userRepo as any,
-      mailService as any,
-      jwtService as any,
+      verificationRepo as unknown as Repository<EmailVerification>,
+      userRepo as unknown as Repository<User>,
+      mailService as unknown as MailService,
+      jwtService as unknown as JwtService,
     );
   });
 
   describe('requestCode', () => {
     test('signup: 이미 가입된 이메일이면 409', async () => {
       userRepo.findOne.mockResolvedValue({ id: 1 });
-      await expect(service.requestCode('a@b.c', 'signup')).rejects.toMatchObject({
+      await expect(
+        service.requestCode('a@b.c', 'signup'),
+      ).rejects.toMatchObject({
         status: 409,
       });
     });
@@ -50,7 +60,9 @@ describe('EmailVerificationService', () => {
     test('쿨다운 60초 안에 재요청하면 429', async () => {
       userRepo.findOne.mockResolvedValue(null);
       verificationRepo.findOne.mockResolvedValue({ createdAt: new Date() });
-      await expect(service.requestCode('a@b.c', 'signup')).rejects.toMatchObject({
+      await expect(
+        service.requestCode('a@b.c', 'signup'),
+      ).rejects.toMatchObject({
         status: 429,
       });
     });
@@ -59,7 +71,9 @@ describe('EmailVerificationService', () => {
       userRepo.findOne.mockResolvedValue(null);
       verificationRepo.findOne.mockResolvedValue(null);
       verificationRepo.count.mockResolvedValue(10);
-      await expect(service.requestCode('a@b.c', 'signup')).rejects.toMatchObject({
+      await expect(
+        service.requestCode('a@b.c', 'signup'),
+      ).rejects.toMatchObject({
         status: 429,
       });
     });
@@ -71,7 +85,10 @@ describe('EmailVerificationService', () => {
 
       await service.requestCode('a@b.c', 'signup');
 
-      const saved = verificationRepo.save.mock.calls[0][0];
+      const saved = verificationRepo.save.mock.calls[0][0] as unknown as {
+        codeHash: string;
+        expiresAt: Date;
+      };
       expect(saved.codeHash).toMatch(/^[0-9a-f]{64}$/);
       expect(saved.expiresAt.getTime()).toBeGreaterThan(Date.now());
       expect(mailService.sendVerificationCode).toHaveBeenCalledWith(
@@ -97,7 +114,9 @@ describe('EmailVerificationService', () => {
 
     test('발급 이력이 없으면 400', async () => {
       verificationRepo.findOne.mockResolvedValue(null);
-      await expect(service.confirmCode('a@b.c', '123456', 'signup')).rejects.toMatchObject({
+      await expect(
+        service.confirmCode('a@b.c', '123456', 'signup'),
+      ).rejects.toMatchObject({
         status: 400,
       });
     });
@@ -107,7 +126,9 @@ describe('EmailVerificationService', () => {
         ...validRow('123456'),
         expiresAt: new Date(Date.now() - 1000),
       });
-      await expect(service.confirmCode('a@b.c', '123456', 'signup')).rejects.toMatchObject({
+      await expect(
+        service.confirmCode('a@b.c', '123456', 'signup'),
+      ).rejects.toMatchObject({
         status: 400,
       });
     });
@@ -117,17 +138,23 @@ describe('EmailVerificationService', () => {
         ...validRow('123456'),
         attemptCount: 5,
       });
-      await expect(service.confirmCode('a@b.c', '123456', 'signup')).rejects.toMatchObject({
+      await expect(
+        service.confirmCode('a@b.c', '123456', 'signup'),
+      ).rejects.toMatchObject({
         status: 429,
       });
     });
 
     test('코드 불일치 시 attemptCount 증가 후 400', async () => {
       verificationRepo.findOne.mockResolvedValue(validRow('123456'));
-      await expect(service.confirmCode('a@b.c', '000000', 'signup')).rejects.toMatchObject({
+      await expect(
+        service.confirmCode('a@b.c', '000000', 'signup'),
+      ).rejects.toMatchObject({
         status: 400,
       });
-      expect(verificationRepo.update).toHaveBeenCalledWith(5, { attemptCount: 1 });
+      expect(verificationRepo.update).toHaveBeenCalledWith(5, {
+        attemptCount: 1,
+      });
     });
 
     test('성공 시 verifiedAt 기록 후 verificationToken 반환', async () => {
@@ -136,7 +163,7 @@ describe('EmailVerificationService', () => {
       const result = await service.confirmCode('a@b.c', '123456', 'signup');
 
       expect(verificationRepo.update).toHaveBeenCalledWith(5, {
-        verifiedAt: expect.any(Date),
+        verifiedAt: expect.any(Date) as Date,
       });
       expect(jwtService.sign).toHaveBeenCalledWith(
         { email: 'a@b.c', purpose: 'signup', verificationId: 5 },
@@ -151,14 +178,22 @@ describe('EmailVerificationService', () => {
       jwtService.verify.mockImplementation(() => {
         throw new Error('invalid');
       });
-      await expect(service.assertVerified('bad-token', 'signup')).rejects.toMatchObject({
+      await expect(
+        service.assertVerified('bad-token', 'signup'),
+      ).rejects.toMatchObject({
         status: 401,
       });
     });
 
     test('purpose 불일치 토큰은 401 (로그인 accessToken 재사용 차단)', async () => {
-      jwtService.verify.mockReturnValue({ userId: 1, email: 'a@b.c', groupId: 2 });
-      await expect(service.assertVerified('login-token', 'signup')).rejects.toMatchObject({
+      jwtService.verify.mockReturnValue({
+        userId: 1,
+        email: 'a@b.c',
+        groupId: 2,
+      });
+      await expect(
+        service.assertVerified('login-token', 'signup'),
+      ).rejects.toMatchObject({
         status: 401,
       });
     });
@@ -175,7 +210,9 @@ describe('EmailVerificationService', () => {
         verifiedAt: new Date(),
         consumedAt: new Date(),
       });
-      await expect(service.assertVerified('token', 'signup')).rejects.toMatchObject({
+      await expect(
+        service.assertVerified('token', 'signup'),
+      ).rejects.toMatchObject({
         status: 401,
       });
     });

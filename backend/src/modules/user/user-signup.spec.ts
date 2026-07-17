@@ -1,5 +1,11 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
+import { DataSource, Repository } from 'typeorm';
+import { JwtService } from '@nestjs/jwt';
 import { UserService } from './user.service';
+import { User } from '../../entities/User.entity';
+import { GroupRepository } from '../../repository/group.repository';
+import { EmailVerificationService } from './email-verification.service';
+import { CreateUserDto } from './user.request.dto';
 
 const makeQueryRunner = () => ({
   connect: jest.fn(),
@@ -8,12 +14,14 @@ const makeQueryRunner = () => ({
   rollbackTransaction: jest.fn(),
   release: jest.fn(),
   manager: {
-    create: jest.fn((_entity: any, v: any) => v),
-    save: jest.fn((_entity: any, v: any) => Promise.resolve({ id: 1, ...v })),
+    create: jest.fn((_entity: unknown, v: Record<string, unknown>) => v),
+    save: jest.fn((_entity: unknown, v: Record<string, unknown>) =>
+      Promise.resolve({ id: 1, ...v }),
+    ),
   },
 });
 
-const baseDto = {
+const baseDto: CreateUserDto = {
   email: 'a@b.c',
   password: 'password123',
   name: '홍길동',
@@ -34,14 +42,14 @@ describe('createUser 이메일 인증 강제', () => {
     const queryRunner = makeQueryRunner();
     const dataSource = { createQueryRunner: () => queryRunner };
     const service = new UserService(
-      {} as any,
-      {} as any,
-      dataSource as any,
-      {} as any,
-      emailVerification as any,
+      {} as unknown as Repository<User>,
+      {} as unknown as GroupRepository,
+      dataSource as unknown as DataSource,
+      {} as unknown as JwtService,
+      emailVerification as unknown as EmailVerificationService,
     );
 
-    await expect(service.createUser(baseDto as any)).rejects.toMatchObject({
+    await expect(service.createUser(baseDto)).rejects.toMatchObject({
       status: 401,
     });
     expect(queryRunner.startTransaction).not.toHaveBeenCalled();
@@ -56,14 +64,14 @@ describe('createUser 이메일 인증 강제', () => {
     };
     const dataSource = { createQueryRunner: () => makeQueryRunner() };
     const service = new UserService(
-      {} as any,
-      {} as any,
-      dataSource as any,
-      {} as any,
-      emailVerification as any,
+      {} as unknown as Repository<User>,
+      {} as unknown as GroupRepository,
+      dataSource as unknown as DataSource,
+      {} as unknown as JwtService,
+      emailVerification as unknown as EmailVerificationService,
     );
 
-    await expect(service.createUser(baseDto as any)).rejects.toMatchObject({
+    await expect(service.createUser(baseDto)).rejects.toMatchObject({
       status: 401,
     });
   });
@@ -78,17 +86,19 @@ describe('createUser 이메일 인증 강제', () => {
     const queryRunner = makeQueryRunner();
     const dataSource = { createQueryRunner: () => queryRunner };
     const service = new UserService(
-      {} as any,
-      {} as any,
-      dataSource as any,
-      {} as any,
-      emailVerification as any,
+      {} as unknown as Repository<User>,
+      {} as unknown as GroupRepository,
+      dataSource as unknown as DataSource,
+      {} as unknown as JwtService,
+      emailVerification as unknown as EmailVerificationService,
     );
 
-    const user = await service.createUser(baseDto as any);
+    const user = await service.createUser(baseDto);
 
     expect(user.name).toBe('홍길동');
-    expect((user as any).phoneNumber).toBeUndefined();
+    expect(
+      (user as unknown as Record<string, unknown>).phoneNumber,
+    ).toBeUndefined();
     expect(emailVerification.markConsumed).toHaveBeenCalledWith(
       5,
       queryRunner.manager,

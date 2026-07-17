@@ -1,6 +1,7 @@
 import * as bcrypt from 'bcrypt';
 import { UserService } from './user.service';
 import { JwtStrategy } from './jwt.strategy';
+import { EmailVerificationService } from './email-verification.service';
 
 describe('User role JWT 전파', () => {
   test('loginUser는 JWT payload에 role을 포함한다', async () => {
@@ -20,7 +21,7 @@ describe('User role JWT 전파', () => {
       {} as any,
       {} as any,
       jwtService as any,
-      {} as any,
+      {} as unknown as EmailVerificationService,
     );
 
     await service.loginUser('admin@test.com', 'pw1234');

@@ -1,5 +1,14 @@
 import * as bcrypt from 'bcrypt';
+import { DataSource, Repository } from 'typeorm';
+import { JwtService } from '@nestjs/jwt';
 import { UserService } from './user.service';
+import { User } from '../../entities/User.entity';
+import { GroupRepository } from '../../repository/group.repository';
+import { EmailVerificationService } from './email-verification.service';
+
+const typedBcrypt = bcrypt as unknown as {
+  compare: (data: string, encrypted: string) => Promise<boolean>;
+};
 
 const makeQueryRunner = () => ({
   connect: jest.fn(),
@@ -8,13 +17,16 @@ const makeQueryRunner = () => ({
   rollbackTransaction: jest.fn(),
   release: jest.fn(),
   manager: {
-    update: jest.fn().mockResolvedValue(undefined),
+    update: jest.fn(
+      (_entity: unknown, _id: number, data: Record<string, unknown>) =>
+        Promise.resolve({ ...data }),
+    ),
   },
 });
 
 describe('resetPassword', () => {
   const makeService = (overrides?: {
-    user?: any;
+    user?: { id: number; email: string } | null;
     assertVerified?: jest.Mock;
     queryRunner?: ReturnType<typeof makeQueryRunner>;
     emailVerification?: { assertVerified: jest.Mock; markConsumed: jest.Mock };
@@ -37,11 +49,11 @@ describe('resetPassword', () => {
     const queryRunner = overrides?.queryRunner ?? makeQueryRunner();
     const dataSource = { createQueryRunner: () => queryRunner };
     const service = new UserService(
-      userRepo as any,
-      {} as any,
-      dataSource as any,
-      {} as any,
-      emailVerification as any,
+      userRepo as unknown as Repository<User>,
+      {} as unknown as GroupRepository,
+      dataSource as unknown as DataSource,
+      {} as unknown as JwtService,
+      emailVerification as unknown as EmailVerificationService,
     );
     return { service, userRepo, emailVerification, queryRunner };
   };
@@ -59,7 +71,9 @@ describe('resetPassword', () => {
     expect(queryRunner.startTransaction).toHaveBeenCalled();
     const [, id, data] = queryRunner.manager.update.mock.calls[0];
     expect(id).toBe(3);
-    expect(await bcrypt.compare('newpassword1', data.password)).toBe(true);
+    expect(
+      await typedBcrypt.compare('newpassword1', data.password as string),
+    ).toBe(true);
     expect(emailVerification.markConsumed).toHaveBeenCalledWith(
       9,
       queryRunner.manager,

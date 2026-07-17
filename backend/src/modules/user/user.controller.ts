@@ -1,4 +1,13 @@
-import { Controller, Post, Body, Put, Param, Delete, ValidationPipe, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Put,
+  Param,
+  Delete,
+  ValidationPipe,
+  UseGuards,
+} from '@nestjs/common';
 import { UserService } from './user.service';
 import {
   ConfirmEmailVerificationDto,
@@ -66,6 +75,9 @@ export class UserController {
 
   @Post('password-reset')
   async resetPassword(@Body(ValidationPipe) dto: ResetPasswordDto) {
-    return this.userService.resetPassword(dto.verificationToken, dto.newPassword);
+    return this.userService.resetPassword(
+      dto.verificationToken,
+      dto.newPassword,
+    );
   }
 }
