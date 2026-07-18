@@ -106,3 +106,63 @@ describe('createUser 이메일 인증 강제', () => {
     expect(queryRunner.commitTransaction).toHaveBeenCalled();
   });
 });
+
+// 유니크 위반(23505)이 500이 아닌 400으로 변환되는지 고정하는 회귀 테스트.
+describe('createUser 유니크 위반 처리', () => {
+  const makeService = (queryRunner: ReturnType<typeof makeQueryRunner>) => {
+    const emailVerification = {
+      assertVerified: jest
+        .fn()
+        .mockResolvedValue({ email: 'a@b.c', verificationId: 5 }),
+      markConsumed: jest.fn(),
+    };
+    const dataSource = { createQueryRunner: () => queryRunner };
+    return new UserService(
+      {} as unknown as Repository<User>,
+      {} as unknown as GroupRepository,
+      dataSource as unknown as DataSource,
+      {} as unknown as JwtService,
+      emailVerification as unknown as EmailVerificationService,
+    );
+  };
+
+  test('중복 그룹명이면 400 Group name already exists', async () => {
+    const queryRunner = makeQueryRunner();
+    queryRunner.manager.save = jest
+      .fn()
+      .mockRejectedValue(
+        Object.assign(new Error('duplicate key'), {
+          code: '23505',
+          table: 'group',
+        }),
+      );
+    const service = makeService(queryRunner);
+
+    await expect(service.createUser(baseDto)).rejects.toMatchObject({
+      status: 400,
+      message: 'Group name already exists',
+    });
+    expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
+  });
+
+  test('중복 이메일이면 400 Email already exists', async () => {
+    const queryRunner = makeQueryRunner();
+    queryRunner.manager.save = jest
+      .fn()
+      // 첫 save(Group)는 성공, 두 번째 save(User)에서 이메일 유니크 위반
+      .mockResolvedValueOnce({ id: 1 })
+      .mockRejectedValueOnce(
+        Object.assign(new Error('duplicate key'), {
+          code: '23505',
+          table: 'user',
+        }),
+      );
+    const service = makeService(queryRunner);
+
+    await expect(service.createUser(baseDto)).rejects.toMatchObject({
+      status: 400,
+      message: 'Email already exists',
+    });
+    expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
+  });
+});
