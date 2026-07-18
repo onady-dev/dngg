@@ -44,6 +44,19 @@ export class LogRepository extends Repository<Log> {
     });
   }
 
+  async findDailyLogsWithGame(
+    date: string,
+    groupId: number,
+  ): Promise<Log[] | null> {
+    return this.logRepository.find({
+      where: {
+        groupId: Number(groupId),
+        createdAt: Raw((alias) => `${alias}::date = :date`, { date }),
+      },
+      relations: ['logitem', 'game'],
+    });
+  }
+
   async findDailyDates(groupId: number): Promise<string[]> {
     // 로그가 실제 존재하는 날짜만, findByDaily와 같은 ::date 기준으로 뽑는다.
     const rows: { date: string }[] = await this.logRepository

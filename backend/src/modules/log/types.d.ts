@@ -18,3 +18,12 @@ export type LogItem = {
     count: number;
   };
 };
+
+export type GameSummary = {
+  id: number;
+  homeTeamName: string | null;
+  awayTeamName: string | null;
+  homeScore: number;
+  awayScore: number;
+  status: string;
+};

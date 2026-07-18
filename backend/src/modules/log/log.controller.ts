@@ -35,6 +35,11 @@ export class LogController {
     return this.logService.getDailyDates(dto.groupId);
   }
 
+  @Get('/daily/games')
+  async getDailyGames(@Query(ValidationPipe) dto: GetLogByDailyRequestDto) {
+    return this.logService.getDailyGames(dto.date, dto.groupId);
+  }
+
   @Get('/game/:id')
   async getLogByGameId(@Param('id') id: number) {
     return this.logService.getLogByGameId(id);

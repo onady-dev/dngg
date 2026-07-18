@@ -1,5 +1,5 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, In } from 'typeorm';
 import { LogRepository } from 'src/repository/log.repository';
 import { GameRepository } from 'src/repository/game.repository';
 import { PostLogRequestDto } from './log.request.dto';
@@ -7,7 +7,8 @@ import { plainToInstance } from 'class-transformer';
 import { Log } from 'src/entities/Log.entity';
 import { Player as PlayerEntity } from 'src/entities/Player.entity';
 import { Logitem } from 'src/entities/Logitem.entity';
-import { Player } from './types';
+import { InGamePlayer } from 'src/entities/InGamePlayer.entity';
+import { GameSummary, Player } from './types';
 import { assertIdsInGroup, findOwnedGame } from 'src/common/group-access';
 
 @Injectable()
@@ -58,6 +59,55 @@ export class LogService {
 
   async getDailyDates(groupId: number) {
     return this.logRepository.findDailyDates(groupId);
+  }
+
+  async getDailyGames(dateString: string, groupId: number) {
+    const logs = await this.logRepository.findDailyLogsWithGame(
+      dateString,
+      groupId,
+    );
+    if (!logs || logs.length === 0) {
+      return [];
+    }
+
+    // 게임별 선수의 홈/어웨이 소속 매핑
+    const gameIds = Array.from(new Set(logs.map((log) => log.gameId)));
+    const inGamePlayers = await this.dataSource
+      .getRepository(InGamePlayer)
+      .find({ where: { gameId: In(gameIds), groupId: Number(groupId) } });
+    const teamByGamePlayer = new Map<string, string>();
+    inGamePlayers.forEach((igp) => {
+      teamByGamePlayer.set(`${igp.gameId}:${igp.playerId}`, igp.team);
+    });
+
+    const gameMap = new Map<number, GameSummary>();
+    logs.forEach((log) => {
+      if (!log.game || log.game.status === 'DELETED') {
+        return;
+      }
+      let summary = gameMap.get(log.gameId);
+      if (!summary) {
+        summary = {
+          id: log.gameId,
+          homeTeamName: log.game.homeTeamName,
+          awayTeamName: log.game.awayTeamName,
+          homeScore: 0,
+          awayScore: 0,
+          status: log.game.status,
+        };
+        gameMap.set(log.gameId, summary);
+      }
+      if (!log.player) {
+        return; // FK 제거 정책: 삭제된 선수 로그는 스코어 합산에서 제외
+      }
+      const team = teamByGamePlayer.get(`${log.gameId}:${log.playerId}`);
+      if (team === 'home') {
+        summary.homeScore += log.logitem.value;
+      } else if (team === 'away') {
+        summary.awayScore += log.logitem.value;
+      }
+    });
+    return Array.from(gameMap.values());
   }
 
   async getLogByGameId(gameId: number) {
