@@ -46,11 +46,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 로컬 개발 pnpm 버전과 일치시킨다 — pnpm 9는 packages 없는
-      # pnpm-workspace.yaml(allowBuilds 전용)을 파싱하지 못해 install이 실패한다
+      # 로컬 개발 pnpm 버전과 정확히 일치시킨다 — pnpm 9는 packages 없는
+      # pnpm-workspace.yaml(allowBuilds 전용)을 파싱하지 못해 install이 실패하고,
+      # pnpm 11.14+는 node:sqlite(Node 22.5+)를 요구해 Node 20 러너에서 크래시한다
       - uses: pnpm/action-setup@v4
         with:
-          version: 11
+          version: 11.13.1
 
       - uses: actions/setup-node@v4
         with:
