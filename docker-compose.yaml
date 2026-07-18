@@ -1,8 +1,8 @@
-# 배포 절차 (루트 package.json 스크립트 사용):
-#   로컬:  .env의 FRONTEND_VERSION/BACKEND_VERSION 갱신 후
-#          npm run deploy          # 이미지 빌드 + push
-#   서버:  .env 버전 동기화 후
-#          npm run deploy:update   # 이미지 pull + up -d
+# 배포는 CI/CD 자동화됨 — main 푸시 시 .github/workflows/deploy.yml이 빌드·푸시·배포한다.
+# 수동 빌드/푸시 금지 (CLAUDE.md의 "배포 — CI/CD" 섹션 참고).
+# 아래 npm 스크립트(deploy:*)는 CI 장애 시 비상용 레거시:
+#   로컬:  npm run deploy          # 이미지 빌드 + push (반드시 linux/amd64로)
+#   서버:  npm run deploy:update   # 이미지 pull + up -d
 
 services:
   db:

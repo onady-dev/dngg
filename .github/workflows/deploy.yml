@@ -37,7 +37,8 @@ jobs:
 
   backend:
     needs: changes
-    if: needs.changes.outputs.backend == 'true'
+    # 수동 배포(workflow_dispatch)는 경로 필터와 무관하게 전체를 빌드한다
+    if: needs.changes.outputs.backend == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -45,9 +46,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # 로컬 개발 pnpm 버전과 일치시킨다 — pnpm 9는 packages 없는
+      # pnpm-workspace.yaml(allowBuilds 전용)을 파싱하지 못해 install이 실패한다
       - uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: 11
 
       - uses: actions/setup-node@v4
         with:
@@ -79,7 +82,7 @@ jobs:
 
   frontend:
     needs: changes
-    if: needs.changes.outputs.frontend == 'true'
+    if: needs.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -109,7 +112,8 @@ jobs:
       ${{ !cancelled() &&
           needs.backend.result != 'failure' &&
           needs.frontend.result != 'failure' &&
-          (needs.changes.outputs.backend == 'true' ||
+          (github.event_name == 'workflow_dispatch' ||
+           needs.changes.outputs.backend == 'true' ||
            needs.changes.outputs.frontend == 'true' ||
            needs.changes.outputs.deploy-config == 'true') }}
     runs-on: ubuntu-latest

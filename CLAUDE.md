@@ -111,6 +111,21 @@ docker compose -f docker-compose.dev.yml up
 - styled-components에 SSR registry(`src/app/registry.tsx`) 사용; 스타일 파일은 같은 위치의 `styles/*.ts` 모듈에 있다. hydration에 민감한 컴포넌트는 `useMounted` 훅을 사용한다.
 - 토스트는 `src/lib/toastBus.ts`를 거친다 (`showGlobalToast`는 즉시 표시, `setPendingToast`는 페이지 이동 후에도 유지).
 
+## 배포 — CI/CD 자동 배포 (⚠️ main 푸시 = 운영 배포)
+
+**`main`에 푸시하면 `.github/workflows/deploy.yml`이 자동으로 운영에 배포한다.** 수동으로 이미지를 빌드/푸시하지 말 것 — CI가 amd64 네이티브로 빌드한다 (compose 파일 상단의 `npm run deploy` 수동 절차는 레거시).
+
+동작 방식:
+- 경로 필터: `backend/**` 변경 → backend 잡, `frontend/**` 변경 → frontend 잡, `docker-compose.yaml`·워크플로 변경 → deploy 잡만 실행. 각 잡은 Docker Hub에 `:latest`와 `:sha-<커밋>` 두 태그를 푸시한다.
+- deploy 잡: 레포의 `docker-compose.yaml`을 서버(`/usr/local/project/dngg`)로 scp 동기화 → `docker compose pull frontend backend && up -d`. **서버의 compose 파일을 직접 수정해도 다음 배포에서 덮어써진다.**
+- 수동 배포: Actions 탭의 workflow_dispatch 버튼 — 경로 필터와 무관하게 백엔드·프론트를 모두 빌드·배포한다 (동시 배포가 필요한 릴리스에 사용).
+- 롤백/버전 고정: 서버 `/usr/local/project/dngg/.env`의 `FRONTEND_VERSION`/`BACKEND_VERSION`을 `sha-<커밋>`으로 바꾸고 `docker compose up -d <서비스>`. 고정돼 있으면 CI deploy가 돌아도 그 서비스는 pull되지 않는다. **릴리스 전에 `latest`로 복원할 것.**
+
+주의(2026-07-18 실제 장애 사례):
+- **백엔드·프론트 잡은 독립적이다** — 한쪽이 실패해도 다른 쪽은 `:latest`를 푸시한다. 이후 compose만 바꾼 커밋이 deploy 잡만 실행하면 **신구 버전이 섞여 배포**될 수 있다 (실제로 신규 프론트+구형 백엔드 조합으로 가입 장애 발생). 프론트·백엔드가 함께 가야 하는 변경은 CI가 전부 green인지 확인하고, 필요하면 workflow_dispatch로 동시 배포할 것.
+- CI 헬스체크는 기존 라우트(`/group/all`, 프론트 루트)만 확인한다 — 배포가 success여도 신규 기능 라우트는 직접 스모크할 것.
+- CI의 pnpm 버전은 로컬과 일치시킨다(현재 11). pnpm 9는 `packages` 없는 `pnpm-workspace.yaml`(allowBuilds 전용)을 못 읽어 install이 실패한다.
+
 ## 배포 주의사항 (PROJECT_CONTEXT.md 참고)
 
 - 사이트는 `https://dngg.one`에서 서비스된다; 해당 페이지에서 평문 `http://<ip>:3010`으로 백엔드를 호출하면 mixed content로 차단되어 서버 로그에도 남지 않는다. API 접근은 HTTPS 또는 same-origin 프록시로 유지할 것.
