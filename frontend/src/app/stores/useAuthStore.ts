@@ -8,6 +8,7 @@ interface User {
   groupId: number;
   accessToken: string;
   role?: string;
+  name?: string | null;
 }
 
 interface AuthState {

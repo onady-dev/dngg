@@ -6,6 +6,7 @@ import { useAuthStore } from "../stores/useAuthStore";
 import { useGroupStore } from "../stores/groupStore";
 import api from "@/lib/axios";
 import { useToast } from "./ui/Toast";
+import type { AuthView } from "./Signup";
 
 export const AuthContainer = styled.div`
   min-height: calc(100vh - var(--header-height));
@@ -77,7 +78,7 @@ export const AuthSwitchButton = styled.button`
   font-size: 0.875rem;
 `;
 
-const Login = ({ setIsSignup }: { setIsSignup: (isLogin: boolean) => void }) => {
+const Login = ({ setView }: { setView: (view: AuthView) => void }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const setUser = useAuthStore((state) => state.setUser);
@@ -96,6 +97,7 @@ const Login = ({ setIsSignup }: { setIsSignup: (isLogin: boolean) => void }) => 
         groupId: response.data.user.groupId,
         accessToken: response.data.accessToken,
         role: response.data.user.role,
+        name: response.data.user.name ?? null,
       });
       // 그룹 자동 선택은 로그인 성공 시점 1회만 수행한다 (이후에는 사용자의 선택/해제를 존중).
       setSelectedGroup(response.data.user.groupId ?? null);
@@ -137,7 +139,12 @@ const Login = ({ setIsSignup }: { setIsSignup: (isLogin: boolean) => void }) => 
         </AuthForm>
         <AuthSwitchRow>
           <span>계정이 없으신가요?</span>
-          <AuthSwitchButton onClick={() => setIsSignup(true)}>회원가입</AuthSwitchButton>
+          <AuthSwitchButton onClick={() => setView("signup")}>회원가입</AuthSwitchButton>
+        </AuthSwitchRow>
+        <AuthSwitchRow>
+          <AuthSwitchButton onClick={() => setView("reset")}>
+            비밀번호를 잊으셨나요?
+          </AuthSwitchButton>
         </AuthSwitchRow>
       </AuthCard>
     </AuthContainer>

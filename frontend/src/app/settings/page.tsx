@@ -4,12 +4,15 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import styled from "styled-components";
 import Signup from "../components/Signup";
+import type { AuthView } from "../components/Signup";
 import Login from "../components/Login";
+import PasswordReset from "../components/PasswordReset";
 import { useAuthStore } from "@/app/stores/useAuthStore";
 import { useGroupStore } from "@/app/stores/groupStore";
 import { useToast } from "../components/ui/Toast";
 import { useConfirm } from "../components/ui/ConfirmDialog";
 import { useMounted } from "@/app/lib/useMounted";
+import { api } from "@/lib/axios";
 
 const AccountContainer = styled.div`
   max-width: 480px;
@@ -123,12 +126,41 @@ const SubscriptionButton = styled.button`
   }
 `;
 
+const NameEditRow = styled.div`
+  display: flex;
+  gap: 0.5rem;
+`;
+
+const NameInput = styled.input`
+  width: 9rem;
+  padding: 0.375rem 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+`;
+
+const NameSaveButton = styled.button`
+  padding: 0.375rem 0.75rem;
+  border-radius: 0.375rem;
+  background: var(--primary-color);
+  color: white;
+  font-weight: 600;
+  font-size: 0.8125rem;
+
+  &:disabled {
+    opacity: 0.6;
+  }
+`;
+
 const SettingsPage = () => {
   const router = useRouter();
   const { user, logout } = useAuthStore((state) => state);
   const { groups, deleteGroup } = useGroupStore();
-  const [isSignup, setIsSignup] = useState(false);
+  const [view, setView] = useState<AuthView>("login");
   const [isDeleting, setIsDeleting] = useState(false);
+  const [nameInput, setNameInput] = useState("");
+  const [isSavingName, setIsSavingName] = useState(false);
+  const setUser = useAuthStore((state) => state.setUser);
   const { showToast } = useToast();
   const confirm = useConfirm();
   const mounted = useMounted();
@@ -136,7 +168,9 @@ const SettingsPage = () => {
   if (!mounted) return null;
 
   if (!user) {
-    return isSignup ? <Signup setIsSignup={setIsSignup} /> : <Login setIsSignup={setIsSignup} />;
+    if (view === "signup") return <Signup setView={setView} />;
+    if (view === "reset") return <PasswordReset setView={setView} />;
+    return <Login setView={setView} />;
   }
 
   const myGroup = groups.find((group) => group.id === user.groupId);
@@ -163,10 +197,44 @@ const SettingsPage = () => {
     }
   };
 
+  const handleSaveName = async () => {
+    const trimmed = nameInput.trim();
+    if (!trimmed || !user || isSavingName) return;
+    setIsSavingName(true);
+    try {
+      await api.put(`/user/${user.id}`, { name: trimmed });
+      setUser({ ...user, name: trimmed });
+      showToast("이름이 저장되었습니다.", "success");
+    } catch {
+      showToast("이름 저장에 실패했습니다. 잠시 후 다시 시도해주세요.", "error");
+    } finally {
+      setIsSavingName(false);
+    }
+  };
+
   return (
     <AccountContainer>
       <AccountCard>
         <AccountTitle>내 계정</AccountTitle>
+        <InfoRow>
+          <InfoLabel>이름</InfoLabel>
+          {user.name ? (
+            <InfoValue>{user.name}</InfoValue>
+          ) : (
+            <NameEditRow>
+              <NameInput
+                type="text"
+                placeholder="이름 입력"
+                value={nameInput}
+                maxLength={30}
+                onChange={(e) => setNameInput(e.target.value)}
+              />
+              <NameSaveButton onClick={handleSaveName} disabled={isSavingName}>
+                저장
+              </NameSaveButton>
+            </NameEditRow>
+          )}
+        </InfoRow>
         <InfoRow>
           <InfoLabel>아이디</InfoLabel>
           <InfoValue>{user.email}</InfoValue>
@@ -179,7 +247,7 @@ const SettingsPage = () => {
           <LogoutButton
             onClick={() => {
               logout();
-              setIsSignup(false);
+              setView("login");
               showToast("로그아웃되었습니다.", "info");
             }}
           >
