@@ -10,6 +10,12 @@ import { useToast } from "@/app/components/ui/Toast";
 
 const COACHMARK_STORAGE_KEY = "record_coachmark_seen";
 
+// 쿼터 번호 표시: 1~4는 nQ, 5부터는 연장1, 연장2…
+const formatQuarter = (q: number | null | undefined) => {
+  const quarter = q ?? 1;
+  return quarter <= 4 ? `${quarter}Q` : `연장${quarter - 4}`;
+};
+
 const Container = styled.div`
   padding: 0.5rem;
   position: relative;
@@ -126,6 +132,28 @@ const SwapButton = styled.button`
   svg {
     width: 1rem;
     height: 1rem;
+  }
+`;
+
+const QuarterBar = styled.div`
+  display: flex;
+  gap: 0.375rem;
+  margin-top: 0.5rem;
+  align-items: center;
+`;
+
+const QuarterChip = styled.button<{ isActive: boolean }>`
+  padding: 0.375rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  background-color: ${props => (props.isActive ? 'var(--primary-color)' : '#e5e7eb')};
+  color: ${props => (props.isActive ? 'white' : '#374151')};
+  transition: all 0.2s;
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.6;
   }
 `;
 
@@ -742,7 +770,19 @@ export default function RecordPage() {
           playerId: created.playerId ?? selectedPlayer,
           logitemId: created.logitemId ?? logItemId,
         } as Log;
-        setGame(prev => (prev ? { ...prev, logs: [...(prev.logs ?? []), newLog] } : prev));
+        setGame(prev =>
+          prev
+            ? {
+                ...prev,
+                // 서버가 찍어준 쿼터가 로컬 표시와 다르면 서버 기준으로 보정
+                currentQuarter:
+                  typeof created.quarter === "number"
+                    ? created.quarter
+                    : prev.currentQuarter,
+                logs: [...(prev.logs ?? []), newLog],
+              }
+            : prev,
+        );
       } else {
         await fetchGameData();
       }
@@ -829,6 +869,21 @@ export default function RecordPage() {
     setIsTeamPositionSwapped(!isTeamPositionSwapped);
   };
 
+  const handleQuarterChange = async (quarter: number) => {
+    if (!game || !canRecord || quarter === (game.currentQuarter ?? 1)) return;
+    try {
+      await api.patch(`/game/${game.id}/quarter`, { quarter }, {
+        headers: {
+          Authorization: `Bearer ${user?.accessToken}`,
+        },
+      });
+      setGame(prev => (prev ? { ...prev, currentQuarter: quarter } : prev));
+    } catch (error) {
+      console.error("쿼터 변경에 실패했습니다:", error);
+      showToast("쿼터 변경에 실패했습니다. 다시 시도해주세요.", "error");
+    }
+  };
+
   if (loading) return <div style={{ padding: "2rem", textAlign: "center", color: "#6b7280" }}>로딩 중...</div>;
   if (!game) return <div style={{ padding: "2rem", textAlign: "center", color: "#6b7280" }}>게임을 찾을 수 없습니다.</div>;
 
@@ -879,6 +934,36 @@ export default function RecordPage() {
           <span className="vs">vs</span>
           <span className="score">{rightTeam.score}</span>
         </ScoreDisplay>
+        {(() => {
+          const currentQuarter = game.currentQuarter ?? 1;
+          const chips = Array.from(
+            { length: Math.max(4, currentQuarter) },
+            (_, i) => i + 1,
+          );
+          const quarterLocked = !canRecord || game.status !== 'IN_PROGRESS';
+          return (
+            <QuarterBar>
+              {chips.map(q => (
+                <QuarterChip
+                  key={q}
+                  isActive={q === currentQuarter}
+                  disabled={quarterLocked}
+                  onClick={() => handleQuarterChange(q)}
+                >
+                  {formatQuarter(q)}
+                </QuarterChip>
+              ))}
+              {!quarterLocked && currentQuarter >= 4 && currentQuarter < 10 && (
+                <QuarterChip
+                  isActive={false}
+                  onClick={() => handleQuarterChange(currentQuarter + 1)}
+                >
+                  +연장
+                </QuarterChip>
+              )}
+            </QuarterBar>
+          );
+        })()}
         <SwapButton onClick={handleSwapTeams}>
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />

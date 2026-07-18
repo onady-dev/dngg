@@ -10,6 +10,7 @@ export interface Game {
   homePlayers: Player[];
   awayPlayers: Player[];
   logs: Log[];
+  currentQuarter?: number; // 백엔드 미배포 시 undefined → 1로 간주
 }
 
 export interface LogItem {
@@ -28,6 +29,7 @@ export interface Log {
   game: Game;
   logitem: LogItem;
   player: Player;
+  quarter?: number | null; // 구 로그는 null → 1쿼터로 간주
 }
 
 export interface Group {
