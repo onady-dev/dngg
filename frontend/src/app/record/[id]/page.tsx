@@ -709,7 +709,9 @@ export default function RecordPage() {
     let away = 0;
     const fouls: { [playerId: number]: number } = {};
     // 현재 쿼터의 팀별 파울 합산 (팀파울) — 쿼터가 바뀌면 0부터 다시 센다.
+    // 단, 연장전은 4쿼터의 연장으로 간주해 4쿼터 팀파울을 이어서 센다 (FIBA 규칙).
     const currentQuarter = game.currentQuarter ?? 1;
+    const foulBucket = (quarter: number) => (quarter >= 4 ? 4 : quarter);
     let homeTeamFouls = 0;
     let awayTeamFouls = 0;
 
@@ -727,7 +729,7 @@ export default function RecordPage() {
       if (logItem?.name === "파울") {
         fouls[log.playerId] = (fouls[log.playerId] || 0) + 1;
         // 구 로그(quarter null)는 1쿼터로 간주
-        if ((log.quarter ?? 1) === currentQuarter) {
+        if (foulBucket(log.quarter ?? 1) === foulBucket(currentQuarter)) {
           if (isHomePlayer) {
             homeTeamFouls += 1;
           } else {
@@ -1027,7 +1029,7 @@ export default function RecordPage() {
             {selectedTeam !== leftTeam.type ? (
               <>
                 <h3>{`${leftTeam.type === 'home' ? '홈팀' : '어웨이팀'} (${leftTeam.name})`}</h3>
-                <TeamFoulBadge title="현재 쿼터 팀파울">
+                <TeamFoulBadge title="현재 쿼터 팀파울 (연장은 4쿼터에 합산)">
                   팀파울 {teamFouls[leftTeam.type]}
                 </TeamFoulBadge>
               </>
@@ -1105,7 +1107,7 @@ export default function RecordPage() {
             {selectedTeam !== rightTeam.type ? (
               <>
                 <h3>{`${rightTeam.type === 'home' ? '홈팀' : '어웨이팀'} (${rightTeam.name})`}</h3>
-                <TeamFoulBadge title="현재 쿼터 팀파울">
+                <TeamFoulBadge title="현재 쿼터 팀파울 (연장은 4쿼터에 합산)">
                   팀파울 {teamFouls[rightTeam.type]}
                 </TeamFoulBadge>
               </>
