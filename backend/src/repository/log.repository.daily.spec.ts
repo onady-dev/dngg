@@ -39,6 +39,21 @@ describe('LogRepository.findByDaily', () => {
   });
 });
 
+describe('LogRepository.findDailyLogsWithGame', () => {
+  test('groupId 필터와 player 포함 relations로 조회한다', async () => {
+    const { repository, inner } = createRepository();
+
+    await repository.findDailyLogsWithGame('2026-07-18', 5);
+
+    expect(inner.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ groupId: 5 }),
+        relations: ['logitem', 'game', 'player'],
+      }),
+    );
+  });
+});
+
 describe('LogRepository.findDailyDates', () => {
   const createQueryBuilderStub = (rows: { date: string }[]) => {
     const qb = {

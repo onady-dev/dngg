@@ -53,7 +53,7 @@ export class LogRepository extends Repository<Log> {
         groupId: Number(groupId),
         createdAt: Raw((alias) => `${alias}::date = :date`, { date }),
       },
-      relations: ['logitem', 'game'],
+      relations: ['logitem', 'game', 'player'],
     });
   }
 
