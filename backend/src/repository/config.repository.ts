@@ -11,13 +11,12 @@ export class LogitemRepository extends Repository<Logitem>{
     }
 
     async findByGroupId(groupId: number): Promise<Logitem[] | null> {
-        return this.logitemRepository.find(
-        //     {
-        //     where: {
-        //         groupId: groupId,
-        //     },
-        // }
-    );
+        // 쿼리 파라미터는 문자열로 들어오므로 숫자로 변환해 필터한다.
+        return this.logitemRepository.find({
+            where: {
+                groupId: Number(groupId),
+            },
+        });
     }
 
     async createLogitem(logitem: Logitem): Promise<Logitem> {
