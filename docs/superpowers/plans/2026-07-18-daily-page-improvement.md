@@ -542,10 +542,12 @@ Expected: FAIL — `service.getDailyGames is not a function`
         groupId: Number(groupId),
         createdAt: Raw((alias) => `${alias}::date = :date`, { date }),
       },
-      relations: ['logitem', 'game'],
+      relations: ['logitem', 'game', 'player'],
     });
   }
 ```
+
+> **정정 (T3 리뷰 반영):** relations에 `'player'`가 반드시 포함되어야 한다. 없으면 `log.player`가 모든 행에서 undefined가 되어 null-player 스킵 가드가 전부 발동, 스코어가 항상 0:0이 된다.
 
 `backend/src/modules/log/types.d.ts`에 추가:
 
