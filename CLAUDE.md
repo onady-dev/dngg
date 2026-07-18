@@ -125,7 +125,7 @@ docker compose -f docker-compose.dev.yml up
 주의(2026-07-18 실제 장애 사례):
 - **백엔드·프론트 잡은 독립적이다** — 한쪽이 실패해도 다른 쪽은 `:latest`를 푸시한다. 이후 compose만 바꾼 커밋이 deploy 잡만 실행하면 **신구 버전이 섞여 배포**될 수 있다 (실제로 신규 프론트+구형 백엔드 조합으로 가입 장애 발생). 프론트·백엔드가 함께 가야 하는 변경은 CI가 전부 green인지 확인하고, 필요하면 workflow_dispatch로 동시 배포할 것. (sha 핀 배포 전환 이후에는 deploy만 도는 커밋이 `:latest`를 집어오는 경로 자체가 제거됨)
 - CI 헬스체크는 기존 라우트(`/group/all`, 프론트 루트)만 확인한다 — 배포가 success여도 신규 기능 라우트는 직접 스모크할 것.
-- CI의 pnpm 버전은 로컬과 일치시킨다(현재 11). pnpm 9는 `packages` 없는 `pnpm-workspace.yaml`(allowBuilds 전용)을 못 읽어 install이 실패한다.
+- CI의 pnpm 버전은 로컬과 정확히 일치시켜 핀한다(현재 `11.13.1` — floating `11`은 금지). pnpm 9는 `packages` 없는 `pnpm-workspace.yaml`(allowBuilds 전용)을 못 읽어 install이 실패하고, pnpm 11.x는 `node:sqlite` 사용으로 **Node 22.13+가 필수**라 CI `setup-node`는 22다 (2026-07-18 배포 실패 원인 — PROJECT_CONTEXT.md 3.3 참고). 운영 컨테이너 Dockerfile은 아직 `node:20`이라 마이너 스큐가 있다.
 
 ## 배포 주의사항 (PROJECT_CONTEXT.md 참고)
 

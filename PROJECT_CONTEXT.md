@@ -96,6 +96,29 @@ TypeError: Cannot read properties of null (reading 'name')
 - API도 HTTPS로 노출하거나
 - 같은 도메인에서 reverse proxy로 `/api` 붙여서 사용
 
+### 3.3 CI 배포 실패 — pnpm 11.x의 Node 22.13+ 요구 (2026-07-18)
+
+main 푸시 후 Deploy 워크플로의 backend 잡이 `actions/setup-node@v4` 단계에서 실패:
+
+```text
+Error [ERR_UNKNOWN_BUILTIN_MODULE]: No such built-in module: node:sqlite
+warn: This version of pnpm requires at least Node.js v22.13
+```
+
+원인:
+- `pnpm/action-setup@v4`의 `version: 11`이 최신 11.x(당시 11.14.0)를 floating 설치
+- pnpm 11.x는 스토어 인덱스에 `node:sqlite` 내장 모듈(Node 22.13+)을 사용
+- CI 러너는 `node-version: 20`이었고, `setup-node`의 `cache: pnpm`이 캐시 경로 확인을 위해 `pnpm store path`를 실행하는 순간 크래시
+- pnpm을 11.13.1로 핀해도 동일하게 실패 — **pnpm 11.x 전체가 Node 22.13+ 필수** (로컬은 Node 24라 재현 안 됨)
+
+해결 (커밋 `9a742fd`, `dbcd7b7`):
+- pnpm은 로컬 개발 버전과 동일한 `11.13.1`로 정확히 핀 (floating 방지)
+- CI `setup-node`를 `node-version: 22`로 상향
+
+당시 운영 영향: 없음 — backend 잡 실패로 deploy 잡이 스킵되어 서버는 이전 버전 유지 (sha 핀 배포 방식이라 frontend `:latest` 푸시도 무해).
+
+남은 스큐: 운영 컨테이너 Dockerfile 2개(backend/frontend)는 아직 `node:20`이라 CI 테스트 런타임(22)과 마이너 버전이 어긋남 — 9장 후속 작업 참고.
+
 ## 4. 최근 코드 수정 사항
 
 ### 4.1 FK 재생성 방지
@@ -268,3 +291,4 @@ curl http://<PUBLIC-IP>:3010/group/all
 - 프론트 API 호출을 HTTPS 또는 same-origin proxy로 정리
 - 인증 토큰 저장 로직 일원화
 - 운영 문서와 실제 배포 스크립트 경로 정리
+- backend/frontend Dockerfile의 `node:20`을 `node:22`로 상향해 CI 테스트 런타임(Node 22)과 정렬 (3.3 참고)
