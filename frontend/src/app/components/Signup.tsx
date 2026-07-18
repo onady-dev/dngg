@@ -48,6 +48,13 @@ const Signup = ({ setView }: { setView: (view: AuthView) => void }) => {
       showToast("회원가입이 완료되었습니다. 로그인해주세요.", "success");
       setView("login");
     } catch (error: any) {
+      if (error?.response?.status === 401) {
+        // 인증 토큰 만료/무효 — 1단계 이메일 인증부터 다시 진행하도록 초기화
+        setVerifiedEmail(null);
+        setVerificationToken("");
+        showToast("인증이 만료되었습니다. 이메일 인증을 다시 진행해주세요.", "error");
+        return;
+      }
       const message = error?.response?.data?.message;
       showToast(message || "회원가입에 실패했습니다. 잠시 후 다시 시도해주세요.", "error");
     }
