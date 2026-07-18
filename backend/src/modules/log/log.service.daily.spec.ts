@@ -17,9 +17,11 @@ const makeLog = (overrides: Record<string, unknown> = {}) => ({
 
 const createService = ({
   dailyLogs = [] as any[],
+  dates = [] as string[],
 } = {}) => {
   const logRepository = {
     findByDaily: jest.fn().mockResolvedValue(dailyLogs),
+    findDailyDates: jest.fn().mockResolvedValue(dates),
   };
   const service = new LogService(
     logRepository as any,
@@ -68,5 +70,18 @@ describe('LogService.getLogByDaily', () => {
 
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe(100);
+  });
+});
+
+describe('LogService.getDailyDates', () => {
+  test('그룹의 로그 날짜 목록을 리포지토리에서 그대로 반환한다', async () => {
+    const { service, logRepository } = createService({
+      dates: ['2026-07-18', '2026-07-15'],
+    });
+
+    const result = await service.getDailyDates(5);
+
+    expect(logRepository.findDailyDates).toHaveBeenCalledWith(5);
+    expect(result).toEqual(['2026-07-18', '2026-07-15']);
   });
 });

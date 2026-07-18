@@ -56,6 +56,10 @@ export class LogService {
     return Array.from(playerMap.values());
   }
 
+  async getDailyDates(groupId: number) {
+    return this.logRepository.findDailyDates(groupId);
+  }
+
   async getLogByGameId(gameId: number) {
     return this.logRepository.findLogsByGameId(gameId);
   }

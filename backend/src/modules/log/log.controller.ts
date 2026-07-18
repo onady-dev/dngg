@@ -11,7 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { LogService } from './log.service';
-import { GetLogByDailyRequestDto, PostLogRequestDto } from './log.request.dto';
+import { GetLogByDailyRequestDto, GetDailyDatesRequestDto, PostLogRequestDto } from './log.request.dto';
 import { Player } from 'src/entities/Player.entity';
 import { AuthGuard } from '@nestjs/passport';
 import { assertSameGroup } from 'src/common/group-access';
@@ -28,6 +28,11 @@ export class LogController {
   @Get('/daily')
   async getLogByDaily(@Query(ValidationPipe) dto: GetLogByDailyRequestDto) {
     return await this.logService.getLogByDaily(dto.date, dto.groupId);
+  }
+
+  @Get('/daily/dates')
+  async getDailyDates(@Query(ValidationPipe) dto: GetDailyDatesRequestDto) {
+    return this.logService.getDailyDates(dto.groupId);
   }
 
   @Get('/game/:id')

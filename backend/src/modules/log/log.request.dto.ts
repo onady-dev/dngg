@@ -26,3 +26,10 @@ export class GetLogByDailyRequestDto {
   @IsNumber()
   groupId: number;
 }
+
+export class GetDailyDatesRequestDto {
+  @Type(() => Number)
+  @IsNotEmpty()
+  @IsNumber()
+  groupId: number;
+}
