@@ -74,7 +74,7 @@ export class EmailVerificationService {
     }
 
     const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
-    await this.verificationRepository.save(
+    const saved = await this.verificationRepository.save(
       this.verificationRepository.create({
         email,
         purpose,
@@ -82,7 +82,13 @@ export class EmailVerificationService {
         expiresAt: new Date(now + CODE_TTL_MS),
       }),
     );
-    await this.mailService.sendVerificationCode(email, code, purpose);
+    try {
+      await this.mailService.sendVerificationCode(email, code, purpose);
+    } catch (error) {
+      // 발송 실패 시 방금 저장한 행을 지워 재발송 쿨다운·일일 한도가 소모되지 않게 한다
+      await this.verificationRepository.delete(saved.id);
+      throw error;
+    }
     return { message: '인증 코드를 발송했습니다.' };
   }
 

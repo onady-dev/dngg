@@ -12,8 +12,11 @@ const createVerificationRepoMock = () => ({
   findOne: jest.fn(),
   count: jest.fn(),
   create: jest.fn((v: Record<string, unknown>) => v),
-  save: jest.fn((v: Record<string, unknown>) => Promise.resolve(v)),
+  save: jest.fn((v: Record<string, unknown>) =>
+    Promise.resolve({ id: 42, ...v }),
+  ),
   update: jest.fn(),
+  delete: jest.fn(),
 });
 
 describe('EmailVerificationService', () => {
@@ -96,6 +99,21 @@ describe('EmailVerificationService', () => {
         expect.stringMatching(/^\d{6}$/),
         'signup',
       );
+      expect(verificationRepo.delete).not.toHaveBeenCalled();
+    });
+
+    test('메일 발송 실패 시 저장된 인증 행을 삭제하고 원래 에러를 그대로 전파한다', async () => {
+      userRepo.findOne.mockResolvedValue(null);
+      verificationRepo.findOne.mockResolvedValue(null);
+      verificationRepo.count.mockResolvedValue(0);
+      const sendError = new Error('SES send failed');
+      mailService.sendVerificationCode.mockRejectedValue(sendError);
+
+      await expect(service.requestCode('a@b.c', 'signup')).rejects.toThrow(
+        sendError,
+      );
+
+      expect(verificationRepo.delete).toHaveBeenCalledWith(42);
     });
   });
 
