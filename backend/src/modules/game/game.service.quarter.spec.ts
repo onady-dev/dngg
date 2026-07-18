@@ -52,6 +52,19 @@ describe('GameService.updateGameQuarter', () => {
     expect(gameRepository.updateGameQuarter).not.toHaveBeenCalled();
   });
 
+  test('삭제된 게임이면 400을 던진다', async () => {
+    const { service, gameRepository } = createService({
+      id: GAME_ID,
+      groupId: OWN_GROUP,
+      status: 'DELETED',
+    });
+
+    await expect(
+      service.updateGameQuarter(GAME_ID, 2, OWN_GROUP),
+    ).rejects.toThrow(HttpException);
+    expect(gameRepository.updateGameQuarter).not.toHaveBeenCalled();
+  });
+
   test('다른 그룹의 게임이면 ForbiddenException을 던진다', async () => {
     const { service, gameRepository } = createService({
       id: GAME_ID,

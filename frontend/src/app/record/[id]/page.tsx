@@ -998,9 +998,10 @@ export default function RecordPage() {
                   {formatQuarter(q)}
                 </QuarterChip>
               ))}
-              {!quarterLocked && currentQuarter >= 4 && currentQuarter < 10 && (
+              {currentQuarter >= 4 && currentQuarter < 10 && (
                 <QuarterChip
                   isActive={false}
+                  disabled={quarterLocked}
                   onClick={() => handleQuarterChange(currentQuarter + 1)}
                 >
                   +연장
