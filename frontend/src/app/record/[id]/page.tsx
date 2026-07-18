@@ -983,8 +983,14 @@ export default function RecordPage() {
         </ScoreDisplay>
         {(() => {
           const currentQuarter = game.currentQuarter ?? 1;
+          // 연장 쿼터에 로그가 하나라도 있으면, 다른 쿼터로 이동해도
+          // 해당 연장 칩이 사라지지 않도록 로그의 최대 쿼터까지 표시한다.
+          const maxLoggedQuarter = (game.logs ?? []).reduce(
+            (max, log) => Math.max(max, log.quarter ?? 1),
+            1,
+          );
           const chips = Array.from(
-            { length: Math.max(4, currentQuarter) },
+            { length: Math.max(4, currentQuarter, maxLoggedQuarter) },
             (_, i) => i + 1,
           );
           const quarterLocked = !canRecord || game.status !== 'IN_PROGRESS' || isChangingQuarter;
