@@ -115,6 +115,22 @@ describe('EmailVerificationService', () => {
 
       expect(verificationRepo.delete).toHaveBeenCalledWith(42);
     });
+
+    test('메일 발송 실패 후 삭제 실패 시에도 원래 발송 에러를 전파한다', async () => {
+      userRepo.findOne.mockResolvedValue(null);
+      verificationRepo.findOne.mockResolvedValue(null);
+      verificationRepo.count.mockResolvedValue(0);
+      const sendError = new Error('SES send failed');
+      const deleteError = new Error('Delete failed');
+      mailService.sendVerificationCode.mockRejectedValue(sendError);
+      verificationRepo.delete.mockRejectedValue(deleteError);
+
+      await expect(service.requestCode('a@b.c', 'signup')).rejects.toBe(
+        sendError,
+      );
+
+      expect(verificationRepo.delete).toHaveBeenCalledWith(42);
+    });
   });
 
   describe('confirmCode', () => {

@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, MoreThan, Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
@@ -24,6 +24,8 @@ const INVALID_VERIFICATION =
 
 @Injectable()
 export class EmailVerificationService {
+  private readonly logger = new Logger(EmailVerificationService.name);
+
   constructor(
     @InjectRepository(EmailVerification)
     private readonly verificationRepository: Repository<EmailVerification>,
@@ -86,7 +88,16 @@ export class EmailVerificationService {
       await this.mailService.sendVerificationCode(email, code, purpose);
     } catch (error) {
       // 발송 실패 시 방금 저장한 행을 지워 재발송 쿨다운·일일 한도가 소모되지 않게 한다
-      await this.verificationRepository.delete(saved.id);
+      try {
+        await this.verificationRepository.delete(saved.id);
+      } catch (deleteError) {
+        this.logger.error(
+          '인증 행 삭제에 실패했습니다. 원래 에러를 그대로 전파합니다.',
+          deleteError instanceof Error
+            ? deleteError.stack
+            : String(deleteError),
+        );
+      }
       throw error;
     }
     return { message: '인증 코드를 발송했습니다.' };
