@@ -38,3 +38,48 @@ describe('LogRepository.findByDaily', () => {
     );
   });
 });
+
+describe('LogRepository.findDailyDates', () => {
+  const createQueryBuilderStub = (rows: { date: string }[]) => {
+    const qb = {
+      select: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      getRawMany: jest.fn().mockResolvedValue(rows),
+    };
+    return qb;
+  };
+
+  test('groupId 필터·::date 캐스팅·최신순 정렬로 날짜 목록을 조회한다', async () => {
+    const { repository, inner } = createRepository();
+    const qb = createQueryBuilderStub([
+      { date: '2026-07-18' },
+      { date: '2026-07-15' },
+    ]);
+    (inner as any).createQueryBuilder = jest.fn().mockReturnValue(qb);
+
+    const result = await repository.findDailyDates(5);
+
+    expect(qb.select).toHaveBeenCalledWith(
+      expect.stringContaining('::date'),
+      'date',
+    );
+    expect(qb.where).toHaveBeenCalledWith('log.groupId = :groupId', {
+      groupId: 5,
+    });
+    expect(qb.orderBy).toHaveBeenCalledWith('date', 'DESC');
+    expect(result).toEqual(['2026-07-18', '2026-07-15']);
+  });
+
+  test('쿼리 문자열로 들어온 groupId도 숫자로 변환해 필터한다', async () => {
+    const { repository, inner } = createRepository();
+    const qb = createQueryBuilderStub([]);
+    (inner as any).createQueryBuilder = jest.fn().mockReturnValue(qb);
+
+    await repository.findDailyDates('5' as unknown as number);
+
+    expect(qb.where).toHaveBeenCalledWith('log.groupId = :groupId', {
+      groupId: 5,
+    });
+  });
+});
