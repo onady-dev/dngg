@@ -60,4 +60,8 @@ export class GameRepository extends Repository<Game> {
       status: status as 'IN_PROGRESS' | 'FINISHED',
     });
   }
+
+  async updateGameQuarter(id: number, quarter: number) {
+    return this.gameRepository.update(id, { currentQuarter: quarter });
+  }
 }

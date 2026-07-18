@@ -102,6 +102,19 @@ export class GameService {
     return this.gameRepository.updateGameStatus(id, status);
   }
 
+  async updateGameQuarter(id: number, quarter: number, userGroupId: number) {
+    const game = await this.assertGameInGroup(id, userGroupId);
+    // 진행 중인 게임만 쿼터 전환을 허용한다 (FINISHED/DELETED 거부).
+    if (game.status !== 'IN_PROGRESS') {
+      throw new HttpException(
+        '진행 중인 게임만 쿼터를 변경할 수 있습니다.',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    await this.gameRepository.updateGameQuarter(id, quarter);
+    return this.gameRepository.findOne({ where: { id } });
+  }
+
   // 대상 게임이 요청자의 소속 그룹 소유인지 검증한다.
   private async assertGameInGroup(gameId: number, userGroupId: number) {
     return findOwnedGame(this.gameRepository, gameId, userGroupId);
@@ -125,6 +138,7 @@ export class GameService {
         .filter((player) => player.team === 'away' && player.player)
         .map((player) => player.player),
       logs: game.logs,
+      currentQuarter: game.currentQuarter,
       status: game.status,
     };
   }

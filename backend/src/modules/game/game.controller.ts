@@ -15,6 +15,7 @@ import { GameService } from './game.service';
 import {
   PostGameAndLogsRequestDto,
   PostGameRequestDto,
+  PatchGameQuarterRequestDto,
 } from './game.request.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { assertSameGroup } from 'src/common/group-access';
@@ -50,6 +51,16 @@ export class GameController {
     @Body('status') status: string,
   ) {
     return this.gameService.updateGameStatus(id, status, req.user.groupId);
+  }
+
+  @Patch(':id/quarter')
+  @UseGuards(AuthGuard('jwt'))
+  async updateGameQuarter(
+    @Request() req,
+    @Param('id') id: number,
+    @Body(ValidationPipe) dto: PatchGameQuarterRequestDto,
+  ) {
+    return this.gameService.updateGameQuarter(id, dto.quarter, req.user.groupId);
   }
 
   @Delete(':id')

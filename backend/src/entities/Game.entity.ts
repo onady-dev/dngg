@@ -13,13 +13,15 @@ export class Game {
   homeTeamName: string;
   @Column('varchar', { length: 20, nullable: true })
   awayTeamName: string;
-  @Column({ 
-    type: 'varchar', 
+  @Column({
+    type: 'varchar',
     default: 'IN_PROGRESS',
     comment: 'IN_PROGRESS | FINISHED | DELETED',
-    enum: ['IN_PROGRESS', 'FINISHED', 'DELETED'] 
+    enum: ['IN_PROGRESS', 'FINISHED', 'DELETED']
   })
   status: 'IN_PROGRESS' | 'FINISHED' | 'DELETED';
+  @Column('int', { default: 1 })
+  currentQuarter: number;
 
   @OneToMany(() => InGamePlayer, (inGamePlayers) => inGamePlayers.game)
   inGamePlayers: InGamePlayer[];

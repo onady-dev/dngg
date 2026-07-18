@@ -1,9 +1,12 @@
 import {
   IsArray,
+  IsInt,
   IsNotEmpty,
   IsNumber,
   IsOptional,
   IsString,
+  Max,
+  Min,
 } from 'class-validator';
 
 export class PostGameRequestDto {
@@ -57,4 +60,12 @@ class Log {
   playerId: number;
   @IsNumber()
   logitemId: number;
+}
+
+export class PatchGameQuarterRequestDto {
+  @IsNotEmpty()
+  @IsInt()
+  @Min(1)
+  @Max(10)
+  quarter: number;
 }
