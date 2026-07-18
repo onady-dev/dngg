@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Game } from 'src/entities/Game.entity';
 import { Group } from 'src/entities/Group.entity';
@@ -8,6 +7,7 @@ import { GroupController } from './group.controller';
 import { GroupService } from './group.service';
 import { Logitem } from 'src/entities/Logitem.entity';
 import { GroupRepository } from 'src/repository/group.repository';
+import { LogitemRepository } from 'src/repository/config.repository';
 import { SubscriptionModule } from '../subscription/subscription.module';
 
 @Module({
@@ -16,6 +16,6 @@ import { SubscriptionModule } from '../subscription/subscription.module';
     SubscriptionModule,
   ],
   controllers: [GroupController],
-  providers: [GroupService, GroupRepository],
+  providers: [GroupService, GroupRepository, LogitemRepository],
 })
 export class GroupModule {}
