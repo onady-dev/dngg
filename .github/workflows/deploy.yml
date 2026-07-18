@@ -130,6 +130,35 @@ jobs:
           source: docker-compose.yaml
           target: ${{ env.DEPLOY_PATH }}
 
+      # 이번 런에서 빌드 성공한 서비스만 커밋 sha 태그로 핀 고정한다.
+      # :latest 드리프트로 인한 신구 버전 혼합 배포(2026-07-18 장애)를 방지 —
+      # 빌드가 스킵된 서비스는 .env의 직전 배포 sha를 그대로 유지한다.
+      - name: Pin built services to this commit's image tag
+        if: needs.backend.result == 'success' || needs.frontend.result == 'success'
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          BACKEND_BUILT: ${{ needs.backend.result == 'success' }}
+          FRONTEND_BUILT: ${{ needs.frontend.result == 'success' }}
+          SHA_TAG: sha-${{ github.sha }}
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          envs: BACKEND_BUILT,FRONTEND_BUILT,SHA_TAG
+          script: |
+            set -e
+            cd ${{ env.DEPLOY_PATH }}
+            pin() {
+              if sudo grep -q "^$1=" .env; then
+                sudo sed -i "s|^$1=.*|$1=$2|" .env
+              else
+                echo "$1=$2" | sudo tee -a .env > /dev/null
+              fi
+              echo "pinned $1=$2"
+            }
+            if [ "$BACKEND_BUILT" = "true" ]; then pin BACKEND_VERSION "$SHA_TAG"; fi
+            if [ "$FRONTEND_BUILT" = "true" ]; then pin FRONTEND_VERSION "$SHA_TAG"; fi
+
       - name: Pull images and restart services
         uses: appleboy/ssh-action@v1.2.0
         with:

@@ -119,10 +119,11 @@ docker compose -f docker-compose.dev.yml up
 - 경로 필터: `backend/**` 변경 → backend 잡, `frontend/**` 변경 → frontend 잡, `docker-compose.yaml`·워크플로 변경 → deploy 잡만 실행. 각 잡은 Docker Hub에 `:latest`와 `:sha-<커밋>` 두 태그를 푸시한다.
 - deploy 잡: 레포의 `docker-compose.yaml`을 서버(`/usr/local/project/dngg`)로 scp 동기화 → `docker compose pull frontend backend && up -d`. **서버의 compose 파일을 직접 수정해도 다음 배포에서 덮어써진다.**
 - 수동 배포: Actions 탭의 workflow_dispatch 버튼 — 경로 필터와 무관하게 백엔드·프론트를 모두 빌드·배포한다 (동시 배포가 필요한 릴리스에 사용).
-- 롤백/버전 고정: 서버 `/usr/local/project/dngg/.env`의 `FRONTEND_VERSION`/`BACKEND_VERSION`을 `sha-<커밋>`으로 바꾸고 `docker compose up -d <서비스>`. 고정돼 있으면 CI deploy가 돌아도 그 서비스는 pull되지 않는다. **릴리스 전에 `latest`로 복원할 것.**
+- 배포는 sha 태그 핀 방식: deploy 잡이 이번 런에서 빌드 성공한 서비스만 서버 `.env`의 `FRONTEND_VERSION`/`BACKEND_VERSION`을 `sha-<커밋>`으로 갱신한다 (빌드 스킵된 서비스는 직전 배포 sha 유지 — `:latest`는 배포 경로에서 사용하지 않음).
+- 롤백: 서버 `.env`의 해당 `*_VERSION`을 이전 `sha-<커밋>`으로 바꾸고 `docker compose up -d <서비스>`. 단, 그 서비스가 재빌드되는 다음 CI 배포가 핀을 덮어쓰므로, 지속적 롤백은 문제 커밋을 revert해 새로 배포하는 방식으로 한다.
 
 주의(2026-07-18 실제 장애 사례):
-- **백엔드·프론트 잡은 독립적이다** — 한쪽이 실패해도 다른 쪽은 `:latest`를 푸시한다. 이후 compose만 바꾼 커밋이 deploy 잡만 실행하면 **신구 버전이 섞여 배포**될 수 있다 (실제로 신규 프론트+구형 백엔드 조합으로 가입 장애 발생). 프론트·백엔드가 함께 가야 하는 변경은 CI가 전부 green인지 확인하고, 필요하면 workflow_dispatch로 동시 배포할 것.
+- **백엔드·프론트 잡은 독립적이다** — 한쪽이 실패해도 다른 쪽은 `:latest`를 푸시한다. 이후 compose만 바꾼 커밋이 deploy 잡만 실행하면 **신구 버전이 섞여 배포**될 수 있다 (실제로 신규 프론트+구형 백엔드 조합으로 가입 장애 발생). 프론트·백엔드가 함께 가야 하는 변경은 CI가 전부 green인지 확인하고, 필요하면 workflow_dispatch로 동시 배포할 것. (sha 핀 배포 전환 이후에는 deploy만 도는 커밋이 `:latest`를 집어오는 경로 자체가 제거됨)
 - CI 헬스체크는 기존 라우트(`/group/all`, 프론트 루트)만 확인한다 — 배포가 success여도 신규 기능 라우트는 직접 스모크할 것.
 - CI의 pnpm 버전은 로컬과 일치시킨다(현재 11). pnpm 9는 `packages` 없는 `pnpm-workspace.yaml`(allowBuilds 전용)을 못 읽어 install이 실패한다.
 
