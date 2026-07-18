@@ -592,6 +592,7 @@ export default function RecordPage() {
   const [foulCount, setFoulCount] = useState<{[playerId: number]: number}>({});
   const [isTeamPositionSwapped, setIsTeamPositionSwapped] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [isChangingQuarter, setIsChangingQuarter] = useState(false);
   const [showCoachmark, setShowCoachmark] = useState(false);
   const [showRotateBanner, setShowRotateBanner] = useState(true);
 
@@ -870,7 +871,16 @@ export default function RecordPage() {
   };
 
   const handleQuarterChange = async (quarter: number) => {
-    if (!game || !canRecord || quarter === (game.currentQuarter ?? 1)) return;
+    if (
+      !game ||
+      !canRecord ||
+      game.status !== 'IN_PROGRESS' ||
+      quarter === (game.currentQuarter ?? 1)
+    )
+      return;
+    // 연속 탭으로 인한 쿼터 변경 요청 경합을 막기 위한 in-flight 가드
+    if (isChangingQuarter) return;
+    setIsChangingQuarter(true);
     try {
       await api.patch(`/game/${game.id}/quarter`, { quarter }, {
         headers: {
@@ -881,6 +891,8 @@ export default function RecordPage() {
     } catch (error) {
       console.error("쿼터 변경에 실패했습니다:", error);
       showToast("쿼터 변경에 실패했습니다. 다시 시도해주세요.", "error");
+    } finally {
+      setIsChangingQuarter(false);
     }
   };
 
@@ -940,7 +952,7 @@ export default function RecordPage() {
             { length: Math.max(4, currentQuarter) },
             (_, i) => i + 1,
           );
-          const quarterLocked = !canRecord || game.status !== 'IN_PROGRESS';
+          const quarterLocked = !canRecord || game.status !== 'IN_PROGRESS' || isChangingQuarter;
           return (
             <QuarterBar>
               {chips.map(q => (
