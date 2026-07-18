@@ -21,8 +21,10 @@ export class CreateUserDto {
   @IsString()
   @Length(1, 30)
   name: string;
+  // Group.name 컬럼이 varchar(20)이므로 DTO에서 먼저 길이를 검증한다.
   @IsNotEmpty()
   @IsString()
+  @Length(1, 20)
   groupName: string;
   @IsNotEmpty()
   @IsString()
