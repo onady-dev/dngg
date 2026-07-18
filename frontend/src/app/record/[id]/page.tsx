@@ -386,6 +386,16 @@ const TeamHeader = styled.div`
   }
 `;
 
+const TeamFoulBadge = styled.span`
+  background: #fee2e2;
+  color: #dc2626;
+  border-radius: 999px;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+`;
+
 const CancelButton = styled.button`
   padding: 0.75rem 1rem;
   background-color: #f3f4f6;
@@ -455,6 +465,13 @@ const LogHistoryPlayerName = styled.span`
 
 const LogHistoryActionName = styled.span`
   color: #4b5563;
+`;
+
+const LogQuarterLabel = styled.span`
+  margin-left: auto;
+  color: #9ca3af;
+  font-size: 0.6875rem;
+  flex-shrink: 0;
 `;
 
 const HistoryButtonContainer = styled.div`
@@ -590,6 +607,10 @@ export default function RecordPage() {
   const [homeScore, setHomeScore] = useState(0);
   const [awayScore, setAwayScore] = useState(0);
   const [foulCount, setFoulCount] = useState<{[playerId: number]: number}>({});
+  const [teamFouls, setTeamFouls] = useState<{ home: number; away: number }>({
+    home: 0,
+    away: 0,
+  });
   const [isTeamPositionSwapped, setIsTeamPositionSwapped] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isChangingQuarter, setIsChangingQuarter] = useState(false);
@@ -686,10 +707,13 @@ export default function RecordPage() {
 
     let home = 0;
     let away = 0;
-    const fouls: {[playerId: number]: number} = {};
-    // 게임 로그에서 스코어 계산
+    const fouls: { [playerId: number]: number } = {};
+    // 현재 쿼터의 팀별 파울 합산 (팀파울) — 쿼터가 바뀌면 0부터 다시 센다.
+    const currentQuarter = game.currentQuarter ?? 1;
+    let homeTeamFouls = 0;
+    let awayTeamFouls = 0;
+
     game.logs?.forEach(log => {
-      // 플레이어가 어느 팀인지 확인
       const isHomePlayer = game.homePlayers.some(p => p.id === log.playerId);
       const logItem = logItems.find(item => item.id === log.logitemId);
 
@@ -702,10 +726,19 @@ export default function RecordPage() {
       }
       if (logItem?.name === "파울") {
         fouls[log.playerId] = (fouls[log.playerId] || 0) + 1;
+        // 구 로그(quarter null)는 1쿼터로 간주
+        if ((log.quarter ?? 1) === currentQuarter) {
+          if (isHomePlayer) {
+            homeTeamFouls += 1;
+          } else {
+            awayTeamFouls += 1;
+          }
+        }
       }
     });
 
     setFoulCount(fouls);
+    setTeamFouls({ home: homeTeamFouls, away: awayTeamFouls });
 
     setHomeScore(home);
     setAwayScore(away);
@@ -991,7 +1024,12 @@ export default function RecordPage() {
         <TeamSection>
           <TeamHeader className="team-header">
             {selectedTeam !== leftTeam.type ? (
-              <h3>{`${leftTeam.type === 'home' ? '홈팀' : '어웨이팀'} (${leftTeam.name})`}</h3>
+              <>
+                <h3>{`${leftTeam.type === 'home' ? '홈팀' : '어웨이팀'} (${leftTeam.name})`}</h3>
+                <TeamFoulBadge title="현재 쿼터 팀파울">
+                  팀파울 {teamFouls[leftTeam.type]}
+                </TeamFoulBadge>
+              </>
             ) : (
               <CancelButton onClick={handleCancel}>취소</CancelButton>
             )}
@@ -1052,6 +1090,7 @@ export default function RecordPage() {
                   {log.playerName}
                 </LogHistoryPlayerName>
                 <LogHistoryActionName>{log.actionName}</LogHistoryActionName>
+                <LogQuarterLabel>{formatQuarter(log.quarter)}</LogQuarterLabel>
               </LogHistoryItem>
             ))}
             {getProcessedLogs().length === 0 && (
@@ -1063,7 +1102,12 @@ export default function RecordPage() {
         <TeamSection>
           <TeamHeader className="team-header">
             {selectedTeam !== rightTeam.type ? (
-              <h3>{`${rightTeam.type === 'home' ? '홈팀' : '어웨이팀'} (${rightTeam.name})`}</h3>
+              <>
+                <h3>{`${rightTeam.type === 'home' ? '홈팀' : '어웨이팀'} (${rightTeam.name})`}</h3>
+                <TeamFoulBadge title="현재 쿼터 팀파울">
+                  팀파울 {teamFouls[rightTeam.type]}
+                </TeamFoulBadge>
+              </>
             ) : (
               <CancelButton onClick={handleCancel}>취소</CancelButton>
             )}
