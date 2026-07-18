@@ -27,10 +27,9 @@ export class LogService {
     return this.logRepository.findByGroupId(groupId);
   }
 
-  async getLogByDaily(dateString: string) {
-    const date = new Date(dateString);
+  async getLogByDaily(dateString: string, groupId: number) {
     const playerMap = new Map<number, Player>();
-    const logs = await this.logRepository.findByDaily(date);
+    const logs = await this.logRepository.findByDaily(dateString, groupId);
     logs?.forEach((log: any) => {
       if (!log.player) {
         return;

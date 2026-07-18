@@ -1,6 +1,6 @@
 import { InjectRepository } from '@nestjs/typeorm';
 import { Log } from 'src/entities/Log.entity';
-import { Like, QueryRunner, Repository, Between } from 'typeorm';
+import { Like, QueryRunner, Repository, Raw } from 'typeorm';
 
 export class LogRepository extends Repository<Log> {
   constructor(
@@ -32,15 +32,13 @@ export class LogRepository extends Repository<Log> {
     });
   }
 
-  async findByDaily(date: Date): Promise<Log[] | null> {
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-    
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
+  async findByDaily(date: string, groupId: number): Promise<Log[] | null> {
+    // 날짜 경계는 DB에 저장된 값의 ::date 기준으로 판정한다.
+    // (/log/daily/dates 목록 생성과 같은 표현식 — 기준 불일치 방지)
     return this.logRepository.find({
       where: {
-        createdAt: Between(startOfDay, endOfDay),
+        groupId: Number(groupId),
+        createdAt: Raw((alias) => `${alias}::date = :date`, { date }),
       },
       relations: ['logitem', 'player'],
     });

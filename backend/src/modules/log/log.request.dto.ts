@@ -1,3 +1,4 @@
+import { Type } from 'class-transformer';
 import { IsNotEmpty, IsNumber, IsString } from 'class-validator';
 
 export class PostLogRequestDto {
@@ -19,4 +20,9 @@ export class GetLogByDailyRequestDto {
   @IsNotEmpty()
   @IsString()
   date: string;
+
+  @Type(() => Number)
+  @IsNotEmpty()
+  @IsNumber()
+  groupId: number;
 }
