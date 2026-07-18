@@ -18,9 +18,9 @@ export class LogService {
     private readonly dataSource: DataSource,
   ) {}
 
-  // 대상 게임이 요청자의 소속 그룹 소유인지 검증한다.
+  // 대상 게임이 요청자의 소속 그룹 소유인지 검증하고 게임을 반환한다.
   private async assertGameInGroup(gameId: number, userGroupId: number) {
-    await findOwnedGame(this.gameRepository, gameId, userGroupId);
+    return findOwnedGame(this.gameRepository, gameId, userGroupId);
   }
 
   async getLogByGroupId(groupId: number) {
@@ -75,7 +75,7 @@ export class LogService {
 
   async createLog(log: PostLogRequestDto, userGroupId: number) {
     // DTO의 groupId가 아닌 게임의 실제 소유 그룹으로 검증한다.
-    await this.assertGameInGroup(log.gameId, userGroupId);
+    const game = await this.assertGameInGroup(log.gameId, userGroupId);
 
     // 선수/기록 항목도 요청자 그룹 소속인지 검증한다.
     await assertIdsInGroup(
@@ -95,7 +95,12 @@ export class LogService {
     const lastLog = await this.logRepository.findLastLogByGameId(log.gameId);
     const sequence = lastLog ? lastLog.sequence + 1 : 1;
 
-    const logInstance = plainToInstance(Log, { ...log, sequence });
+    // 쿼터는 클라이언트가 아닌 서버(게임의 현재 쿼터)가 결정한다.
+    const logInstance = plainToInstance(Log, {
+      ...log,
+      sequence,
+      quarter: game.currentQuarter ?? 1,
+    });
     return this.logRepository.createLog(logInstance);
   }
 
