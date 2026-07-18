@@ -53,6 +53,8 @@ services:
       - DB_DATABASE=${DB_DATABASE}
       - PORT=${PORT:-3010}
       - JWT_SECRET=${JWT_SECRET}
+      - MAIL_FROM=${MAIL_FROM}
+      - AWS_REGION=${AWS_REGION:-ap-northeast-2}
     depends_on:
       - db
     restart: always
