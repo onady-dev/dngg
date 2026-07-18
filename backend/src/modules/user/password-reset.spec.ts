@@ -111,4 +111,25 @@ describe('resetPassword', () => {
     expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
     expect(queryRunner.release).toHaveBeenCalled();
   });
+
+  test('rollbackTransaction 자체가 실패해도 원래 에러가 마스킹되지 않는다', async () => {
+    const queryRunner = makeQueryRunner();
+    queryRunner.rollbackTransaction = jest
+      .fn()
+      .mockRejectedValue(new Error('rollback failed'));
+    const emailVerification = {
+      assertVerified: jest
+        .fn()
+        .mockResolvedValue({ email: 'a@b.c', verificationId: 9 }),
+      markConsumed: jest.fn().mockRejectedValue(new Error('db down')),
+    };
+    const { service } = makeService({ queryRunner, emailVerification });
+
+    await expect(
+      service.resetPassword('token', 'newpassword1'),
+    ).rejects.toThrow('db down');
+
+    expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
+    expect(queryRunner.release).toHaveBeenCalled();
+  });
 });

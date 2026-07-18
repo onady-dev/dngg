@@ -1,6 +1,6 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import { User } from '../../entities/User.entity';
 import { CreateUserDto, UpdateUserDto } from './user.request.dto';
 import { Group } from 'src/entities/Group.entity';
@@ -18,6 +18,8 @@ const typedBcrypt = bcrypt as unknown as {
 
 @Injectable()
 export class UserService {
+  private readonly logger = new Logger(UserService.name);
+
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
@@ -41,28 +43,25 @@ export class UserService {
       );
     }
 
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
     try {
-      const group = queryRunner.manager.create(Group, { name: dto.groupName });
-      const savedGroup = await queryRunner.manager.save(Group, group);
-      const hashedPassword = await bcrypt.hash(dto.password, 10);
-      const user = queryRunner.manager.create(User, {
-        email: dto.email,
-        name: dto.name,
-        groupId: savedGroup.id,
-        password: hashedPassword,
+      return await this.withTransaction(async (manager) => {
+        const group = manager.create(Group, { name: dto.groupName });
+        const savedGroup = await manager.save(Group, group);
+        const hashedPassword = await bcrypt.hash(dto.password, 10);
+        const user = manager.create(User, {
+          email: dto.email,
+          name: dto.name,
+          groupId: savedGroup.id,
+          password: hashedPassword,
+        });
+        const savedUser = await manager.save(User, user);
+        await this.emailVerificationService.markConsumed(
+          verificationId,
+          manager,
+        );
+        return savedUser;
       });
-      const savedUser = await queryRunner.manager.save(User, user);
-      await this.emailVerificationService.markConsumed(
-        verificationId,
-        queryRunner.manager,
-      );
-      await queryRunner.commitTransaction();
-      return savedUser;
     } catch (error) {
-      await queryRunner.rollbackTransaction();
       if (error.code === '23505') {
         if (error.table === 'user') {
           throw new HttpException(
@@ -76,6 +75,35 @@ export class UserService {
         );
       }
       throw error;
+    }
+  }
+
+  // queryRunner 보일러플레이트 공통화: connect/startTransaction 실패도 release를
+  // 보장하고, rollback 실패가 원래 에러를 가리지 않도록 한다.
+  private async withTransaction<T>(
+    fn: (manager: EntityManager) => Promise<T>,
+  ): Promise<T> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    try {
+      await queryRunner.connect();
+      await queryRunner.startTransaction();
+      try {
+        const result = await fn(queryRunner.manager);
+        await queryRunner.commitTransaction();
+        return result;
+      } catch (error) {
+        try {
+          await queryRunner.rollbackTransaction();
+        } catch (rollbackError) {
+          this.logger.error(
+            '트랜잭션 롤백에 실패했습니다. 원래 에러를 그대로 전파합니다.',
+            rollbackError instanceof Error
+              ? rollbackError.stack
+              : String(rollbackError),
+          );
+        }
+        throw error;
+      }
     } finally {
       await queryRunner.release();
     }
@@ -130,25 +158,13 @@ export class UserService {
       throw new HttpException('User not found', HttpStatus.NOT_FOUND);
     }
 
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-    try {
+    await this.withTransaction(async (manager) => {
       const hashedPassword = await typedBcrypt.hash(newPassword, 10);
-      await queryRunner.manager.update(User, user.id, {
+      await manager.update(User, user.id, {
         password: hashedPassword,
       });
-      await this.emailVerificationService.markConsumed(
-        verificationId,
-        queryRunner.manager,
-      );
-      await queryRunner.commitTransaction();
-      return { message: '비밀번호가 변경되었습니다.' };
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+      await this.emailVerificationService.markConsumed(verificationId, manager);
+    });
+    return { message: '비밀번호가 변경되었습니다.' };
   }
 }
