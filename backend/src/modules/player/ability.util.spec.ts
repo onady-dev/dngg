@@ -98,7 +98,7 @@ describe('computeAbility - dynamic fallback', () => {
 
   it('동적 축은 사용빈도 상위 이름, 전부 higherIsBetter', () => {
     const a = computeAbility({ rows: customRows, gamesPlayed: games, targetPlayerId: 1, groupId: 3 });
-    expect(a.axes.map((x) => x.label)).toEqual(['펀치', '킥', '방어', '클린치']);
+    expect(a.axes.map((x) => x.label)).toEqual(['킥', '펀치', '방어', '클린치']);
     expect(a.axes.every((x) => x.higherIsBetter)).toBe(true);
   });
 

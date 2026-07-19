@@ -142,7 +142,7 @@ function pickAxes(rows: AbilityRow[], names: Set<string>): AxisDef[] {
 function buildDynamicAxes(rows: AbilityRow[]): AxisDef[] {
   const countByName = new Map<string, number>();
   rows.forEach((r) =>
-    countByName.set(r.name, (countByName.get(r.name) ?? 0) + 1),
+    countByName.set(r.name, (countByName.get(r.name) ?? 0) + r.count),
   );
   const topNames = [...countByName.entries()]
     .sort((a, b) => b[1] - a[1])
