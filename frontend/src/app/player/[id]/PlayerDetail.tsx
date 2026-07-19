@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { LogItem } from "@/types/game";
 import { api } from "@/lib/axios";
-import { GameRecord } from "./types";
+import { GameRecord, PlayerAbility } from "./types";
 import PlayerDetailClient from "./PlayerDetailClient";
 
 interface PlayerLog {
@@ -31,6 +31,7 @@ export default function PlayerDetail({ params }: PlayerDetailProps) {
   const [player, setPlayer] = useState<any>(null);
   const [gameRecords, setGameRecords] = useState<GameRecord[]>([]);
   const [allLogItemNames, setAllLogItemNames] = useState<string[]>([]);
+  const [ability, setAbility] = useState<PlayerAbility | null>(null);
 
   const playerId = params.id;
 
@@ -108,6 +109,15 @@ export default function PlayerDetail({ params }: PlayerDetailProps) {
         setPlayer(playerData);
         setGameRecords(sortedRecords);
         setAllLogItemNames(logItemNames);
+
+        // 능력치는 실패해도 나머지 렌더에 영향 없도록 독립 처리
+        api
+          .get(`/player/${playerId}/ability`)
+          .then((res) => setAbility(res.data))
+          .catch((e) => {
+            console.error("Error fetching ability:", e);
+            setAbility(null);
+          });
       } catch (error) {
         console.error("Error fetching player data:", error);
         setError("데이터를 불러오는데 실패했습니다");
@@ -142,10 +152,11 @@ export default function PlayerDetail({ params }: PlayerDetailProps) {
 
   return (
     <div className="min-h-screen bg-white">
-      <PlayerDetailClient 
-        player={player} 
-        gameRecords={gameRecords} 
-        allLogItemNames={allLogItemNames} 
+      <PlayerDetailClient
+        player={player}
+        gameRecords={gameRecords}
+        allLogItemNames={allLogItemNames}
+        ability={ability}
       />
     </div>
   );

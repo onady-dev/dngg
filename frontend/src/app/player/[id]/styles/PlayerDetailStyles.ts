@@ -243,3 +243,74 @@ export const SummaryRow = styled.tr`
 export const AverageRow = styled.tr`
   background-color: #eff6ff;
 `;
+
+export const AbilityCardWrap = styled.div`
+  background-color: white;
+  border-radius: 1rem;
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+
+  @media (max-width: 640px) {
+    padding: 1rem;
+    border-radius: 0.75rem;
+    margin-bottom: 1rem;
+  }
+`;
+
+export const AbilityHeader = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+`;
+
+export const AbilityTitle = styled.h2`
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #1e293b;
+`;
+
+export const AbilityModeBadge = styled.span`
+  padding: 0.125rem 0.5rem;
+  background-color: #eff6ff;
+  color: #1d4ed8;
+  border-radius: 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+`;
+
+export const AbilityCaption = styled.p`
+  margin-top: 0.5rem;
+  font-size: 0.8125rem;
+  color: #94a3b8;
+  text-align: center;
+`;
+
+export const AbilityEmpty = styled.p`
+  padding: 2rem 1rem;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 0.9375rem;
+`;
+
+export const AbilityRawList = styled.ul`
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  margin-top: 0.5rem;
+
+  li {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.875rem;
+    color: #475569;
+    border-bottom: 1px solid #f1f5f9;
+    padding-bottom: 0.375rem;
+  }
+  li span:last-child {
+    font-weight: 600;
+    color: #1e293b;
+  }
+`;

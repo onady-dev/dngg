@@ -2,16 +2,18 @@
 
 import React, { useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { GameRecord, Player } from "./types";
+import { GameRecord, Player, PlayerAbility } from "./types";
+import AbilityCard from "./AbilityCard";
 import * as S from "./styles/PlayerDetailStyles";
 
 interface PlayerDetailClientProps {
   player: Player;
   gameRecords: GameRecord[];
   allLogItemNames: string[];
+  ability: PlayerAbility | null;
 }
 
-export default function PlayerDetailClient({ player, gameRecords, allLogItemNames }: PlayerDetailClientProps) {
+export default function PlayerDetailClient({ player, gameRecords, allLogItemNames, ability }: PlayerDetailClientProps) {
   const router = useRouter();
 
   // 실제 게임 기록 사용
@@ -74,6 +76,8 @@ export default function PlayerDetailClient({ player, gameRecords, allLogItemName
           </S.PlayerBadge>
         </S.PlayerHeader>
       </S.PlayerInfoCard>
+
+      <AbilityCard ability={ability} />
 
       <S.StatsCard>
         <S.TableContainer>
