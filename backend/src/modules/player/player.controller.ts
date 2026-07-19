@@ -5,6 +5,7 @@ import {
   Delete,
   Get,
   Param,
+  ParseIntPipe,
   Post,
   Put,
   Query,
@@ -27,12 +28,12 @@ export class PlayerController {
   }
 
   @Get(':id')
-  async getPlayerByPlayerId(@Param('id') id: number) {
+  async getPlayerByPlayerId(@Param('id', ParseIntPipe) id: number) {
     return this.playerService.getPlayerByPlayerId(id);
   }
 
   @Get(':id/ability')
-  async getPlayerAbility(@Param('id') id: number) {
+  async getPlayerAbility(@Param('id', ParseIntPipe) id: number) {
     return this.playerService.getPlayerAbility(id);
   }
 
@@ -55,7 +56,7 @@ export class PlayerController {
   @UseGuards(AuthGuard('jwt'))
   async updatePlayer(
     @Request() req,
-    @Param('id') id: number,
+    @Param('id', ParseIntPipe) id: number,
     @Body(ValidationPipe) dto: PostPlayerRequestDto,
   ) {
     assertSameGroup(req.user.groupId, dto.groupId);
@@ -64,13 +65,13 @@ export class PlayerController {
 
   @Delete(':id')
   @UseGuards(AuthGuard('jwt'))
-  async deletePlayer(@Request() req, @Param('id') id: number) {
+  async deletePlayer(@Request() req, @Param('id', ParseIntPipe) id: number) {
     // 쿼리의 groupId는 신뢰하지 않고 JWT의 groupId로 소유권을 검증한다.
     return this.playerService.deletePlayer(id, req.user.groupId);
   }
 
   @Get('total-games-played/:id')
-  async getTotalGamesPlayed(@Param('id') id: number) {
+  async getTotalGamesPlayed(@Param('id', ParseIntPipe) id: number) {
     return this.playerService.getTotalGamesPlayed(id);
   }
 }
