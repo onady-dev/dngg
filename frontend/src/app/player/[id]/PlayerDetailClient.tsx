@@ -83,7 +83,7 @@ export default function PlayerDetailClient({ player, gameRecords, allLogItemName
 
       <AbilityCard ability={ability} />
 
-      <ShareButton playerId={player.id} playerName={player.name} />
+      <ShareButton playerId={player.id} />
 
       <S.StatsCard>
         <S.TableContainer>

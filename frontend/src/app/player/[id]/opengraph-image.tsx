@@ -20,13 +20,29 @@ interface Axis {
   rawPerGame: number;
 }
 
+const R_RATIO = 0.3; // 폴리곤 반경 비율 (라벨 공간 확보 위해 작게)
+const LABEL_RATIO = 0.3 * 1.34; // 라벨 링 반경 비율
+
+// i번째 축 각도(12시 시작, 시계방향)
+const axisAngle = (i: number, n: number) => -Math.PI / 2 + (i * 2 * Math.PI) / n;
+
+// 각 축 라벨의 중심 좌표(RADAR_BOX 좌표계)
+function labelPositions(n: number, box: number): { x: number; y: number }[] {
+  const c = box / 2;
+  const rl = box * LABEL_RATIO;
+  return Array.from({ length: n }, (_, i) => ({
+    x: c + rl * Math.cos(axisAngle(i, n)),
+    y: c + rl * Math.sin(axisAngle(i, n)),
+  }));
+}
+
 // 레이더 도형만(텍스트 없음) SVG 문자열로 생성 → data URI로 <img> 삽입.
 // 텍스트가 없으므로 SVG 래스터화에 한글 폰트가 필요 없다.
 function radarSvg(scores: number[], px: number): string {
   const n = scores.length;
   const cx = px / 2;
   const cy = px / 2;
-  const r = px * 0.38;
+  const r = px * R_RATIO;
   const ang = (i: number) => -Math.PI / 2 + (i * 2 * Math.PI) / n;
   const pt = (i: number, f: number) => [
     cx + r * f * Math.cos(ang(i)),
@@ -97,11 +113,15 @@ export default async function Image({ params }: { params: { id: string } }) {
   }
 
   const scored = hasData && axes.length >= 3 && axes.every((x) => x.score !== null);
-  const radar = scored ? radarSvg(axes.map((x) => x.score as number), 460) : null;
-  const topAxes = [...axes]
-    .filter((x) => x.score !== null)
-    .sort((a, b) => (b.score as number) - (a.score as number))
-    .slice(0, 3);
+  const RADAR_BOX = 520;
+  const radar = scored ? radarSvg(axes.map((x) => x.score as number), RADAR_BOX) : null;
+  const labels = scored
+    ? labelPositions(axes.length, RADAR_BOX).map((pos, i) => ({
+        ...pos,
+        label: axes[i].label,
+        score: Math.round(axes[i].score as number),
+      }))
+    : [];
 
   return new ImageResponse(
     (
@@ -122,7 +142,7 @@ export default async function Image({ params }: { params: { id: string } }) {
             style={{
               display: "flex",
               flexDirection: "column",
-              width: 560,
+              width: 400,
               justifyContent: "center",
             }}
           >
@@ -134,32 +154,39 @@ export default async function Image({ params }: { params: { id: string } }) {
             >
               {name}
             </div>
-            <div style={{ display: "flex", flexDirection: "column", marginTop: 24 }}>
-              {scored ? (
-                topAxes.map((x) => (
-                  <div
-                    key={x.key}
-                    style={{ display: "flex", alignItems: "center", marginBottom: 12 }}
-                  >
-                    <div style={{ display: "flex", fontSize: 30, color: INK, width: 200 }}>
-                      {x.label}
-                    </div>
-                    <div style={{ display: "flex", fontSize: 30, color: ACCENT, fontWeight: 700 }}>
-                      {String(Math.round(x.score as number))}
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div style={{ display: "flex", fontSize: 30, color: MUTED }}>
-                  아직 능력치 기록이 부족해요
-                </div>
-              )}
-            </div>
+            {!scored && (
+              <div style={{ display: "flex", fontSize: 30, color: MUTED, marginTop: 20 }}>
+                아직 능력치 기록이 부족해요
+              </div>
+            )}
           </div>
           <div style={{ display: "flex", flex: 1, justifyContent: "center", alignItems: "center" }}>
             {radar ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={dataUri(radar)} width={460} height={460} alt="" />
+              <div style={{ position: "relative", display: "flex", width: RADAR_BOX, height: RADAR_BOX }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={dataUri(radar)} width={RADAR_BOX} height={RADAR_BOX} alt="" />
+                {labels.map((l) => (
+                  <div
+                    key={l.label}
+                    style={{
+                      position: "absolute",
+                      left: l.x,
+                      top: l.y,
+                      transform: "translate(-50%, -50%)",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                    }}
+                  >
+                    <div style={{ display: "flex", fontSize: 24, fontWeight: 700, color: INK }}>
+                      {l.label}
+                    </div>
+                    <div style={{ display: "flex", fontSize: 22, fontWeight: 700, color: ACCENT }}>
+                      {String(l.score)}
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : (
               <div style={{ display: "flex", fontSize: 200 }}>🏀</div>
             )}
