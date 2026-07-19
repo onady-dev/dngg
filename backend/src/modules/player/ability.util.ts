@@ -91,7 +91,7 @@ export function computeAbility(input: ComputeInput): PlayerAbility {
   const axisDefs = pickAxes(rows, names);
 
   const targetGames = gamesByPlayer.get(targetPlayerId) ?? 0;
-  const hasData = targetGames > 0 && groupSize > 0;
+  const hasData = targetGames > 0 && groupSize > 0 && axisDefs.length > 0;
 
   const axes = axisDefs.map((def) => {
     const perGame = (pid: number) => {
@@ -133,7 +133,27 @@ function round1(n: number): number {
   return Math.round(n * 10) / 10;
 }
 
-// Task 3에서 동적 폴백을 추가한다. 지금은 농구 축만 반환.
-function pickAxes(_rows: AbilityRow[], _names: Set<string>): AxisDef[] {
-  return BASKETBALL_AXES;
+function pickAxes(rows: AbilityRow[], names: Set<string>): AxisDef[] {
+  const mappable = BASKETBALL_AXES.filter((def) => def.present(names)).length;
+  if (mappable >= 4) return BASKETBALL_AXES;
+  return buildDynamicAxes(rows);
+}
+
+function buildDynamicAxes(rows: AbilityRow[]): AxisDef[] {
+  const countByName = new Map<string, number>();
+  rows.forEach((r) =>
+    countByName.set(r.name, (countByName.get(r.name) ?? 0) + 1),
+  );
+  const topNames = [...countByName.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([name]) => name);
+  if (topNames.length < 3) return [];
+  return topNames.map((name) => ({
+    key: `dyn_${name}`,
+    label: name,
+    higherIsBetter: true,
+    raw: (rs: AbilityRow[]) => sumCount(rs, (n) => n === name),
+    present: () => true,
+  }));
 }

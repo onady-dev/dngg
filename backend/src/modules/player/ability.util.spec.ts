@@ -75,3 +75,40 @@ describe('computeAbility - basketball', () => {
     expect(a.axes.every((x) => x.score === null)).toBe(true);
   });
 });
+
+describe('computeAbility - dynamic fallback', () => {
+  const customRows: AbilityRow[] = [
+    { playerId: 1, name: '펀치', count: 10, valueSum: 0 },
+    { playerId: 1, name: '킥', count: 8, valueSum: 0 },
+    { playerId: 1, name: '방어', count: 6, valueSum: 0 },
+    { playerId: 1, name: '클린치', count: 4, valueSum: 0 },
+    { playerId: 2, name: '펀치', count: 5, valueSum: 0 },
+    { playerId: 2, name: '킥', count: 12, valueSum: 0 },
+    { playerId: 2, name: '방어', count: 2, valueSum: 0 },
+  ];
+  const games: GamesPlayed[] = [
+    { playerId: 1, gamesPlayed: 2 },
+    { playerId: 2, gamesPlayed: 2 },
+  ];
+
+  it('농구 매핑이 4축 미만이면 mode=dynamic', () => {
+    const a = computeAbility({ rows: customRows, gamesPlayed: games, targetPlayerId: 1, groupId: 3 });
+    expect(a.mode).toBe('dynamic');
+  });
+
+  it('동적 축은 사용빈도 상위 이름, 전부 higherIsBetter', () => {
+    const a = computeAbility({ rows: customRows, gamesPlayed: games, targetPlayerId: 1, groupId: 3 });
+    expect(a.axes.map((x) => x.label)).toEqual(['펀치', '킥', '방어', '클린치']);
+    expect(a.axes.every((x) => x.higherIsBetter)).toBe(true);
+  });
+
+  it('매핑 가능한 이름이 3종 미만이면 hasData=false', () => {
+    const tiny: AbilityRow[] = [
+      { playerId: 1, name: '펀치', count: 3, valueSum: 0 },
+      { playerId: 1, name: '킥', count: 2, valueSum: 0 },
+    ];
+    const a = computeAbility({ rows: tiny, gamesPlayed: [{ playerId: 1, gamesPlayed: 1 }], targetPlayerId: 1, groupId: 3 });
+    expect(a.hasData).toBe(false);
+    expect(a.axes).toHaveLength(0);
+  });
+});
