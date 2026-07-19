@@ -38,7 +38,7 @@ export default function RadarChart({ axes, size = 280 }: RadarChartProps) {
     .join(" ");
 
   const ariaLabel = axes
-    .map((ax) => `${ax.label} ${Math.round(ax.value)}`)
+    .map((ax) => `${ax.label} ${Math.round(Math.max(0, Math.min(100, ax.value)))}`)
     .join(", ");
 
   return (
