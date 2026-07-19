@@ -214,12 +214,13 @@ import { Like, QueryRunner, Repository, Raw } from 'typeorm';
 
 ```typescript
   async findByDaily(date: string, groupId: number): Promise<Log[] | null> {
-    // 날짜 경계는 DB에 저장된 값의 ::date 기준으로 판정한다.
+    // 날짜 경계는 DB에 저장된 값의 DATE 캐스트 기준으로 판정한다.
     // (/log/daily/dates 목록 생성과 같은 표현식 — 기준 불일치 방지)
+    // 주의: `${alias}::date` 형태는 TypeORM 파라미터 바인딩과 충돌(syntax error) — 표준 CAST 사용 (T8 스모크 반영)
     return this.logRepository.find({
       where: {
         groupId: Number(groupId),
-        createdAt: Raw((alias) => `${alias}::date = :date`, { date }),
+        createdAt: Raw((alias) => `CAST(${alias} AS DATE) = :date`, { date }),
       },
       relations: ['logitem', 'player'],
     });
@@ -352,7 +353,8 @@ Expected: FAIL — `service.getDailyDates is not a function`
     // 로그가 실제 존재하는 날짜만, findByDaily와 같은 ::date 기준으로 뽑는다.
     const rows: { date: string }[] = await this.logRepository
       .createQueryBuilder('log')
-      .select(`DISTINCT TO_CHAR(log.createdAt::date, 'YYYY-MM-DD')`, 'date')
+      .select(`DISTINCT TO_CHAR(CAST(log."createdAt" AS DATE), 'YYYY-MM-DD')`, 'date')
+      // 주의: raw select 문자열은 TypeORM 프로퍼티 치환이 없다 — 컬럼을 직접 quoting할 것 (T8 스모크 반영)
       .where('log.groupId = :groupId', { groupId: Number(groupId) })
       .orderBy('date', 'DESC')
       .getRawMany();
@@ -540,7 +542,7 @@ Expected: FAIL — `service.getDailyGames is not a function`
     return this.logRepository.find({
       where: {
         groupId: Number(groupId),
-        createdAt: Raw((alias) => `${alias}::date = :date`, { date }),
+        createdAt: Raw((alias) => `CAST(${alias} AS DATE) = :date`, { date }),
       },
       relations: ['logitem', 'game', 'player'],
     });
