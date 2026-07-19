@@ -33,12 +33,12 @@ export class LogRepository extends Repository<Log> {
   }
 
   async findByDaily(date: string, groupId: number): Promise<Log[] | null> {
-    // 날짜 경계는 DB에 저장된 값의 ::date 기준으로 판정한다.
+    // 날짜 경계는 DB에 저장된 값의 CAST 기준으로 판정한다.
     // (/log/daily/dates 목록 생성과 같은 표현식 — 기준 불일치 방지)
     return this.logRepository.find({
       where: {
         groupId: Number(groupId),
-        createdAt: Raw((alias) => `${alias}::date = :date`, { date }),
+        createdAt: Raw((alias) => `CAST(${alias} AS DATE) = :date`, { date }),
       },
       relations: ['logitem', 'player'],
     });
@@ -51,17 +51,17 @@ export class LogRepository extends Repository<Log> {
     return this.logRepository.find({
       where: {
         groupId: Number(groupId),
-        createdAt: Raw((alias) => `${alias}::date = :date`, { date }),
+        createdAt: Raw((alias) => `CAST(${alias} AS DATE) = :date`, { date }),
       },
       relations: ['logitem', 'game', 'player'],
     });
   }
 
   async findDailyDates(groupId: number): Promise<string[]> {
-    // 로그가 실제 존재하는 날짜만, findByDaily와 같은 ::date 기준으로 뽑는다.
+    // 로그가 실제 존재하는 날짜만, findByDaily와 같은 CAST 기준으로 뽑는다.
     const rows: { date: string }[] = await this.logRepository
       .createQueryBuilder('log')
-      .select(`DISTINCT TO_CHAR(log.createdAt::date, 'YYYY-MM-DD')`, 'date')
+      .select(`DISTINCT TO_CHAR(CAST(log."createdAt" AS DATE), 'YYYY-MM-DD')`, 'date')
       .where('log.groupId = :groupId', { groupId: Number(groupId) })
       .orderBy('date', 'DESC')
       .getRawMany();

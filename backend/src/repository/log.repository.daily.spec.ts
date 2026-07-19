@@ -65,7 +65,7 @@ describe('LogRepository.findDailyDates', () => {
     return qb;
   };
 
-  test('groupId 필터·::date 캐스팅·최신순 정렬로 날짜 목록을 조회한다', async () => {
+  test('groupId 필터·CAST 캐스팅·최신순 정렬로 날짜 목록을 조회한다', async () => {
     const { repository, inner } = createRepository();
     const qb = createQueryBuilderStub([
       { date: '2026-07-18' },
@@ -76,7 +76,7 @@ describe('LogRepository.findDailyDates', () => {
     const result = await repository.findDailyDates(5);
 
     expect(qb.select).toHaveBeenCalledWith(
-      expect.stringContaining('::date'),
+      expect.stringContaining('CAST(log."createdAt" AS DATE)'),
       'date',
     );
     expect(qb.where).toHaveBeenCalledWith('log.groupId = :groupId', {
