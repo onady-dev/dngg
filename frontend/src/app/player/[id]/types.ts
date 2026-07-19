@@ -17,3 +17,22 @@ export interface Player {
   position: string;
   backnumber: string;
 }
+
+export interface AbilityAxis {
+  key: string;
+  label: string;
+  score: number | null;
+  rawPerGame: number;
+  groupAvgPerGame: number;
+  higherIsBetter: boolean;
+}
+
+export interface PlayerAbility {
+  playerId: number;
+  groupId: number;
+  mode: "basketball" | "dynamic";
+  gamesPlayed: number;
+  groupSize: number;
+  hasData: boolean;
+  axes: AbilityAxis[];
+}
