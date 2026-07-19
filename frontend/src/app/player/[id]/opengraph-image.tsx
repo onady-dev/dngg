@@ -134,7 +134,6 @@ export default async function Image({ params }: { params: { id: string } }) {
           backgroundColor: "white",
           fontFamily: "Pretendard",
           padding: 56,
-          border: `12px solid ${ACCENT}`,
         }}
       >
         <div style={{ display: "flex", flex: 1, alignItems: "center" }}>
