@@ -51,6 +51,17 @@ const GlobalStyles = createGlobalStyle`
   ul, li {
     list-style: none;
   }
+
+  /* 모바일(터치) 환경에서 인풋 포커스 시 브라우저가 자동 확대하는 문제 방지.
+     iOS Safari 등은 폼 요소의 font-size가 16px 미만이면 포커스 시 화면을 확대한다.
+     실제 표시 크기를 16px로 통일해 확대를 막는다(핀치 줌은 그대로 유지). */
+  @media (pointer: coarse) {
+    input,
+    textarea,
+    select {
+      font-size: 16px !important;
+    }
+  }
 `;
 
 export default GlobalStyles;
