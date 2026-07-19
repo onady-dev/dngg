@@ -86,7 +86,7 @@ export default function RadarChart({ axes, size = 280 }: RadarChartProps) {
           >
             <tspan fontWeight={600}>{ax.label}</tspan>
             <tspan x={lx} dy={14} fill={ACCENT} fontWeight={700}>
-              {Math.round(ax.value)}
+              {Math.round(Math.max(0, Math.min(100, ax.value)))}
             </tspan>
           </text>
         );
