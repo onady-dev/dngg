@@ -1,4 +1,5 @@
 import { LogRepository } from 'src/repository/log.repository';
+import { Not } from 'typeorm';
 
 // 실제 DB 없이 find 호출 옵션(where 절 구성)만 검증한다. (logitem.repository.spec.ts 패턴)
 const createRepository = () => {
@@ -20,7 +21,10 @@ describe('LogRepository.findByDaily', () => {
 
     expect(inner.find).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ groupId: 5 }),
+        where: expect.objectContaining({
+          groupId: 5,
+          game: { status: Not('DELETED') },
+        }),
         relations: ['logitem', 'player'],
       }),
     );
@@ -57,15 +61,17 @@ describe('LogRepository.findDailyLogsWithGame', () => {
 describe('LogRepository.findDailyDates', () => {
   const createQueryBuilderStub = (rows: { date: string }[]) => {
     const qb = {
+      innerJoin: jest.fn().mockReturnThis(),
       select: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
       orderBy: jest.fn().mockReturnThis(),
       getRawMany: jest.fn().mockResolvedValue(rows),
     };
     return qb;
   };
 
-  test('groupId 필터·CAST 캐스팅·최신순 정렬로 날짜 목록을 조회한다', async () => {
+  test('groupId 필터·CAST 캐스팅·DELETED 게임 제외·최신순 정렬로 날짜 목록을 조회한다', async () => {
     const { repository, inner } = createRepository();
     const qb = createQueryBuilderStub([
       { date: '2026-07-18' },
@@ -75,6 +81,7 @@ describe('LogRepository.findDailyDates', () => {
 
     const result = await repository.findDailyDates(5);
 
+    expect(qb.innerJoin).toHaveBeenCalledWith('log.game', 'game');
     expect(qb.select).toHaveBeenCalledWith(
       expect.stringContaining('CAST(log."createdAt" AS DATE)'),
       'date',
@@ -82,6 +89,7 @@ describe('LogRepository.findDailyDates', () => {
     expect(qb.where).toHaveBeenCalledWith('log.groupId = :groupId', {
       groupId: 5,
     });
+    expect(qb.andWhere).toHaveBeenCalledWith(`game.status != 'DELETED'`);
     expect(qb.orderBy).toHaveBeenCalledWith('date', 'DESC');
     expect(result).toEqual(['2026-07-18', '2026-07-15']);
   });
