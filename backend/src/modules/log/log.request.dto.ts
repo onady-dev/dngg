@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsNotEmpty, IsNumber, IsString } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsString, Matches } from 'class-validator';
 
 export class PostLogRequestDto {
   @IsNotEmpty()
@@ -19,6 +19,9 @@ export class PostLogRequestDto {
 export class GetLogByDailyRequestDto {
   @IsNotEmpty()
   @IsString()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, {
+    message: 'date는 YYYY-MM-DD 형식이어야 합니다.',
+  })
   date: string;
 
   @Type(() => Number)
