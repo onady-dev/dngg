@@ -387,3 +387,33 @@ export const SwitcherEmpty = styled.li`
   font-size: 0.875rem;
   color: #94a3b8;
 `;
+
+/* 능력치 카드 공유 버튼 */
+export const ShareButton = styled.button`
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin: 0 0 1.5rem;
+  padding: 0.625rem 1rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: white;
+  background-color: #2563eb;
+  border: none;
+  border-radius: 0.625rem;
+  cursor: pointer;
+
+  &:hover {
+    background-color: #1d4ed8;
+  }
+  &:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+
+  @media (max-width: 640px) {
+    width: 100%;
+    justify-content: center;
+    margin-bottom: 1rem;
+  }
+`;

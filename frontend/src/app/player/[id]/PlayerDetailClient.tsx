@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { GameRecord, GroupPlayer, Player, PlayerAbility } from "./types";
 import AbilityCard from "./AbilityCard";
 import PlayerSwitcher from "./PlayerSwitcher";
+import ShareButton from "./ShareButton";
 import * as S from "./styles/PlayerDetailStyles";
 
 interface PlayerDetailClientProps {
@@ -81,6 +82,8 @@ export default function PlayerDetailClient({ player, gameRecords, allLogItemName
       </S.PlayerInfoCard>
 
       <AbilityCard ability={ability} />
+
+      <ShareButton playerId={player.id} playerName={player.name} />
 
       <S.StatsCard>
         <S.TableContainer>
