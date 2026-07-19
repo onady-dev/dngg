@@ -33,18 +33,23 @@ describe('PlayerService.getPlayerAbility', () => {
   it('선수 그룹으로 능력치를 집계해 반환', async () => {
     const { service, abilityRepository } = makeService();
     const result = await service.getPlayerAbility(1);
+    // 두 집계 모두 선수의 실제 groupId(7)로 호출되어야 한다
     expect(abilityRepository.aggregateGroupAbility).toHaveBeenCalledWith(7);
+    expect(abilityRepository.aggregateGamesPlayed).toHaveBeenCalledWith(7);
     expect(result.playerId).toBe(1);
     expect(result.groupId).toBe(7);
     expect(result.axes.length).toBeGreaterThanOrEqual(3);
   });
 
-  it('선수가 없으면 404', async () => {
-    const { service } = makeService({
+  it('선수가 없으면 404이며 집계를 호출하지 않는다', async () => {
+    const { service, abilityRepository } = makeService({
       playerRepository: { findById: jest.fn().mockResolvedValue(null) },
     });
     await expect(service.getPlayerAbility(999)).rejects.toBeInstanceOf(
       NotFoundException,
     );
+    // NotFound 시 집계 I/O로 넘어가지 않고 단락되어야 한다
+    expect(abilityRepository.aggregateGroupAbility).not.toHaveBeenCalled();
+    expect(abilityRepository.aggregateGamesPlayed).not.toHaveBeenCalled();
   });
 });

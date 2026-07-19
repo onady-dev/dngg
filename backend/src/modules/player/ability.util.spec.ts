@@ -112,3 +112,36 @@ describe('computeAbility - dynamic fallback', () => {
     expect(a.axes).toHaveLength(0);
   });
 });
+
+describe('computeAbility - basketball/dynamic 경계 (mappable 3 vs 4)', () => {
+  const games: GamesPlayed[] = [
+    { playerId: 1, gamesPlayed: 1 },
+    { playerId: 2, gamesPlayed: 1 },
+  ];
+
+  it('농구 축 3개만 매핑되면 dynamic', () => {
+    // 어시/리바/스틸 → assist·rebound·defense = 3축 매핑 (scoring/outside/stability 미매핑)
+    const rows: AbilityRow[] = [
+      { playerId: 1, name: '어시', count: 2, valueSum: 0 },
+      { playerId: 1, name: '리바', count: 2, valueSum: 0 },
+      { playerId: 1, name: '스틸', count: 1, valueSum: 0 },
+      { playerId: 2, name: '리바', count: 3, valueSum: 0 },
+    ];
+    const a = computeAbility({ rows, gamesPlayed: games, targetPlayerId: 1, groupId: 4 });
+    expect(a.mode).toBe('dynamic');
+  });
+
+  it('농구 축 4개 매핑되면 basketball(6축)', () => {
+    // 어시/리바/스틸/턴오버 → assist·rebound·defense·stability = 4축 매핑
+    const rows: AbilityRow[] = [
+      { playerId: 1, name: '어시', count: 2, valueSum: 0 },
+      { playerId: 1, name: '리바', count: 2, valueSum: 0 },
+      { playerId: 1, name: '스틸', count: 1, valueSum: 0 },
+      { playerId: 1, name: '턴오버', count: 1, valueSum: 0 },
+      { playerId: 2, name: '리바', count: 3, valueSum: 0 },
+    ];
+    const a = computeAbility({ rows, gamesPlayed: games, targetPlayerId: 1, groupId: 4 });
+    expect(a.mode).toBe('basketball');
+    expect(a.axes).toHaveLength(6);
+  });
+});
