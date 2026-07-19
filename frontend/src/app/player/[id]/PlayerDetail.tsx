@@ -41,14 +41,17 @@ export default function PlayerDetail({ params }: PlayerDetailProps) {
         setLoading(true);
         setError(null);
 
-        // 로그 아이템, 선수 정보, 선수 로그를 동시에 가져옵니다
-        const [playerResponse, logsResponse, logItemsResponse, totalGamesPlayed] = await Promise.all([
-          api.get(`/player/${playerId}`),
+        // 선수 정보를 먼저 받아 그룹 컨텍스트를 확보한다.
+        // (/logitem은 groupId 쿼리가 필수 — 없으면 서버가 500)
+        const playerResponse = await api.get(`/player/${playerId}`);
+        const playerData = playerResponse.data;
+
+        // 나머지는 병렬로. logitem은 선수의 그룹으로 필터링한다.
+        const [logsResponse, logItemsResponse, totalGamesPlayed] = await Promise.all([
           api.get(`/log/player/${playerId}`),
-          api.get("/logitem"),
+          api.get(`/logitem?groupId=${playerData.groupId}`),
           api.get(`/player/total-games-played/${playerId}`)
         ]);
-        const playerData = playerResponse.data;
         const allLogItems = logItemsResponse.data;
 
         // 게임별로 로그 그룹화
