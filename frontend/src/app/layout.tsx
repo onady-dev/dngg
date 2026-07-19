@@ -11,7 +11,15 @@ import { Providers } from "./providers";
 
 const inter = Inter({ subsets: ["latin"] });
 
+// 상대 metadata URL(og:image 등)을 절대 URL로 해석하는 기준.
+// 미설정 시 http://localhost:3000으로 잡혀 크롤러가 카드를 못 가져온다.
+// 운영 NEXT_PUBLIC_API_URL=https://dngg.one/api → origin https://dngg.one.
+const siteUrl = process.env.NEXT_PUBLIC_API_URL
+  ? new URL(process.env.NEXT_PUBLIC_API_URL).origin
+  : "http://localhost:3011";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: "DN.GG",
   description: "농구 경기 기록·통계 서비스",
   manifest: "/manifest.json",
