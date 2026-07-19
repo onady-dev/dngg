@@ -1,7 +1,5 @@
 "use client";
 
-import React from "react";
-
 interface RadarAxis {
   label: string;
   value: number; // 0~100
@@ -47,8 +45,11 @@ export default function RadarChart({ axes, size = 280 }: RadarChartProps) {
       width="100%"
       style={{ maxWidth: size, display: "block", margin: "0 auto" }}
       role="img"
+      focusable={false}
       aria-label={`능력치: ${ariaLabel}`}
     >
+      {/* aria-label이 요약을 제공하므로 시각 요소는 보조기술에서 숨긴다 */}
+      <g aria-hidden="true">
       {/* 그리드 */}
       {gridPolys.map((pts, idx) => (
         <polygon key={idx} points={pts} fill="none" stroke={GRID} strokeWidth={1} />
@@ -91,6 +92,7 @@ export default function RadarChart({ axes, size = 280 }: RadarChartProps) {
           </text>
         );
       })}
+      </g>
     </svg>
   );
 }
