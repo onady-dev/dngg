@@ -104,7 +104,7 @@ const DailyPage = () => {
     <Container>
       <Header>
         <Title>일일 기록</Title>
-        {selectedDate && (
+        {selectedDate && dates.includes(selectedDate) && (
           <DateNavigator
             dates={dates}
             selectedDate={selectedDate}
@@ -129,6 +129,11 @@ const DailyPage = () => {
         <SectionError
           message="선수 기록을 불러오는데 실패했습니다."
           onRetry={() => recordsQuery.refetch()}
+        />
+      ) : logitemsQuery.isError ? (
+        <SectionError
+          message="기록 항목을 불러오는데 실패했습니다."
+          onRetry={() => logitemsQuery.refetch()}
         />
       ) : (
         <RecordsTable
