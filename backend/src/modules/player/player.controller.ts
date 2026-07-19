@@ -31,6 +31,11 @@ export class PlayerController {
     return this.playerService.getPlayerByPlayerId(id);
   }
 
+  @Get(':id/ability')
+  async getPlayerAbility(@Param('id') id: number) {
+    return this.playerService.getPlayerAbility(id);
+  }
+
   @Post()
   @UseGuards(AuthGuard('jwt'))
   async createPlayer(

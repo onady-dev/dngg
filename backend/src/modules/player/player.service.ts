@@ -10,12 +10,16 @@ import { PlayerRepository } from 'src/repository/player.repository';
 import { Player } from 'src/entities/Player.entity';
 import { QueryFailedError } from 'typeorm';
 import { InGamePlayersRepository } from 'src/repository/inGamePlayers.repository';
+import { AbilityRepository } from 'src/repository/ability.repository';
+import { computeAbility } from './ability.util';
+import { PlayerAbility } from './ability.types';
 
 @Injectable()
 export class PlayerService {
   constructor(
     private readonly playerRepository: PlayerRepository,
     private readonly inGamePlayersRepository: InGamePlayersRepository,
+    private readonly abilityRepository: AbilityRepository,
   ) {}
 
   async getPlayerByGroupId(groupId: number) {
@@ -59,5 +63,18 @@ export class PlayerService {
   async getTotalGamesPlayed(id: number) {
     const test = await this.inGamePlayersRepository.getTotalGamesPlayed(id);
     return test;
+  }
+
+  async getPlayerAbility(id: number): Promise<PlayerAbility> {
+    const player = await this.playerRepository.findById(id);
+    if (!player) {
+      throw new NotFoundException('선수를 찾을 수 없습니다.');
+    }
+    const groupId = player.groupId;
+    const [rows, gamesPlayed] = await Promise.all([
+      this.abilityRepository.aggregateGroupAbility(groupId),
+      this.abilityRepository.aggregateGamesPlayed(groupId),
+    ]);
+    return computeAbility({ rows, gamesPlayed, targetPlayerId: id, groupId });
   }
 }

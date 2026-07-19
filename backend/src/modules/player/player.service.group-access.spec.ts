@@ -8,7 +8,11 @@ const createService = (player: { id: number; groupId: number } | null) => {
     updatePlayer: jest.fn().mockResolvedValue(undefined),
     deletePlayer: jest.fn().mockResolvedValue(undefined),
   };
-  const service = new PlayerService(playerRepository as any, {} as any);
+  const service = new PlayerService(
+    playerRepository as any,
+    {} as any,
+    {} as any,
+  );
   return { service, playerRepository };
 };
 
