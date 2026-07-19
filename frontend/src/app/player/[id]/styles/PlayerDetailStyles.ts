@@ -314,3 +314,76 @@ export const AbilityRawList = styled.ul`
     color: #1e293b;
   }
 `;
+
+/* 선수 전환 콤보박스 */
+export const SwitcherWrap = styled.div`
+  position: relative;
+  margin-top: 0.75rem;
+  max-width: 320px;
+
+  @media (max-width: 640px) {
+    max-width: 100%;
+  }
+`;
+
+export const SwitcherInput = styled.input`
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  color: #1e293b;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  outline: none;
+
+  &::placeholder {
+    color: #94a3b8;
+  }
+  &:focus {
+    border-color: #2563eb;
+    background-color: white;
+  }
+`;
+
+export const SwitcherDropdown = styled.ul`
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  max-height: 260px;
+  overflow-y: auto;
+  background-color: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  padding: 0.25rem;
+`;
+
+export const SwitcherItem = styled.li<{ isActive?: boolean }>`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.625rem;
+  font-size: 0.875rem;
+  color: #1e293b;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  background-color: ${({ isActive }) => (isActive ? "#eff6ff" : "transparent")};
+
+  &:hover {
+    background-color: #eff6ff;
+  }
+
+  span.num {
+    color: #94a3b8;
+    font-size: 0.8125rem;
+    font-weight: 600;
+  }
+`;
+
+export const SwitcherEmpty = styled.li`
+  padding: 0.5rem 0.625rem;
+  font-size: 0.875rem;
+  color: #94a3b8;
+`;

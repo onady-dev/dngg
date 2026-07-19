@@ -2,8 +2,9 @@
 
 import React, { useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { GameRecord, Player, PlayerAbility } from "./types";
+import { GameRecord, GroupPlayer, Player, PlayerAbility } from "./types";
 import AbilityCard from "./AbilityCard";
+import PlayerSwitcher from "./PlayerSwitcher";
 import * as S from "./styles/PlayerDetailStyles";
 
 interface PlayerDetailClientProps {
@@ -11,9 +12,10 @@ interface PlayerDetailClientProps {
   gameRecords: GameRecord[];
   allLogItemNames: string[];
   ability: PlayerAbility | null;
+  groupPlayers: GroupPlayer[];
 }
 
-export default function PlayerDetailClient({ player, gameRecords, allLogItemNames, ability }: PlayerDetailClientProps) {
+export default function PlayerDetailClient({ player, gameRecords, allLogItemNames, ability, groupPlayers }: PlayerDetailClientProps) {
   const router = useRouter();
 
   // 실제 게임 기록 사용
@@ -75,6 +77,7 @@ export default function PlayerDetailClient({ player, gameRecords, allLogItemName
             {player.position} #{player.backnumber}
           </S.PlayerBadge>
         </S.PlayerHeader>
+        <PlayerSwitcher players={groupPlayers} currentPlayerId={player.id} />
       </S.PlayerInfoCard>
 
       <AbilityCard ability={ability} />

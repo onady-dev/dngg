@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { LogItem } from "@/types/game";
 import { api } from "@/lib/axios";
-import { GameRecord, PlayerAbility } from "./types";
+import { GameRecord, GroupPlayer, PlayerAbility } from "./types";
 import PlayerDetailClient from "./PlayerDetailClient";
 
 interface PlayerLog {
@@ -32,6 +32,7 @@ export default function PlayerDetail({ params }: PlayerDetailProps) {
   const [gameRecords, setGameRecords] = useState<GameRecord[]>([]);
   const [allLogItemNames, setAllLogItemNames] = useState<string[]>([]);
   const [ability, setAbility] = useState<PlayerAbility | null>(null);
+  const [groupPlayers, setGroupPlayers] = useState<GroupPlayer[]>([]);
 
   const playerId = params.id;
 
@@ -45,6 +46,16 @@ export default function PlayerDetail({ params }: PlayerDetailProps) {
         // (/logitem은 groupId 쿼리가 필수 — 없으면 서버가 500)
         const playerResponse = await api.get(`/player/${playerId}`);
         const playerData = playerResponse.data;
+
+        // 같은 그룹 선수 목록(선수 전환 콤보박스용)은 독립 처리 —
+        // 실패해도 페이지 나머지 렌더에 영향 없이 콤보박스만 숨긴다.
+        api
+          .get(`/player?groupId=${playerData.groupId}`)
+          .then((res) => setGroupPlayers(res.data))
+          .catch((e) => {
+            console.error("Error fetching group players:", e);
+            setGroupPlayers([]);
+          });
 
         // 나머지는 병렬로. logitem은 선수의 그룹으로 필터링한다.
         const [logsResponse, logItemsResponse, totalGamesPlayed] = await Promise.all([
@@ -160,6 +171,7 @@ export default function PlayerDetail({ params }: PlayerDetailProps) {
         gameRecords={gameRecords}
         allLogItemNames={allLogItemNames}
         ability={ability}
+        groupPlayers={groupPlayers}
       />
     </div>
   );

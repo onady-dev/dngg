@@ -18,6 +18,14 @@ export interface Player {
   backnumber: string;
 }
 
+// 그룹 선수 목록(선수 전환 콤보박스용). backnumber/position은 표시에만 사용.
+export interface GroupPlayer {
+  id: number;
+  name: string;
+  backnumber?: string | number | null;
+  position?: string | null;
+}
+
 export interface AbilityAxis {
   key: string;
   label: string;
