@@ -17,9 +17,12 @@ export default function PlayerSwitcher({ players, currentPlayerId }: PlayerSwitc
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(0);
 
-  // 현재 선수를 제외한 같은 그룹 선수
+  // 현재 선수를 제외한 같은 그룹 선수 (이름 가나다순)
   const others = useMemo(
-    () => players.filter((p) => p.id !== currentPlayerId),
+    () =>
+      players
+        .filter((p) => p.id !== currentPlayerId)
+        .sort((a, b) => a.name.localeCompare(b.name, "ko")),
     [players, currentPlayerId],
   );
 
