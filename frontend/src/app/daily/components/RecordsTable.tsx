@@ -23,11 +23,18 @@ const RANK_COL_WIDTH = '3rem';
 const RecordsTable = ({ records, logItems, loading }: Props) => {
   const [sort, setSort] = useState<SortState | null>(null);
 
-  // 순위는 정렬 상태와 무관하게 totalScore 내림차순 기준으로 고정
+  // 순위는 정렬 상태와 무관하게 totalScore 내림차순 기준 공동 순위(1-2-2-4)로 고정
   const rankById = useMemo(() => {
     const byTotal = [...records].sort((a, b) => b.totalScore - a.totalScore);
     const map = new Map<number, number>();
-    byTotal.forEach((record, i) => map.set(record.id, i + 1));
+    let prevScore: number | null = null;
+    let prevRank = 0;
+    byTotal.forEach((record, i) => {
+      const rank = record.totalScore === prevScore ? prevRank : i + 1;
+      map.set(record.id, rank);
+      prevScore = record.totalScore;
+      prevRank = rank;
+    });
     return map;
   }, [records]);
 
