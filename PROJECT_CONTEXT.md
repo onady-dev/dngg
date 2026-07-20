@@ -195,6 +195,29 @@ warn: This version of pnpm requires at least Node.js v22.13
 
 토큰 저장 방식이 일관되지 않을 수 있으니 로그인/401 처리 확인 필요.
 
+### 5.4 [임시] 회원가입 이메일 인증 우회 (2026-07-20, SES 승인 대기)
+
+AWS SES 프로덕션 승인 지연으로 인증 코드 메일이 발송되지 않아, **회원가입 이메일 인증을 임시로 우회**했다. SES 승인되면 아래를 모두 복구할 것.
+
+배경:
+- 운영에서 SES 미승인 상태면 `mailService.sendVerificationCode`가 실패 → `requestCode`가 방금 저장한 인증 행을 지우고 에러 반환 → 사용자는 인증 코드를 받을 수 없어 가입 자체가 막힘.
+- 그래서 인증 단계를 건너뛰고 `email`/`password`/`name`/`groupName`만으로 가입되도록 변경.
+
+변경 파일 (모두 코드에 `[임시]` 마커 주석 있음):
+- `backend/src/modules/user/user.service.ts` — `createUser`의 `assertVerified`·email 일치 검사·`markConsumed` 호출을 주석 처리
+- `backend/src/modules/user/user.request.dto.ts` — `CreateUserDto.verificationToken`을 `@IsNotEmpty @IsString`(필수) → `@IsOptional @IsString`(선택)으로 완화
+- `backend/src/modules/user/user-signup.spec.ts` — "인증 강제" describe 3개를 블록 주석 처리(복구용 원문 보존), "토큰 없이도 가입" 우회 테스트 추가
+- `frontend/src/app/components/Signup.tsx` — `EmailCodeVerification` 게이트 제거, 이메일 직접 입력 필드 추가, `POST /user` 본문에서 `verificationToken` 제거
+
+복구 방법 (SES 승인 후):
+1. 위 4개 파일의 `[임시]` 주석을 원복한다 (이 커밋을 `git revert`하거나 git 이력으로 원본 확인).
+2. `user-signup.spec.ts`의 "인증 강제" describe 블록 주석 해제 + "우회" 테스트 제거.
+3. `backend`에서 `pnpm test` green 확인 후 배포.
+
+주의:
+- 우회 동안에는 **누구나 임의 이메일로 계정+그룹 생성 가능**(이메일 소유 증명 없음). 중복 이메일은 DB 유니크 제약(→ 400 `Email already exists`)으로만 차단된다.
+- **비밀번호 재설정(`resetPassword`)도 SES 발송에 의존**하므로 미승인 동안 동작하지 않는다. 이번 우회 범위에는 포함하지 않았다.
+
 ## 6. 운영 명령 메모
 
 ### 6.1 로컬 DB만 올리기
@@ -292,3 +315,4 @@ curl http://<PUBLIC-IP>:3010/group/all
 - 인증 토큰 저장 로직 일원화
 - 운영 문서와 실제 배포 스크립트 경로 정리
 - backend/frontend Dockerfile의 `node:20`을 `node:22`로 상향해 CI 테스트 런타임(Node 22)과 정렬 (3.3 참고)
+- **[임시] SES 승인 후 회원가입 이메일 인증 복구** (5.4 참고) — 우회 동안 이메일 소유 증명 없이 가입 가능하므로 승인 즉시 되돌릴 것

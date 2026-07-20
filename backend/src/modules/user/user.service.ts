@@ -30,18 +30,20 @@ export class UserService {
   ) {}
 
   async createUser(dto: CreateUserDto): Promise<User> {
+    // [임시] AWS SES 승인 지연으로 이메일 인증을 우회한다. 승인 후 아래 블록을 복구하고
+    // CreateUserDto.verificationToken을 다시 @IsNotEmpty 필수로 되돌릴 것.
     // 이메일 인증을 통과한 요청만 가입 가능 — 토큰의 email과 가입 email이 일치해야 한다
-    const { email: verifiedEmail, verificationId } =
-      await this.emailVerificationService.assertVerified(
-        dto.verificationToken,
-        'signup',
-      );
-    if (verifiedEmail !== dto.email) {
-      throw new HttpException(
-        '이메일 인증이 유효하지 않습니다. 다시 인증해주세요.',
-        HttpStatus.UNAUTHORIZED,
-      );
-    }
+    // const { email: verifiedEmail, verificationId } =
+    //   await this.emailVerificationService.assertVerified(
+    //     dto.verificationToken,
+    //     'signup',
+    //   );
+    // if (verifiedEmail !== dto.email) {
+    //   throw new HttpException(
+    //     '이메일 인증이 유효하지 않습니다. 다시 인증해주세요.',
+    //     HttpStatus.UNAUTHORIZED,
+    //   );
+    // }
 
     try {
       return await this.withTransaction(async (manager) => {
@@ -55,10 +57,11 @@ export class UserService {
           password: hashedPassword,
         });
         const savedUser = await manager.save(User, user);
-        await this.emailVerificationService.markConsumed(
-          verificationId,
-          manager,
-        );
+        // [임시] 이메일 인증 우회 — 복구 시 아래 소비 처리도 함께 되돌릴 것
+        // await this.emailVerificationService.markConsumed(
+        //   verificationId,
+        //   manager,
+        // );
         return savedUser;
       });
     } catch (error) {
