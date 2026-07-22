@@ -1,7 +1,7 @@
 # DNGG 토스 구독 결제 Go-Live 계획서
 
 - 작성일: 2026-07-21
-- 상태: 초안 (사용자 검토 대기)
+- 상태: **Phase 0(테스트 키 E2E 검증) 완료 — 2026-07-22.** Phase 1(가맹점 심사)·2(웹훅)·3(배포 배선)·4(라이브)·5(롤아웃) 대기
 - 성격: **운영 실결제 활성화 런북** — 기능 개발이 아니라 이미 구현된 구독 결제를 실제 서비스에서 돈이 오가게 만드는 절차서
 - 선행 문서:
   - `docs/superpowers/specs/2026-07-13-subscription-design.md` (기능 설계, 승인·구현·병합 완료)
@@ -86,11 +86,44 @@
 - CI 헬스체크는 `/group/all`·프론트 루트만 확인 → 구독/웹훅 신규 라우트는 **수동 스모크** 필수.
 - main 푸시 = 운영 배포. 프론트·백 잡은 독립 → 함께 가야 하면 CI green 확인 또는 workflow_dispatch 동시 배포.
 
+### 3.5 Phase 0 검증 중 발견한 코드 이슈 (2026-07-22)
+
+라이브 결제 UX에 직접 닿는 부분이라 go-live 전 정리 권장. → 이번 세션에서 수정 적용(별도 커밋).
+
+1. **[중] 프론트 빌링키 이중 제출** — `frontend/src/app/subscription/page.tsx`의 authKey 처리 `useEffect`가 `POST /subscription/billing-key`를 2회 호출한다(dev의 React StrictMode 이중 실행에서 재현). 첫 호출은 201로 정상 구독 생성, 두 번째는 이미 소비된 authKey로 `issueBillingKey`가 실패하며 **정돈된 409가 아닌 500**을 반환한다. 데이터는 authKey 단일 사용 + `uq_active_subscription_per_group` 유니크 인덱스로 이중 결제/중복 구독이 차단되지만, 두 번째 호출이 잠깐 `activeCount` 게이트를 통과하고 500이 노출되는 점이 문제.
+   - 조치: (a) `useEffect`를 `useRef` 가드로 authKey당 1회만 제출. (b) `subscribe()`에서 `issueBillingKey` 실패를 정돈된 상태코드(400)로 래핑 — 결제 이전 단계이므로 실패 Payment는 기록하지 않음.
+2. **[하] 로그인/회원가입 응답에 password 해시 노출** — `POST /user`·`POST /user/login` 응답 본문에 사용자 `password`(bcrypt 해시)가 그대로 포함된다. 노출 자체가 불필요한 정보 유출.
+   - 조치: `user.service.ts`의 `createUser`/`loginUser` 반환에서 `password` 제거.
+
 ---
 
 ## 4. Phase 0 — 테스트 키 E2E 검증 게이트 (로컬, 외부 의존 없음)
 
 **목적:** 한 번도 실행 검증되지 않은 결제 플로우가 실제로 도는지 라이브 이전에 확인. **이 게이트를 통과하지 못하면 이후 단계로 가지 않는다.**
+
+> ### ✅ 검증 결과 (2026-07-22, 로컬 스택 + 토스 테스트 키 + Playwright)
+>
+> **7개 시나리오 + 유예/만료 변형 전부 기대대로 통과.** 백엔드 유닛테스트 160개 PASS. 실제 토스 테스트 API로 카드등록·첫결제·재청구·거절이 모두 코드대로 동작했고, 이중 결제·중복 구독 없음.
+>
+> | 시나리오 | 결과 |
+> |---|---|
+> | status·customerKey 발급 | ✅ customerKey 신규 영속화 |
+> | 카드등록→빌링키→첫결제→active | ✅ 9,900 결제, 기간 설정, UI "구독 중" |
+> | 재구독 | ✅ 409 |
+> | 무료한도 게이팅 | ✅ 402 `SUBSCRIPTION_REQUIRED` + 프론트 `/subscription` 리다이렉트 |
+> | 해지 예약 → 재개 | ✅ |
+> | 크론 갱신(성공) | ✅ 실제 재청구, 기간 연장 |
+> | 갱신 실패 → past_due / 유예초과 → expired | ✅ 무효 빌링키로 실검증 |
+> | 첫 결제 실패 | ✅ 유닛테스트 + 갱신실패 경로로 검증 |
+>
+> **런북 보정 (실측):**
+> 1. **토스 전용 테스트 카드번호는 없다.** 실제 한국 카드사 BIN(앞 6자리)이 유효해야 함(예: 신한 `465887`). 임의 번호는 `NOT_SUPPORTED_CARD_TYPE`로 거절. 시크릿 키 유효성·빌링 활성은 `POST /v1/billing/authorizations/issue`에 더미 authKey를 던져 `NOT_FOUND_BILLING`이 오는지로 사전 진단 가능.
+> 2. **시나리오 4(게이팅)는 `monetizationStartedAt` AppSetting ON + 비-admin 계정 + 무료한도 소진**이 전제 (`game.service.ts` 게이팅은 유료화 시작 후·비admin·무구독일 때만 402). admin·유료화 전에는 무제한.
+> 3. **크론은 수동 HTTP 트리거가 없다**(`@Cron` 매일 4시). 검증 시 `NestFactory.createApplicationContext`로 앱 컨텍스트를 부팅해 `renewDueSubscriptions(new Date())`를 1회 호출하는 임시 스크립트를 사용.
+>
+> **Phase 0에서 발견한 코드 이슈 (별도 수정 — 아래 §3.5):**
+> - [중] 프론트 빌링키 이중 제출 → 두 번째 호출이 500 반환.
+> - [하] 로그인/회원가입 응답 본문에 password 해시 노출.
 
 - [ ] 토스 개발자센터 가입 → **테스트 API 키** 발급(`test_ck_...` / `test_sk_...`). 계약 없이 즉시 발급 가능.
 - [ ] 로컬 env 설정:
