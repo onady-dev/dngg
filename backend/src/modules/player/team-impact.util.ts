@@ -58,7 +58,7 @@ export function buildGameResults(
   });
 }
 
-export function computeRecord(results: GameResult[]) {
+export function computeRecord(results: GameResult[]): { wins: number; draws: number; losses: number } {
   let wins = 0, draws = 0, losses = 0;
   results.forEach((r) => {
     if (r.result === 'W') wins++;
@@ -68,7 +68,7 @@ export function computeRecord(results: GameResult[]) {
   return { wins, draws, losses };
 }
 
-export function computeAverages(results: GameResult[]) {
+export function computeAverages(results: GameResult[]): { avgTeamScore: number; avgOpponentScore: number; avgMargin: number } {
   const n = results.length;
   if (n === 0) return { avgTeamScore: 0, avgOpponentScore: 0, avgMargin: 0 };
   const team = results.reduce((s, r) => s + r.myScore, 0);
@@ -80,7 +80,7 @@ export function computeAverages(results: GameResult[]) {
   };
 }
 
-export function computeClutch(results: GameResult[]) {
+export function computeClutch(results: GameResult[]): { games: number; wins: number; draws: number; losses: number; winRate: number | null } {
   const close = results.filter((r) => Math.abs(r.margin) <= CLOSE_MARGIN);
   let wins = 0, draws = 0, losses = 0;
   close.forEach((r) => {
@@ -102,7 +102,7 @@ export function computeRecentForm(results: GameResult[]): Result[] {
   return results.slice(-RECENT_FORM_LIMIT).map((r) => r.result);
 }
 
-export function computeStreak(results: GameResult[]) {
+export function computeStreak(results: GameResult[]): { current: number; currentType: Result | null; best: number } {
   let best = 0;
   let run = 0;
   results.forEach((r) => {
@@ -128,7 +128,7 @@ export function computeStreak(results: GameResult[]) {
   return { current, currentType, best };
 }
 
-export function computeImpact(results: GameResult[]) {
+export function computeImpact(results: GameResult[]): { avgPointsInWins: number | null; avgPointsInLosses: number | null } {
   const avg = (arr: GameResult[]) =>
     arr.length ? round1(arr.reduce((s, r) => s + r.myPoints, 0) / arr.length) : null;
   return {

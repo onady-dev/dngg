@@ -1,4 +1,13 @@
-import { buildGameResults, computeStreak, computeClutch } from './team-impact.util';
+import {
+  buildGameResults,
+  computeStreak,
+  computeClutch,
+  computeRecord,
+  computeAverages,
+  computeRecentForm,
+  computeImpact,
+  round1,
+} from './team-impact.util';
 import { GameRow, TeamAggRow, SelfAggRow } from './team-impact.types';
 
 describe('buildGameResults', () => {
@@ -46,5 +55,60 @@ describe('computeClutch', () => {
     expect(computeClutch(results)).toEqual({
       games: 3, wins: 1, draws: 1, losses: 1, winRate: 33,
     });
+  });
+});
+
+describe('computeRecord', () => {
+  it('승/무/패를 집계', () => {
+    const mk = (result: 'W' | 'D' | 'L') => ({ result }) as any;
+    expect(computeRecord([mk('W'), mk('W'), mk('D'), mk('L')])).toEqual({
+      wins: 2,
+      draws: 1,
+      losses: 1,
+    });
+  });
+});
+
+describe('computeAverages', () => {
+  it('내/상대 점수 평균과 마진을 소수 1자리로', () => {
+    const mk = (myScore: number, oppScore: number) => ({ myScore, oppScore }) as any;
+    // (10+15)/2=12.5, (8+9)/2=8.5, margin (2+6)/2=4
+    expect(computeAverages([mk(10, 8), mk(15, 9)])).toEqual({
+      avgTeamScore: 12.5,
+      avgOpponentScore: 8.5,
+      avgMargin: 4,
+    });
+  });
+  it('경기 없으면 0', () => {
+    expect(computeAverages([])).toEqual({ avgTeamScore: 0, avgOpponentScore: 0, avgMargin: 0 });
+  });
+});
+
+describe('computeRecentForm', () => {
+  it('최근 10경기만, 오래된→최신 순 유지', () => {
+    const mk = (result: 'W' | 'D' | 'L') => ({ result }) as any;
+    const results = Array.from({ length: 12 }, (_, i) => mk(i < 6 ? 'L' : 'W'));
+    const form = computeRecentForm(results);
+    expect(form).toHaveLength(10);
+    expect(form).toEqual(['L', 'L', 'L', 'L', 'W', 'W', 'W', 'W', 'W', 'W']);
+  });
+});
+
+describe('computeImpact', () => {
+  it('승리/패배 경기 평균 개인 득점, 무는 제외', () => {
+    const mk = (result: 'W' | 'D' | 'L', myPoints: number) => ({ result, myPoints }) as any;
+    const out = computeImpact([mk('W', 10), mk('W', 20), mk('L', 4), mk('D', 99)]);
+    expect(out).toEqual({ avgPointsInWins: 15, avgPointsInLosses: 4 });
+  });
+  it('승리 경기 없으면 null', () => {
+    const mk = (result: 'W' | 'D' | 'L', myPoints: number) => ({ result, myPoints }) as any;
+    expect(computeImpact([mk('L', 5)]).avgPointsInWins).toBeNull();
+  });
+});
+
+describe('round1', () => {
+  it('소수 1자리 반올림', () => {
+    expect(round1(4.44)).toBe(4.4);
+    expect(round1(4.46)).toBe(4.5);
   });
 });
