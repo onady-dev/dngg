@@ -1,4 +1,12 @@
-import { GameRow, TeamAggRow, SelfAggRow, ContributionShare } from './team-impact.types';
+import {
+  GameRow,
+  TeamAggRow,
+  SelfAggRow,
+  RosterRow,
+  ContributionShare,
+  PlayerTeamImpact,
+  TeammateChemistry,
+} from './team-impact.types';
 
 export const CLOSE_MARGIN = 5;
 export const RECENT_FORM_LIMIT = 10;
@@ -203,5 +211,71 @@ export function computeAbility(
     astToRatio: to > 0 ? round1(ast / to) : null,
     astCount: ast,
     toCount: to,
+  };
+}
+
+export function computeChemistry(
+  games: GameRow[],
+  results: GameResult[],
+  roster: RosterRow[],
+): TeammateChemistry[] {
+  const myTeamByGame = new Map<number, string>();
+  games.forEach((g) => myTeamByGame.set(g.gameId, g.team));
+  const resultByGame = new Map<number, Result>();
+  results.forEach((r) => resultByGame.set(r.gameId, r.result));
+
+  const acc = new Map<number, TeammateChemistry>();
+  roster.forEach((row) => {
+    if (myTeamByGame.get(row.gameId) !== row.team) return; // 같은 팀만
+    const result = resultByGame.get(row.gameId);
+    if (!result) return;
+    const cur =
+      acc.get(row.playerId) ??
+      { playerId: row.playerId, name: row.name, games: 0, wins: 0, draws: 0, losses: 0, winRate: 0 };
+    cur.games++;
+    if (result === 'W') cur.wins++;
+    else if (result === 'D') cur.draws++;
+    else cur.losses++;
+    acc.set(row.playerId, cur);
+  });
+
+  return [...acc.values()]
+    .filter((t) => t.games >= MIN_CHEMISTRY_GAMES)
+    .map((t) => ({ ...t, winRate: Math.round((t.wins / t.games) * 100) }))
+    .sort((a, b) => b.winRate - a.winRate || b.games - a.games)
+    .slice(0, MAX_CHEMISTRY);
+}
+
+export function computeTeamImpact(input: {
+  games: GameRow[];
+  teamAgg: TeamAggRow[];
+  selfAgg: SelfAggRow[];
+  roster: RosterRow[];
+  targetPlayerId: number;
+  groupId: number;
+}): PlayerTeamImpact {
+  const { games, teamAgg, selfAgg, roster, targetPlayerId, groupId } = input;
+  const results = buildGameResults(games, teamAgg, selfAgg);
+  const finishedGames = results.length;
+  const record = computeRecord(results);
+  const averages = computeAverages(results);
+
+  return {
+    playerId: targetPlayerId,
+    groupId,
+    finishedGames,
+    hasData: finishedGames > 0,
+    record,
+    winRate: finishedGames > 0 ? Math.round((record.wins / finishedGames) * 100) : null,
+    recentForm: computeRecentForm(results),
+    streak: computeStreak(results),
+    avgTeamScore: averages.avgTeamScore,
+    avgOpponentScore: averages.avgOpponentScore,
+    avgMargin: averages.avgMargin,
+    clutch: computeClutch(results),
+    contributions: computeContributions(games, teamAgg, selfAgg),
+    ability: computeAbility(selfAgg, finishedGames),
+    impact: computeImpact(results),
+    bestTeammates: computeChemistry(games, results, roster),
   };
 }

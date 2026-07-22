@@ -9,6 +9,8 @@ import {
   round1,
   computeContributions,
   computeAbility,
+  computeChemistry,
+  computeTeamImpact,
 } from './team-impact.util';
 import { GameRow, TeamAggRow, SelfAggRow } from './team-impact.types';
 
@@ -169,5 +171,47 @@ describe('computeAbility', () => {
     const out = computeAbility([{ gameId: 1, name: '어시', count: 3, valueSum: 0 }] as any, 1);
     expect(out.astToRatio).toBeNull();
     expect(out.astCount).toBe(3);
+  });
+});
+
+describe('computeChemistry', () => {
+  const games = [
+    { gameId: 1, team: 'home' as const, date: '2026-07-01' },
+    { gameId: 2, team: 'home' as const, date: '2026-07-02' },
+    { gameId: 3, team: 'home' as const, date: '2026-07-03' },
+  ];
+  const results = [
+    { gameId: 1, result: 'W' },
+    { gameId: 2, result: 'W' },
+    { gameId: 3, result: 'L' },
+  ] as any;
+  // 동료 10(같은 팀 home 3경기: 2승 1패), 동료 20(상대 팀이라 제외), 동료 30(2경기 → 최소치 미달)
+  const roster = [
+    { gameId: 1, team: 'home', playerId: 10, name: '김철수' },
+    { gameId: 2, team: 'home', playerId: 10, name: '김철수' },
+    { gameId: 3, team: 'home', playerId: 10, name: '김철수' },
+    { gameId: 1, team: 'away', playerId: 20, name: '상대편' },
+    { gameId: 1, team: 'home', playerId: 30, name: '박민수' },
+    { gameId: 2, team: 'home', playerId: 30, name: '박민수' },
+  ];
+
+  it('같은 팀 3경기 이상만, 승률 내림차순 상위 N', () => {
+    const out = computeChemistry(games as any, results, roster as any);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({
+      playerId: 10, name: '김철수', games: 3, wins: 2, losses: 1, winRate: 67,
+    });
+  });
+});
+
+describe('computeTeamImpact', () => {
+  it('완료 경기 없으면 hasData=false, winRate=null', () => {
+    const out = computeTeamImpact({
+      games: [], teamAgg: [], selfAgg: [], roster: [], targetPlayerId: 5, groupId: 7,
+    });
+    expect(out).toMatchObject({
+      playerId: 5, groupId: 7, finishedGames: 0, hasData: false, winRate: null,
+    });
+    expect(out.bestTeammates).toEqual([]);
   });
 });
