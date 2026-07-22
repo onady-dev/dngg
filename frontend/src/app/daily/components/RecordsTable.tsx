@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import styled from 'styled-components';
 import { LogItemDef, PlayerRecord } from '../types';
 
@@ -103,7 +104,9 @@ const RecordsTable = ({ records, logItems, loading }: Props) => {
                   {topThree ? MEDALS[rank - 1] : rank}
                 </Td>
                 <Td isFirst topThree={topThree}>
-                  <PlayerName>{record.name}</PlayerName>
+                  <PlayerLink href={`/player/${record.id}`}>
+                    {record.name}
+                  </PlayerLink>
                 </Td>
                 <Td topThree={topThree}>
                   <StatValue isPositive={record.totalScore >= 0}>
@@ -225,8 +228,22 @@ const Td = styled.td<{ isFirst?: boolean; isRank?: boolean; topThree?: boolean }
   }
 `;
 
-const PlayerName = styled.span`
+const PlayerLink = styled(Link)`
   font-weight: 500;
+  color: #2563eb;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+
+  &:hover {
+    text-decoration: underline;
+  }
+
+  &:focus-visible {
+    outline: 2px solid #2563eb;
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
 `;
 
 const StatValue = styled.span<{ isPositive?: boolean; isNeutral?: boolean }>`
