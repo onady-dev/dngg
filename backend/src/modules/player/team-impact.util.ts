@@ -44,7 +44,9 @@ export function buildGameResults(
   });
 
   const sorted = [...games].sort((a, b) => {
-    if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+    const ta = new Date(a.date).getTime();
+    const tb = new Date(b.date).getTime();
+    if (ta !== tb) return ta - tb;
     return a.gameId - b.gameId;
   });
 

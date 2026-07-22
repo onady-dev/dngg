@@ -37,6 +37,15 @@ describe('buildGameResults', () => {
     expect(results[0]).toMatchObject({ myScore: 12, oppScore: 10, result: 'W', myPoints: 4 });
     expect(results[1]).toMatchObject({ myScore: 8, oppScore: 8, result: 'D', myPoints: 3 });
   });
+
+  it('로케일 형식 날짜 문자열도 시간 순으로 정렬(사전식 아님)', () => {
+    const g = [
+      { gameId: 2, team: 'home', date: 'Fri Jul 10 2026 00:00:00 GMT+0900' },
+      { gameId: 1, team: 'away', date: 'Wed Jul 08 2026 00:00:00 GMT+0900' },
+    ] as any;
+    const results = buildGameResults(g, [], []);
+    expect(results.map((r) => r.gameId)).toEqual([1, 2]); // 07-08(Wed)이 07-10(Fri)보다 먼저
+  });
 });
 
 describe('computeStreak', () => {
@@ -146,6 +155,22 @@ describe('computeContributions', () => {
     expect(assist).toMatchObject({ share: 50, present: true });
     // 리바: 로그에 전혀 없음 → present false, share null
     expect(rebound).toMatchObject({ share: null, present: false });
+  });
+
+  it('수비(스틸+블록) 기여도 집계', () => {
+    const g = [{ gameId: 1, team: 'home' as const, date: '2026-07-08' }];
+    const team = [
+      { gameId: 1, team: 'home', name: '스틸', count: 6, valueSum: 0 },
+      { gameId: 1, team: 'home', name: '블록', count: 4, valueSum: 0 },
+    ];
+    const self = [
+      { gameId: 1, name: '스틸', count: 3, valueSum: 0 },
+      { gameId: 1, name: '블록', count: 2, valueSum: 0 },
+    ];
+    const out = computeContributions(g as any, team as any, self as any);
+    const defense = out.find((c) => c.key === 'defense')!;
+    // 본인 5 / 팀 10 = 50%
+    expect(defense).toMatchObject({ share: 50, present: true });
   });
 });
 

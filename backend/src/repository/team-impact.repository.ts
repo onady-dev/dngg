@@ -24,7 +24,9 @@ export class TeamImpactRepository {
       .innerJoin('igp.game', 'game')
       .select('igp.gameId', 'gameId')
       .addSelect('igp.team', 'team')
-      .addSelect('game.date', 'date')
+      // getRawMany는 엔티티 날짜 문자열화를 적용하지 않아 raw Date가 오므로,
+      // SQL에서 ISO 문자열로 포맷한다 (log.repository의 TO_CHAR 규칙과 동일).
+      .addSelect("TO_CHAR(game.date, 'YYYY-MM-DD')", 'date')
       .where('igp.playerId = :playerId', { playerId })
       .andWhere("game.status = 'FINISHED'")
       .getRawMany();
