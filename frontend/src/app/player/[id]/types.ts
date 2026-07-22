@@ -44,3 +44,52 @@ export interface PlayerAbility {
   hasData: boolean;
   axes: AbilityAxis[];
 }
+
+export type GameResultLetter = "W" | "D" | "L";
+
+export interface TeammateChemistry {
+  playerId: number;
+  name: string;
+  games: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  winRate: number;
+}
+
+export interface ContributionShare {
+  key: "scoring" | "assist" | "rebound" | "defense";
+  label: string;
+  share: number | null;
+  present: boolean;
+}
+
+export interface PlayerTeamImpact {
+  playerId: number;
+  groupId: number;
+  finishedGames: number;
+  hasData: boolean;
+  record: { wins: number; draws: number; losses: number };
+  winRate: number | null;
+  recentForm: GameResultLetter[];
+  streak: { current: number; currentType: GameResultLetter | null; best: number };
+  avgTeamScore: number;
+  avgOpponentScore: number;
+  avgMargin: number;
+  clutch: {
+    games: number;
+    wins: number;
+    draws: number;
+    losses: number;
+    winRate: number | null;
+  };
+  contributions: ContributionShare[];
+  ability: {
+    effPerGame: number;
+    astToRatio: number | null;
+    astCount: number;
+    toCount: number;
+  };
+  impact: { avgPointsInWins: number | null; avgPointsInLosses: number | null };
+  bestTeammates: TeammateChemistry[];
+}
