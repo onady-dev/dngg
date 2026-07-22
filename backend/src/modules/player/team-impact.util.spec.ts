@@ -214,4 +214,42 @@ describe('computeTeamImpact', () => {
     });
     expect(out.bestTeammates).toEqual([]);
   });
+
+  it('완료 경기가 있으면 승률·전적·케미를 조립하고 결과 없는 로스터 행은 스킵', () => {
+    const games = [
+      { gameId: 1, team: 'home' as const, date: '2026-07-01' },
+      { gameId: 2, team: 'home' as const, date: '2026-07-02' },
+      { gameId: 3, team: 'home' as const, date: '2026-07-03' },
+    ];
+    // g1: home 20 > away 10 승, g2: home 15 > away 12 승, g3: home 8 < away 14 패
+    const teamAgg = [
+      { gameId: 1, team: 'home', name: '2점', count: 10, valueSum: 20 },
+      { gameId: 1, team: 'away', name: '2점', count: 5, valueSum: 10 },
+      { gameId: 2, team: 'home', name: '2점', count: 7, valueSum: 15 },
+      { gameId: 2, team: 'away', name: '2점', count: 6, valueSum: 12 },
+      { gameId: 3, team: 'home', name: '2점', count: 4, valueSum: 8 },
+      { gameId: 3, team: 'away', name: '2점', count: 7, valueSum: 14 },
+    ];
+    const selfAgg = [{ gameId: 1, name: '2점', count: 3, valueSum: 6 }];
+    const roster = [
+      { gameId: 1, team: 'home', playerId: 10, name: '김철수' },
+      { gameId: 2, team: 'home', playerId: 10, name: '김철수' },
+      { gameId: 3, team: 'home', playerId: 10, name: '김철수' },
+      { gameId: 99, team: 'home', playerId: 10, name: '김철수' }, // results/games에 없음 → 스킵
+    ];
+    const out = computeTeamImpact({
+      games: games as any,
+      teamAgg: teamAgg as any,
+      selfAgg: selfAgg as any,
+      roster: roster as any,
+      targetPlayerId: 5,
+      groupId: 7,
+    });
+    expect(out.finishedGames).toBe(3);
+    expect(out.hasData).toBe(true);
+    expect(out.record).toEqual({ wins: 2, draws: 0, losses: 1 });
+    expect(out.winRate).toBe(67);
+    expect(out.bestTeammates).toHaveLength(1);
+    expect(out.bestTeammates[0]).toMatchObject({ playerId: 10, games: 3, wins: 2, losses: 1 });
+  });
 });

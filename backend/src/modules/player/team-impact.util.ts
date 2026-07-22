@@ -232,11 +232,13 @@ export function computeChemistry(
     const cur =
       acc.get(row.playerId) ??
       { playerId: row.playerId, name: row.name, games: 0, wins: 0, draws: 0, losses: 0, winRate: 0 };
-    cur.games++;
-    if (result === 'W') cur.wins++;
-    else if (result === 'D') cur.draws++;
-    else cur.losses++;
-    acc.set(row.playerId, cur);
+    acc.set(row.playerId, {
+      ...cur,
+      games: cur.games + 1,
+      wins: cur.wins + (result === 'W' ? 1 : 0),
+      draws: cur.draws + (result === 'D' ? 1 : 0),
+      losses: cur.losses + (result === 'L' ? 1 : 0),
+    });
   });
 
   return [...acc.values()]
