@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Log } from 'src/entities/Log.entity';
+import { InGamePlayer } from 'src/entities/InGamePlayer.entity';
 import { AbilityRow, GamesPlayed } from 'src/modules/player/ability.types';
 
 @Injectable()
@@ -36,17 +37,17 @@ export class AbilityRepository {
     }));
   }
 
-  // 선수별 참여(로그 존재) 게임 수. 삭제 게임/삭제 선수 제외.
+  // 선수별 총 출전 게임 수. InGamePlayer 로스터 기준(기록 유무 무관), 삭제 게임/삭제 선수 제외.
   async aggregateGamesPlayed(groupId: number): Promise<GamesPlayed[]> {
-    const rows = await this.logRepository
-      .createQueryBuilder('log')
-      .innerJoin('log.game', 'game')
-      .innerJoin('log.player', 'player')
-      .select('log.playerId', 'playerId')
-      .addSelect('COUNT(DISTINCT log.gameId)', 'gamesPlayed')
-      .where('log.groupId = :groupId', { groupId })
+    const rows = await this.logRepository.manager
+      .createQueryBuilder(InGamePlayer, 'igp')
+      .innerJoin('igp.game', 'game')
+      .innerJoin('igp.player', 'player') // FK 제거 정책: INNER JOIN으로 삭제 선수 제외
+      .select('igp.playerId', 'playerId')
+      .addSelect('COUNT(DISTINCT igp.gameId)', 'gamesPlayed')
+      .where('igp.groupId = :groupId', { groupId })
       .andWhere("game.status != 'DELETED'")
-      .groupBy('log.playerId')
+      .groupBy('igp.playerId')
       .getRawMany();
 
     return rows.map((r) => ({

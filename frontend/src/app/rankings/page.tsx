@@ -132,10 +132,13 @@ export default function Rankings() {
         const allLogsByItem = allLogsResponses.map((res) => res.data as LogItem[]);
         const flattenedLogs = allLogsByItem.flat();
 
+        // 득점 총합 계산용 전체 로그 집계 (게임당 평균의 분모는 아래 '총 출전 게임 수' 사용)
+        const overallStats = calculatePlayerStats(flattenedLogs);
+
         // 3. 고유한 플레이어 ID 추출
         const uniquePlayerIds = [...new Set(flattenedLogs.map((log) => log.playerId))];
 
-        // 4. 플레이어 정보를 배치로 가져오기 (2개 API를 1번에)
+        // 4. 플레이어 정보 + 총 출전 게임 수 배치 조회
         const playersData = await Promise.all(
           uniquePlayerIds.map(async (playerId) => {
             try {
@@ -146,7 +149,7 @@ export default function Rankings() {
               return {
                 playerId,
                 info: playerResponse.data,
-                gamesPlayed: gamesPlayedResponse.data,
+                gamesPlayed: gamesPlayedResponse.data as number,
               };
             } catch (err) {
               console.error(`플레이어 정보를 불러오는데 실패했습니다 (ID: ${playerId}):`, err);
@@ -170,7 +173,8 @@ export default function Rankings() {
               if (!playerData) return null;
 
               const totalValue = stats.totalCount;
-              const avgValue = playerData.gamesPlayed > 0 ? totalValue / playerData.gamesPlayed : 0;
+              const gamesPlayed = playerData.gamesPlayed;
+              const avgValue = gamesPlayed > 0 ? totalValue / gamesPlayed : 0;
 
               return {
                 playerId,
@@ -181,7 +185,7 @@ export default function Rankings() {
                 value: logItem.value,
                 totalCount: totalValue,
                 avgPerGame: avgValue,
-                gamesPlayed: playerData.gamesPlayed,
+                gamesPlayed,
               } as PlayerRanking;
             })
             .filter((p): p is PlayerRanking => p !== null);
@@ -194,26 +198,26 @@ export default function Rankings() {
           };
         });
 
-        // 6. 득점 랭킹 계산 (이미 가져온 데이터 재사용)
-        const playerStats = calculatePlayerStats(flattenedLogs);
+        // 6. 득점 랭킹 계산 (총합은 overallStats, 분모는 총 출전 게임 수)
         const allPlayers = rankingsData.flatMap((r) => r.players);
 
         const scoreRanking: LogItemRanking = {
           id: -1,
           name: "득점",
           value: 1,
-          players: Array.from(playerStats.entries())
+          players: Array.from(overallStats.entries())
             .map(([playerId, stats]) => {
               const player = allPlayers.find((p) => p.playerId === playerId);
               if (!player) return null;
 
+              const gamesPlayed = playersMap.get(playerId)?.gamesPlayed ?? 0;
               return {
                 ...player,
                 totalCount: stats.totalScore,
-                avgPerGame: stats.games.size > 0 ? stats.totalScore / stats.games.size : 0,
+                avgPerGame: gamesPlayed > 0 ? stats.totalScore / gamesPlayed : 0,
                 totalScore: stats.totalScore,
-                avgScore: stats.games.size > 0 ? stats.totalScore / stats.games.size : 0,
-                gamesPlayed: stats.games.size,
+                avgScore: gamesPlayed > 0 ? stats.totalScore / gamesPlayed : 0,
+                gamesPlayed,
               } as PlayerRanking;
             })
             .filter((p): p is PlayerRanking => p !== null),

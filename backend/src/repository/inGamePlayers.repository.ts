@@ -45,10 +45,12 @@ export class InGamePlayersRepository extends Repository<InGamePlayer> {
   }
 
   async getTotalGamesPlayed(id: number) {
-    return this.inGamePlayersRepository.count({
-      where: {
-        playerId: id,
-      },
-    });
+    // 총 출전 게임 수 — 삭제된 게임(status='DELETED')은 제외한다.
+    return this.inGamePlayersRepository
+      .createQueryBuilder('igp')
+      .innerJoin('igp.game', 'game')
+      .where('igp.playerId = :id', { id })
+      .andWhere("game.status != 'DELETED'")
+      .getCount();
   }
 }
