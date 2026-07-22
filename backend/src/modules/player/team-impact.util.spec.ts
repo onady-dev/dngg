@@ -7,6 +7,8 @@ import {
   computeRecentForm,
   computeImpact,
   round1,
+  computeContributions,
+  computeAbility,
 } from './team-impact.util';
 import { GameRow, TeamAggRow, SelfAggRow } from './team-impact.types';
 
@@ -110,5 +112,62 @@ describe('round1', () => {
   it('소수 1자리 반올림', () => {
     expect(round1(4.44)).toBe(4.4);
     expect(round1(4.46)).toBe(4.5);
+  });
+});
+
+describe('computeContributions', () => {
+  const games = [
+    { gameId: 1, team: 'home' as const, date: '2026-07-08' },
+    { gameId: 2, team: 'away' as const, date: '2026-07-10' },
+  ];
+  // 내 팀: g1=home, g2=away. 다른 팀 로그는 분모에서 제외돼야 한다.
+  const teamAgg = [
+    { gameId: 1, team: 'home', name: '2점', count: 10, valueSum: 20 },
+    { gameId: 1, team: 'away', name: '2점', count: 99, valueSum: 198 }, // 무시
+    { gameId: 1, team: 'home', name: '어시', count: 4, valueSum: 0 },
+    { gameId: 2, team: 'away', name: '어시', count: 6, valueSum: 0 },
+  ];
+  const selfAgg = [
+    { gameId: 1, name: '2점', count: 3, valueSum: 6 },
+    { gameId: 1, name: '어시', count: 2, valueSum: 0 },
+    { gameId: 2, name: '어시', count: 3, valueSum: 0 },
+  ];
+
+  it('내 팀 합 대비 본인 비중 + 카테고리 present 판정', () => {
+    const out = computeContributions(games as any, teamAgg as any, selfAgg as any);
+    const scoring = out.find((c) => c.key === 'scoring')!;
+    const assist = out.find((c) => c.key === 'assist')!;
+    const rebound = out.find((c) => c.key === 'rebound')!;
+    // 득점: 본인 6 / 내팀(g1 home) 20 = 30%
+    expect(scoring).toMatchObject({ share: 30, present: true });
+    // 어시: 본인 5 / 내팀(g1 home 4 + g2 away 6 = 10) = 50%
+    expect(assist).toMatchObject({ share: 50, present: true });
+    // 리바: 로그에 전혀 없음 → present false, share null
+    expect(rebound).toMatchObject({ share: null, present: false });
+  });
+});
+
+describe('computeAbility', () => {
+  const selfAgg = [
+    { gameId: 1, name: '3점', count: 2, valueSum: 6 },
+    { gameId: 1, name: '리바', count: 3, valueSum: 0 },
+    { gameId: 1, name: '어시', count: 4, valueSum: 0 },
+    { gameId: 1, name: '스틸', count: 1, valueSum: 0 },
+    { gameId: 1, name: '턴오버', count: 2, valueSum: 0 },
+  ];
+
+  it('EFF = (득점+리바+어시+스틸+블록−턴오버−파울)/게임, AST/TO 계산', () => {
+    const out = computeAbility(selfAgg as any, 1);
+    // 6 + 3 + 4 + 1 + 0 - 2 - 0 = 12 → /1게임 = 12
+    expect(out.effPerGame).toBe(12);
+    expect(out.astCount).toBe(4);
+    expect(out.toCount).toBe(2);
+    expect(out.astToRatio).toBe(2);
+  });
+
+  it('턴오버 0이면 AST/TO는 null', () => {
+    const out = computeAbility([{ gameId: 1, name: '어시', count: 3, valueSum: 0 }] as any, 1);
+    expect(out.astToRatio).toBeNull();
+    expect(out.astCount).toBe(3);
   });
 });

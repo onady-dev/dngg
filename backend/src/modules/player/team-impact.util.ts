@@ -1,4 +1,4 @@
-import { GameRow, TeamAggRow, SelfAggRow } from './team-impact.types';
+import { GameRow, TeamAggRow, SelfAggRow, ContributionShare } from './team-impact.types';
 
 export const CLOSE_MARGIN = 5;
 export const RECENT_FORM_LIMIT = 10;
@@ -134,5 +134,74 @@ export function computeImpact(results: GameResult[]): { avgPointsInWins: number 
   return {
     avgPointsInWins: avg(results.filter((r) => r.result === 'W')),
     avgPointsInLosses: avg(results.filter((r) => r.result === 'L')),
+  };
+}
+
+export const isScoring = (n: string) =>
+  n.includes('3점') || n.includes('2점') || n.includes('자유투');
+export const isAssist = (n: string) => n.includes('어시');
+export const isRebound = (n: string) => n.includes('리바');
+export const isDefense = (n: string) => n.includes('스틸') || n.includes('블록');
+export const isTurnover = (n: string) => n.includes('턴오버');
+export const isFoul = (n: string) => n.includes('파울');
+
+export function computeContributions(
+  games: GameRow[],
+  teamAgg: TeamAggRow[],
+  selfAgg: SelfAggRow[],
+): ContributionShare[] {
+  const myTeamByGame = new Map<number, string>();
+  games.forEach((g) => myTeamByGame.set(g.gameId, g.team));
+
+  const cats = [
+    { key: 'scoring' as const, label: '득점', match: isScoring, useValue: true },
+    { key: 'assist' as const, label: '어시스트', match: isAssist, useValue: false },
+    { key: 'rebound' as const, label: '리바운드', match: isRebound, useValue: false },
+    { key: 'defense' as const, label: '수비', match: isDefense, useValue: false },
+  ];
+
+  const allNames = new Set<string>();
+  teamAgg.forEach((r) => allNames.add(r.name));
+  selfAgg.forEach((r) => allNames.add(r.name));
+
+  const amount = (r: { count: number; valueSum: number }, useValue: boolean) =>
+    useValue ? r.valueSum : r.count;
+
+  return cats.map((cat) => {
+    const present = [...allNames].some((n) => cat.match(n));
+    const teamTotal = teamAgg
+      .filter((r) => cat.match(r.name) && myTeamByGame.get(r.gameId) === r.team)
+      .reduce((s, r) => s + amount(r, cat.useValue), 0);
+    const selfTotal = selfAgg
+      .filter((r) => cat.match(r.name))
+      .reduce((s, r) => s + amount(r, cat.useValue), 0);
+    const share = teamTotal > 0 ? Math.round((selfTotal / teamTotal) * 100) : null;
+    return { key: cat.key, label: cat.label, share, present };
+  });
+}
+
+export function computeAbility(
+  selfAgg: SelfAggRow[],
+  finishedGames: number,
+): { effPerGame: number; astToRatio: number | null; astCount: number; toCount: number } {
+  const sumWhere = (pred: (n: string) => boolean, useValue: boolean) =>
+    selfAgg
+      .filter((r) => pred(r.name))
+      .reduce((s, r) => s + (useValue ? r.valueSum : r.count), 0);
+
+  const points = sumWhere(isScoring, true);
+  const reb = sumWhere(isRebound, false);
+  const ast = sumWhere(isAssist, false);
+  const stl = selfAgg.filter((r) => r.name.includes('스틸')).reduce((s, r) => s + r.count, 0);
+  const blk = selfAgg.filter((r) => r.name.includes('블록')).reduce((s, r) => s + r.count, 0);
+  const to = sumWhere(isTurnover, false);
+  const foul = sumWhere(isFoul, false);
+
+  const effTotal = points + reb + ast + stl + blk - to - foul;
+  return {
+    effPerGame: finishedGames > 0 ? round1(effTotal / finishedGames) : 0,
+    astToRatio: to > 0 ? round1(ast / to) : null,
+    astCount: ast,
+    toCount: to,
   };
 }
