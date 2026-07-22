@@ -1,0 +1,138 @@
+import { GameRow, TeamAggRow, SelfAggRow } from './team-impact.types';
+
+export const CLOSE_MARGIN = 5;
+export const RECENT_FORM_LIMIT = 10;
+export const MIN_CHEMISTRY_GAMES = 3;
+export const MAX_CHEMISTRY = 3;
+
+export type Result = 'W' | 'D' | 'L';
+
+export interface GameResult {
+  gameId: number;
+  team: 'home' | 'away';
+  myScore: number;
+  oppScore: number;
+  margin: number;
+  result: Result;
+  myPoints: number;
+}
+
+export const round1 = (n: number): number => Math.round(n * 10) / 10;
+
+// 게임별 결과를 날짜 오름차순(동일 날짜는 gameId 오름차순)으로 파생한다.
+export function buildGameResults(
+  games: GameRow[],
+  teamAgg: TeamAggRow[],
+  selfAgg: SelfAggRow[],
+): GameResult[] {
+  const scoreByGameTeam = new Map<string, number>();
+  teamAgg.forEach((r) => {
+    const key = `${r.gameId}:${r.team}`;
+    scoreByGameTeam.set(key, (scoreByGameTeam.get(key) ?? 0) + r.valueSum);
+  });
+  const myPointsByGame = new Map<number, number>();
+  selfAgg.forEach((r) => {
+    myPointsByGame.set(r.gameId, (myPointsByGame.get(r.gameId) ?? 0) + r.valueSum);
+  });
+
+  const sorted = [...games].sort((a, b) => {
+    if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+    return a.gameId - b.gameId;
+  });
+
+  return sorted.map((g) => {
+    const oppTeam = g.team === 'home' ? 'away' : 'home';
+    const myScore = scoreByGameTeam.get(`${g.gameId}:${g.team}`) ?? 0;
+    const oppScore = scoreByGameTeam.get(`${g.gameId}:${oppTeam}`) ?? 0;
+    const margin = myScore - oppScore;
+    const result: Result = margin > 0 ? 'W' : margin < 0 ? 'L' : 'D';
+    return {
+      gameId: g.gameId,
+      team: g.team,
+      myScore,
+      oppScore,
+      margin,
+      result,
+      myPoints: myPointsByGame.get(g.gameId) ?? 0,
+    };
+  });
+}
+
+export function computeRecord(results: GameResult[]) {
+  let wins = 0, draws = 0, losses = 0;
+  results.forEach((r) => {
+    if (r.result === 'W') wins++;
+    else if (r.result === 'D') draws++;
+    else losses++;
+  });
+  return { wins, draws, losses };
+}
+
+export function computeAverages(results: GameResult[]) {
+  const n = results.length;
+  if (n === 0) return { avgTeamScore: 0, avgOpponentScore: 0, avgMargin: 0 };
+  const team = results.reduce((s, r) => s + r.myScore, 0);
+  const opp = results.reduce((s, r) => s + r.oppScore, 0);
+  return {
+    avgTeamScore: round1(team / n),
+    avgOpponentScore: round1(opp / n),
+    avgMargin: round1((team - opp) / n),
+  };
+}
+
+export function computeClutch(results: GameResult[]) {
+  const close = results.filter((r) => Math.abs(r.margin) <= CLOSE_MARGIN);
+  let wins = 0, draws = 0, losses = 0;
+  close.forEach((r) => {
+    if (r.result === 'W') wins++;
+    else if (r.result === 'D') draws++;
+    else losses++;
+  });
+  const games = close.length;
+  return {
+    games,
+    wins,
+    draws,
+    losses,
+    winRate: games > 0 ? Math.round((wins / games) * 100) : null,
+  };
+}
+
+export function computeRecentForm(results: GameResult[]): Result[] {
+  return results.slice(-RECENT_FORM_LIMIT).map((r) => r.result);
+}
+
+export function computeStreak(results: GameResult[]) {
+  let best = 0;
+  let run = 0;
+  results.forEach((r) => {
+    if (r.result === 'W') {
+      run++;
+      best = Math.max(best, run);
+    } else {
+      run = 0;
+    }
+  });
+  let current = 0;
+  let currentType: Result | null = null;
+  for (let i = results.length - 1; i >= 0; i--) {
+    if (i === results.length - 1) {
+      currentType = results[i].result;
+      current = 1;
+    } else if (results[i].result === currentType) {
+      current++;
+    } else {
+      break;
+    }
+  }
+  return { current, currentType, best };
+}
+
+export function computeImpact(results: GameResult[]) {
+  const avg = (arr: GameResult[]) =>
+    arr.length ? round1(arr.reduce((s, r) => s + r.myPoints, 0) / arr.length) : null;
+  return {
+    avgPointsInWins: avg(results.filter((r) => r.result === 'W')),
+    avgPointsInLosses: avg(results.filter((r) => r.result === 'L')),
+  };
+}
