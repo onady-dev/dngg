@@ -55,6 +55,13 @@ services:
       - JWT_SECRET=${JWT_SECRET}
       - MAIL_FROM=${MAIL_FROM}
       - AWS_REGION=${AWS_REGION:-ap-northeast-2}
+      # 구독 결제(토스) — 서버 .env에서 주입. TOSS_SECRET_KEY 미설정 시 결제가
+      # 조용히 401 실패하고 가격은 기본값으로 폴백돼 오탐하기 쉽다.
+      - TOSS_SECRET_KEY=${TOSS_SECRET_KEY}
+      - SUBSCRIPTION_PRICE_MONTHLY=${SUBSCRIPTION_PRICE_MONTHLY:-9900}
+      - SUBSCRIPTION_PRICE_YEARLY=${SUBSCRIPTION_PRICE_YEARLY:-99000}
+      - FREE_GAME_LIMIT=${FREE_GAME_LIMIT:-10}
+      - TOSS_WEBHOOK_SECRET=${TOSS_WEBHOOK_SECRET}
     depends_on:
       - db
     restart: always

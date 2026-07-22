@@ -20,6 +20,9 @@ COPY . .
 # (CI에는 .env.production이 없으므로 이 값이 유일한 소스다)
 ARG NEXT_PUBLIC_API_URL=https://dngg.one/api
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+# 토스 클라이언트 키도 빌드 시점에 번들에 박힌다 — 값 변경 시 프론트 이미지 재빌드 필요.
+ARG NEXT_PUBLIC_TOSS_CLIENT_KEY
+ENV NEXT_PUBLIC_TOSS_CLIENT_KEY=$NEXT_PUBLIC_TOSS_CLIENT_KEY
 
 # 빌드
 RUN pnpm run build
