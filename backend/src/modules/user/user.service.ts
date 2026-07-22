@@ -119,7 +119,10 @@ export class UserService {
     return clone;
   }
 
-  async updateUser(id: number, dto: UpdateUserDto): Promise<Omit<User, 'password'>> {
+  async updateUser(
+    id: number,
+    dto: UpdateUserDto,
+  ): Promise<Omit<User, 'password'>> {
     const updateData: any = { ...dto };
     if (dto.password) {
       updateData.password = await bcrypt.hash(dto.password, 10);
