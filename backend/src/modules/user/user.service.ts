@@ -29,7 +29,7 @@ export class UserService {
     private readonly emailVerificationService: EmailVerificationService,
   ) {}
 
-  async createUser(dto: CreateUserDto): Promise<User> {
+  async createUser(dto: CreateUserDto): Promise<Omit<User, 'password'>> {
     // [임시] AWS SES 승인 지연으로 이메일 인증을 우회한다. 승인 후 아래 블록을 복구하고
     // CreateUserDto.verificationToken을 다시 @IsNotEmpty 필수로 되돌릴 것.
     // 이메일 인증을 통과한 요청만 가입 가능 — 토큰의 email과 가입 email이 일치해야 한다
@@ -62,7 +62,7 @@ export class UserService {
         //   verificationId,
         //   manager,
         // );
-        return savedUser;
+        return this.omitPassword(savedUser);
       });
     } catch (error) {
       if (error.code === '23505') {
@@ -112,13 +112,22 @@ export class UserService {
     }
   }
 
-  async updateUser(id: number, dto: UpdateUserDto): Promise<User> {
+  // 응답에서 비밀번호 해시를 제거한다 (원본은 변형하지 않음).
+  private omitPassword(user: User): Omit<User, 'password'> {
+    const clone = { ...user };
+    delete (clone as Partial<User>).password;
+    return clone;
+  }
+
+  async updateUser(id: number, dto: UpdateUserDto): Promise<Omit<User, 'password'>> {
     const updateData: any = { ...dto };
     if (dto.password) {
       updateData.password = await bcrypt.hash(dto.password, 10);
     }
     await this.userRepository.update(id, updateData);
-    return await this.userRepository.findOneOrFail({ where: { id } });
+    return this.omitPassword(
+      await this.userRepository.findOneOrFail({ where: { id } }),
+    );
   }
 
   async deleteUser(id: number): Promise<void> {
@@ -128,7 +137,7 @@ export class UserService {
   async loginUser(
     email: string,
     password: string,
-  ): Promise<{ user: User; accessToken: string }> {
+  ): Promise<{ user: Omit<User, 'password'>; accessToken: string }> {
     const user = await this.userRepository.findOne({ where: { email } });
     if (!user) {
       throw new HttpException('User not found', HttpStatus.NOT_FOUND);
@@ -144,7 +153,7 @@ export class UserService {
       role: user.role,
     };
     const accessToken = this.jwtService.sign(payload);
-    return { user, accessToken };
+    return { user: this.omitPassword(user), accessToken };
   }
 
   async resetPassword(

@@ -120,10 +120,24 @@ export class SubscriptionService {
       dto.billingCycle === 'yearly' ? 'DNGG 연 구독' : 'DNGG 월 구독';
 
     // 발급 + 첫 결제는 하나의 단위. 결제 실패 시 빌링키를 저장하지 않는다.
-    const { billingKey } = await this.toss.issueBillingKey(
-      dto.authKey,
-      customerKey,
-    );
+    // 빌링키 발급 실패(이미 소비된 authKey·유효하지 않은 인증 등)는 결제 이전
+    // 단계이므로 실패 Payment를 남기지 않고 정돈된 400으로 응답한다. (프론트가
+    // authKey를 재제출해 같은 authKey로 재발급을 시도하면 토스가 거절하는데,
+    // 이를 래핑하지 않으면 raw Error가 500으로 새어나간다.)
+    let billingKey: string;
+    try {
+      ({ billingKey } = await this.toss.issueBillingKey(
+        dto.authKey,
+        customerKey,
+      ));
+    } catch (error) {
+      throw new HttpException(
+        error instanceof Error
+          ? error.message
+          : '카드 인증 정보가 유효하지 않습니다.',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
 
     let payment;
     try {

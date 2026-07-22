@@ -112,6 +112,33 @@ describe('SubscriptionService.subscribe', () => {
     }
   });
 
+  test('빌링키 발급 실패 시 결제 없이 400을 던지고 실패 Payment도 남기지 않는다', async () => {
+    // authKey 재사용 등으로 issueBillingKey가 실패하면 결제 이전 단계이므로
+    // raw 500이 아니라 정돈된 400을 반환하고, 결제 시도·실패 Payment 모두 없어야 한다.
+    const toss = {
+      issueBillingKey: jest
+        .fn()
+        .mockRejectedValue(new Error('이미 소비된 authKey')),
+      requestBillingPayment: jest.fn(),
+    };
+    const dataSource = makeDataSource();
+    const { service, payRepo } = makeService({ toss, dataSource });
+
+    try {
+      await service.subscribe(GROUP_ID, USER_ID, {
+        authKey: 'already_used',
+        billingCycle: 'monthly',
+      });
+      fail('Should have thrown HttpException');
+    } catch (e) {
+      expect(e).toBeInstanceOf(HttpException);
+      expect((e as HttpException).getStatus()).toBe(HttpStatus.BAD_REQUEST);
+      expect(toss.requestBillingPayment).not.toHaveBeenCalled();
+      expect(payRepo.save).not.toHaveBeenCalled();
+      expect(dataSource.transaction).not.toHaveBeenCalled();
+    }
+  });
+
   test('동시 요청 레이스로 유니크 위반 시 409 + 환불 대상 Payment 기록', async () => {
     // count 선체크는 통과(0)했지만 트랜잭션 insert가 부분 유니크 인덱스에 걸린다.
     const uniqueError = { driverError: { code: '23505' } };

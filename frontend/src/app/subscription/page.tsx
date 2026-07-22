@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect } from "react";
+import { Suspense, useEffect, useRef } from "react";
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { loadTossPayments } from "@tosspayments/tosspayments-sdk";
@@ -71,12 +71,16 @@ function SubscriptionContent() {
     },
   });
 
-  // 토스 리다이렉트 복귀: authKey가 있으면 빌링키 발급 + 첫 결제
+  // 토스 리다이렉트 복귀: authKey가 있으면 빌링키 발급 + 첫 결제.
+  // authKey당 정확히 1회만 제출한다 — StrictMode 이중 실행/리렌더에서 중복 POST가
+  // 나가면 두 번째는 이미 소비된 authKey로 실패하므로, ref로 제출 이력을 가드한다.
+  const submittedAuthKeyRef = useRef<string | null>(null);
   useEffect(() => {
     const authKey = searchParams.get("authKey");
     const returnedCycle =
       (searchParams.get("cycle") as BillingCycle) ?? "monthly";
-    if (authKey && !subscribeMutation.isPending) {
+    if (authKey && submittedAuthKeyRef.current !== authKey) {
+      submittedAuthKeyRef.current = authKey;
       subscribeMutation.mutate({ authKey, billingCycle: returnedCycle });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
