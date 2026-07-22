@@ -12,6 +12,7 @@ const createService = (player: { id: number; groupId: number } | null) => {
     playerRepository as any,
     {} as any,
     {} as any,
+    {} as any, // teamImpactRepository (미사용)
   );
   return { service, playerRepository };
 };

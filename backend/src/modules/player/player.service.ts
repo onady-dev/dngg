@@ -13,6 +13,9 @@ import { InGamePlayersRepository } from 'src/repository/inGamePlayers.repository
 import { AbilityRepository } from 'src/repository/ability.repository';
 import { computeAbility } from './ability.util';
 import { PlayerAbility } from './ability.types';
+import { TeamImpactRepository } from 'src/repository/team-impact.repository';
+import { computeTeamImpact } from './team-impact.util';
+import { PlayerTeamImpact } from './team-impact.types';
 
 @Injectable()
 export class PlayerService {
@@ -20,6 +23,7 @@ export class PlayerService {
     private readonly playerRepository: PlayerRepository,
     private readonly inGamePlayersRepository: InGamePlayersRepository,
     private readonly abilityRepository: AbilityRepository,
+    private readonly teamImpactRepository: TeamImpactRepository,
   ) {}
 
   async getPlayerByGroupId(groupId: number) {
@@ -76,5 +80,28 @@ export class PlayerService {
       this.abilityRepository.aggregateGamesPlayed(groupId),
     ]);
     return computeAbility({ rows, gamesPlayed, targetPlayerId: id, groupId });
+  }
+
+  async getPlayerTeamImpact(id: number): Promise<PlayerTeamImpact> {
+    const player = await this.playerRepository.findById(id);
+    if (!player) {
+      throw new NotFoundException('선수를 찾을 수 없습니다.');
+    }
+    const groupId = player.groupId;
+    const games = await this.teamImpactRepository.findFinishedGames(id);
+    const gameIds = games.map((g) => g.gameId);
+    const [teamAgg, selfAgg, roster] = await Promise.all([
+      this.teamImpactRepository.aggregateTeamByItem(gameIds),
+      this.teamImpactRepository.aggregateSelfByItem(id, gameIds),
+      this.teamImpactRepository.findTeammates(id, gameIds),
+    ]);
+    return computeTeamImpact({
+      games,
+      teamAgg,
+      selfAgg,
+      roster,
+      targetPlayerId: id,
+      groupId,
+    });
   }
 }

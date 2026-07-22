@@ -37,6 +37,11 @@ export class PlayerController {
     return this.playerService.getPlayerAbility(id);
   }
 
+  @Get(':id/team-impact')
+  async getPlayerTeamImpact(@Param('id', ParseIntPipe) id: number) {
+    return this.playerService.getPlayerTeamImpact(id);
+  }
+
   @Post()
   @UseGuards(AuthGuard('jwt'))
   async createPlayer(

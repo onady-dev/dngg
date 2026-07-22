@@ -11,6 +11,7 @@ import { PlayerController } from './player.controller';
 import { PlayerRepository } from 'src/repository/player.repository';
 import { InGamePlayersRepository } from 'src/repository/inGamePlayers.repository';
 import { AbilityRepository } from 'src/repository/ability.repository';
+import { TeamImpactRepository } from 'src/repository/team-impact.repository';
 import { InGamePlayer } from 'src/entities/InGamePlayer.entity';
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { InGamePlayer } from 'src/entities/InGamePlayer.entity';
     PlayerRepository,
     InGamePlayersRepository,
     AbilityRepository,
+    TeamImpactRepository,
   ],
 })
 export class PlayerModule {}

@@ -23,9 +23,10 @@ describe('PlayerService.getPlayerAbility', () => {
       ...overrides.abilityRepository,
     };
     const service = new PlayerService(
-      playerRepository as any,
+      playerRepository,
       {} as any, // inGamePlayersRepository (미사용)
-      abilityRepository as any,
+      abilityRepository,
+      {} as any, // teamImpactRepository (미사용)
     );
     return { service, playerRepository, abilityRepository };
   };
