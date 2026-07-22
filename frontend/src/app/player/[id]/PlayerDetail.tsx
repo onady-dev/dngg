@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { LogItem } from "@/types/game";
 import { api } from "@/lib/axios";
-import { GameRecord, GroupPlayer, PlayerAbility } from "./types";
+import { GameRecord, GroupPlayer, PlayerAbility, PlayerTeamImpact } from "./types";
 import PlayerDetailClient from "./PlayerDetailClient";
 
 interface PlayerLog {
@@ -32,6 +32,7 @@ export default function PlayerDetail({ params }: PlayerDetailProps) {
   const [gameRecords, setGameRecords] = useState<GameRecord[]>([]);
   const [allLogItemNames, setAllLogItemNames] = useState<string[]>([]);
   const [ability, setAbility] = useState<PlayerAbility | null>(null);
+  const [teamImpact, setTeamImpact] = useState<PlayerTeamImpact | null>(null);
   const [groupPlayers, setGroupPlayers] = useState<GroupPlayer[]>([]);
 
   const playerId = params.id;
@@ -132,6 +133,15 @@ export default function PlayerDetail({ params }: PlayerDetailProps) {
             console.error("Error fetching ability:", e);
             setAbility(null);
           });
+
+        // 팀 기여도도 실패해도 나머지 렌더에 영향 없도록 독립 처리
+        api
+          .get(`/player/${playerId}/team-impact`)
+          .then((res) => setTeamImpact(res.data))
+          .catch((e) => {
+            console.error("Error fetching team impact:", e);
+            setTeamImpact(null);
+          });
       } catch (error) {
         console.error("Error fetching player data:", error);
         setError("데이터를 불러오는데 실패했습니다");
@@ -171,6 +181,7 @@ export default function PlayerDetail({ params }: PlayerDetailProps) {
         gameRecords={gameRecords}
         allLogItemNames={allLogItemNames}
         ability={ability}
+        teamImpact={teamImpact}
         groupPlayers={groupPlayers}
       />
     </div>

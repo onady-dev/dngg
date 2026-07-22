@@ -2,10 +2,11 @@
 
 import React, { useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { GameRecord, GroupPlayer, Player, PlayerAbility } from "./types";
+import { GameRecord, GroupPlayer, Player, PlayerAbility, PlayerTeamImpact } from "./types";
 import AbilityCard from "./AbilityCard";
 import PlayerSwitcher from "./PlayerSwitcher";
 import ShareButton from "./ShareButton";
+import TeamImpactCard from "./TeamImpactCard";
 import * as S from "./styles/PlayerDetailStyles";
 
 interface PlayerDetailClientProps {
@@ -13,10 +14,11 @@ interface PlayerDetailClientProps {
   gameRecords: GameRecord[];
   allLogItemNames: string[];
   ability: PlayerAbility | null;
+  teamImpact: PlayerTeamImpact | null;
   groupPlayers: GroupPlayer[];
 }
 
-export default function PlayerDetailClient({ player, gameRecords, allLogItemNames, ability, groupPlayers }: PlayerDetailClientProps) {
+export default function PlayerDetailClient({ player, gameRecords, allLogItemNames, ability, teamImpact, groupPlayers }: PlayerDetailClientProps) {
   const router = useRouter();
 
   // 실제 게임 기록 사용
@@ -85,6 +87,8 @@ export default function PlayerDetailClient({ player, gameRecords, allLogItemName
 
       <ShareButton playerId={player.id} />
 
+      <TeamImpactCard impact={teamImpact} />
+
       <S.StatsCard>
         <S.TableContainer>
           <S.Table>
@@ -134,34 +138,6 @@ export default function PlayerDetailClient({ player, gameRecords, allLogItemName
                   );
                 })}
               </S.AverageRow>
-              {displayRecords.map((record) => (
-                <tr key={record.gameId}>
-                  <S.Td isFirst>
-                    <S.GameInfo>
-                      <S.GameName>{record.gameName}</S.GameName>
-                      <S.GameDate>
-                        {`${new Date(record.gameDate).getFullYear()}.${String(new Date(record.gameDate).getMonth() + 1).padStart(2, "0")}.${String(
-                          new Date(record.gameDate).getDate()
-                        ).padStart(2, "0")}`}
-                      </S.GameDate>
-                    </S.GameInfo>
-                  </S.Td>
-                  <S.Td>
-                    <S.StatValue isPositive={record.totalScore >= 0}>{record.totalScore}점</S.StatValue>
-                  </S.Td>
-                  {allLogItemNames.map((name) => {
-                    const logItem = record.logs.find((log) => log.name === name);
-                    const count = logItem?.count || 0;
-                    return (
-                      <S.Td key={name}>
-                        <S.StatValue isPositive={count > 0} isNeutral={count === 0}>
-                          {count > 0 ? `${count}회` : "-"}
-                        </S.StatValue>
-                      </S.Td>
-                    );
-                  })}
-                </tr>
-              ))}
             </tbody>
           </S.Table>
         </S.TableContainer>
