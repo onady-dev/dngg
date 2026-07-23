@@ -146,6 +146,11 @@ export default function Rankings() {
                 api.get(`/player/${playerId}`),
                 api.get(`/player/total-games-played/${playerId}`),
               ]);
+              // 삭제된 선수는 /player/:id 응답이 비어 있다(404가 아닌 null/빈 본문).
+              // 로그는 보존되지만 랭킹에는 노출하지 않도록 제외한다.
+              if (!playerResponse.data || !playerResponse.data.name) {
+                return null;
+              }
               return {
                 playerId,
                 info: playerResponse.data,
