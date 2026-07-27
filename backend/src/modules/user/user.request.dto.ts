@@ -26,10 +26,9 @@ export class CreateUserDto {
   @IsString()
   @Length(1, 20)
   groupName: string;
-  // [임시] AWS SES 승인 지연으로 이메일 인증 우회 — 승인 후 @IsNotEmpty @IsString 필수로 복구할 것
-  @IsOptional()
+  @IsNotEmpty()
   @IsString()
-  verificationToken?: string;
+  verificationToken: string;
 }
 
 export class UpdateUserDto {

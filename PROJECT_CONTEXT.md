@@ -195,9 +195,13 @@ warn: This version of pnpm requires at least Node.js v22.13
 
 토큰 저장 방식이 일관되지 않을 수 있으니 로그인/401 처리 확인 필요.
 
-### 5.4 [임시] 회원가입 이메일 인증 우회 (2026-07-20, SES 승인 대기)
+### 5.4 회원가입 이메일 인증 우회 → 복구 완료 (2026-07-20 우회 → 2026-07-27 복구)
 
-AWS SES 프로덕션 승인 지연으로 인증 코드 메일이 발송되지 않아, **회원가입 이메일 인증을 임시로 우회**했다. SES 승인되면 아래를 모두 복구할 것.
+**상태: 복구 완료.** 2026-07-27 AWS SES 프로덕션 액세스 심사가 승인(`ProductionAccessEnabled: true`, Case ID `178434357600847`, 서울 리전 `ap-northeast-2`)되어 아래 우회를 모두 되돌렸다. 이 섹션은 이력으로 남긴다.
+
+승인 후 SES 계정 상태: 일일 50,000통 / 14 msg/sec, `EnforcementStatus: HEALTHY`, 도메인 `dngg.one` 검증 완료.
+
+원래 우회 내용(2026-07-20): AWS SES 프로덕션 승인 지연으로 인증 코드 메일이 발송되지 않아, **회원가입 이메일 인증을 임시로 우회**했다.
 
 배경:
 - 운영에서 SES 미승인 상태면 `mailService.sendVerificationCode`가 실패 → `requestCode`가 방금 저장한 인증 행을 지우고 에러 반환 → 사용자는 인증 코드를 받을 수 없어 가입 자체가 막힘.
@@ -209,14 +213,16 @@ AWS SES 프로덕션 승인 지연으로 인증 코드 메일이 발송되지 �
 - `backend/src/modules/user/user-signup.spec.ts` — "인증 강제" describe 3개를 블록 주석 처리(복구용 원문 보존), "토큰 없이도 가입" 우회 테스트 추가
 - `frontend/src/app/components/Signup.tsx` — `EmailCodeVerification` 게이트 제거, 이메일 직접 입력 필드 추가, `POST /user` 본문에서 `verificationToken` 제거
 
-복구 방법 (SES 승인 후):
-1. 위 4개 파일의 `[임시]` 주석을 원복한다 (이 커밋을 `git revert`하거나 git 이력으로 원본 확인).
-2. `user-signup.spec.ts`의 "인증 강제" describe 블록 주석 해제 + "우회" 테스트 제거.
-3. `backend`에서 `pnpm test` green 확인 후 배포.
+복구 방법 (2026-07-27 실제 수행):
+1. 위 4개 파일의 `[임시]` 주석을 원복. 단 `git revert 9e09861`은 쓰지 않았다 — 이후 `43c66a8`(응답 password 해시 제거)·`f3d4c54`(포매팅)가 `user.service.ts`를 건드려 충돌·회귀 위험이 있었기 때문. 주석 블록을 수동 복원했다.
+2. `frontend/src/app/components/Signup.tsx`는 우회 이후 변경이 없어 `git show 9e09861^:` 원본을 그대로 복원.
+3. `user-signup.spec.ts`의 "인증 강제" describe 블록 주석 해제 + "우회" 테스트 제거.
+4. `backend` `pnpm test` 30 스위트/184건 green, backend·frontend `pnpm build` 통과 확인 후 배포.
 
 주의:
-- 우회 동안에는 **누구나 임의 이메일로 계정+그룹 생성 가능**(이메일 소유 증명 없음). 중복 이메일은 DB 유니크 제약(→ 400 `Email already exists`)으로만 차단된다.
-- **비밀번호 재설정(`resetPassword`)도 SES 발송에 의존**하므로 미승인 동안 동작하지 않는다. 이번 우회 범위에는 포함하지 않았다.
+- 우회 동안에는 **누구나 임의 이메일로 계정+그룹 생성 가능**했다(이메일 소유 증명 없음). 중복 이메일은 DB 유니크 제약(→ 400 `Email already exists`)으로만 차단됐다. 해당 기간 가입 계정은 이메일 검증이 안 된 상태다.
+- **비밀번호 재설정(`resetPassword`)도 SES 발송에 의존**하므로 미승인 동안 동작하지 않았다. 우회 범위에는 포함하지 않았고, SES 승인으로 함께 정상화됐다.
+- 이 복구는 **백엔드·프론트가 반드시 동시에 배포**되어야 한다. `verificationToken`이 DTO 필수로 돌아갔기 때문에 한쪽만 배포되면 가입이 400/401로 깨진다 (3.x의 2026-07-18 장애와 동일 패턴). workflow_dispatch로 동시 배포할 것.
 
 ## 6. 운영 명령 메모
 
@@ -315,4 +321,5 @@ curl http://<PUBLIC-IP>:3010/group/all
 - 인증 토큰 저장 로직 일원화
 - 운영 문서와 실제 배포 스크립트 경로 정리
 - backend/frontend Dockerfile의 `node:20`을 `node:22`로 상향해 CI 테스트 런타임(Node 22)과 정렬 (3.3 참고)
-- **[임시] SES 승인 후 회원가입 이메일 인증 복구** (5.4 참고) — 우회 동안 이메일 소유 증명 없이 가입 가능하므로 승인 즉시 되돌릴 것
+- SES 아이덴티티 `hny0611@naver.com`이 `VerificationStatus: FAILED` 상태 — 발신용으로 쓸 계획이면 재검증 필요 (수신은 프로덕션 승인으로 제약 없음)
+- 우회 기간(2026-07-20 ~ 07-27)에 이메일 소유 증명 없이 생성된 계정이 있을 수 있음 — 필요 시 가입일 기준으로 점검 (5.4 참고)

@@ -29,41 +29,6 @@ const baseDto: CreateUserDto = {
   verificationToken: 'valid-token',
 };
 
-// [임시] AWS SES 승인 지연으로 이메일 인증을 우회하는 동안의 동작을 고정한다.
-// 승인 후 user.service.ts의 인증 블록과 함께 아래 "인증 강제" describe를 복구할 것.
-describe('createUser 이메일 인증 우회(임시)', () => {
-  test('인증 토큰 없이도 가입되고 인증을 소비하지 않는다', async () => {
-    const emailVerification = {
-      assertVerified: jest.fn(),
-      markConsumed: jest.fn(),
-    };
-    const queryRunner = makeQueryRunner();
-    const dataSource = { createQueryRunner: () => queryRunner };
-    const service = new UserService(
-      {} as unknown as Repository<User>,
-      {} as unknown as GroupRepository,
-      dataSource as unknown as DataSource,
-      {} as unknown as JwtService,
-      emailVerification as unknown as EmailVerificationService,
-    );
-
-    // 토큰이 없어도(선택 필드) 가입이 진행되어야 한다
-    const dtoWithoutToken: CreateUserDto = {
-      email: 'a@b.c',
-      password: 'password123',
-      name: '홍길동',
-      groupName: '테스트그룹',
-    };
-    const user = await service.createUser(dtoWithoutToken);
-
-    expect(user.name).toBe('홍길동');
-    expect(emailVerification.assertVerified).not.toHaveBeenCalled();
-    expect(emailVerification.markConsumed).not.toHaveBeenCalled();
-    expect(queryRunner.commitTransaction).toHaveBeenCalled();
-  });
-});
-
-/* [임시] SES 승인 후 복구 — 이메일 인증 강제 테스트
 describe('createUser 이메일 인증 강제', () => {
   test('assertVerified가 거부하면 가입이 진행되지 않는다', async () => {
     const emailVerification = {
@@ -141,7 +106,6 @@ describe('createUser 이메일 인증 강제', () => {
     expect(queryRunner.commitTransaction).toHaveBeenCalled();
   });
 });
-*/
 
 // 유니크 위반(23505)이 500이 아닌 400으로 변환되는지 고정하는 회귀 테스트.
 describe('createUser 유니크 위반 처리', () => {
