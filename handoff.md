@@ -179,11 +179,17 @@ DTO 필수화)와 프론트(`EmailCodeVerification` 게이트)를 한 커밋에 
      넘기지 말 것.**
 
    부수 효과로 4xx 로그의 `[[object Object]]` 컨텍스트도 사라진다.
-2. **`bootstrap()`에 `.catch` 없음** (`main.ts`) — 부팅 가드 에러가 unhandled rejection
-   스택으로 뜬다. Node 20이 non-zero exit이라 동작은 맞지만 `docker logs`에서 한글 메시지가
-   묻힌다. `bootstrap().catch(e => { console.error(e.message); process.exit(1); })`
+2. ~~**`bootstrap()`에 `.catch` 없음**~~ — **완료**, 같은 브랜치.
+   `backend/src/common/bootstrap-failure.ts`의 `reportBootstrapFailure`를
+   `bootstrap().catch(...)`로 연결했다. 핸들러를 별도 모듈로 뺀 이유는 `main.ts`가
+   import 즉시 앱을 띄워 테스트에서 불러올 수 없기 때문이다.
+   제안된 `console.error(e.message)`와 달리 **스택도 메시지 뒤에 함께 출력한다** —
+   가드가 아닌 부팅 실패(DB 연결 거부, 포트 점유)는 스택이 있어야 진단된다.
 3. **`main.ts`가 `assertMailConfigured`를 호출한다는 것 자체는 테스트가 없다** — 그 줄이
-   지워지면 가드가 조용히 무력화되는데 테스트는 초록이다.
+   지워지면 가드가 조용히 무력화되는데 테스트는 초록이다. 2번 작업 중 `NODE_ENV=prod` +
+   `MAIL_FROM` 미설정으로 `dist/main.js`를 직접 돌려 배선을 확인했지만 **수동 스모크였다.**
+   자동화하려면 빌드된 `dist/main.js`를 spawn해 종료 코드·stderr를 검증해야 하는데,
+   CI는 `pnpm test` 전에 빌드하지 않으므로(`deploy.yml`) 그대로 넣으면 CI에서 깨진다.
 4. **`GET /admin/inquiries`에 페이지네이션·인덱스 없음** — 매 조회마다 전체 문의를
    2000자 본문째로 가져온다. 초기 볼륨에선 무해. `status`/`createdAt` 인덱스도 없다.
 5. **관리자 답변 실패 토스트가 원인을 구분하지 않는다** — 404·400·네트워크 끊김도 전부
