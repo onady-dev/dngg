@@ -3,6 +3,7 @@ import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { assertMailConfigured } from './modules/mail/mail.service';
+import { reportBootstrapFailure } from './common/bootstrap-failure';
 
 async function bootstrap() {
   assertMailConfigured(process.env.NODE_ENV, process.env.MAIL_FROM);
@@ -37,4 +38,4 @@ async function bootstrap() {
 
   await app.listen(process.env.PORT || 3010);
 }
-bootstrap();
+bootstrap().catch(reportBootstrapFailure);
