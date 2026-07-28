@@ -1,0 +1,59 @@
+"use client";
+
+import { useEffect } from "react";
+import Script from "next/script";
+import { usePathname } from "next/navigation";
+import { useAuthStore } from "@/app/stores/useAuthStore";
+import { GA_MEASUREMENT_ID, pageview, setAnalyticsUser } from "@/lib/analytics";
+
+// dev에서만 debug_mode를 붙인다 — GA4 DebugView가 이 플래그로 이벤트를 잡는다.
+const gaConfig = JSON.stringify({
+  send_page_view: false,
+  ...(process.env.NODE_ENV !== "production" ? { debug_mode: true } : {}),
+});
+
+export default function AnalyticsProvider() {
+  const pathname = usePathname();
+
+  // App Router는 라우트 변경 pageview를 자동 추적하지 않으므로 직접 쏜다.
+  // config에 send_page_view: false를 줬으므로 최초 진입 pageview도 이 effect의
+  // 첫 실행으로 한 번만 나간다(중복 없음).
+  //
+  // useSearchParams는 일부러 쓰지 않는다 — 쓰면 Suspense 경계가 강제되고 정적 렌더가
+  // 깨진다. 쿼리스트링(UTM)은 gtag가 document.location에서 자동으로 읽으므로
+  // 공유 링크의 utm_* 파라미터는 최초 pageview에 그대로 담긴다.
+  useEffect(() => {
+    if (!pathname) return;
+    pageview(pathname);
+  }, [pathname]);
+
+  // 로그인·로그아웃·axios 401 만료가 전부 useAuthStore를 거치므로(lib/axios.ts:44)
+  // 여기 한 곳만 구독하면 모든 경로가 잡힌다.
+  // persist 스토어라 새로고침 시 복원된 세션도 첫 호출에서 잡힌다.
+  useEffect(() => {
+    setAnalyticsUser(useAuthStore.getState().user?.id ?? null);
+    return useAuthStore.subscribe((state) => {
+      setAnalyticsUser(state.user?.id ?? null);
+    });
+  }, []);
+
+  // 측정 ID가 없으면 스크립트를 아예 붙이지 않는다 — 로컬 개발이 운영 속성을
+  // 오염시키지 않는다. GA_MEASUREMENT_ID는 빌드 시점 상수라 서버/클라이언트가
+  // 같은 값을 보므로 hydration 불일치가 없다.
+  if (!GA_MEASUREMENT_ID) return null;
+
+  return (
+    <>
+      <Script
+        src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
+        strategy="afterInteractive"
+      />
+      <Script id="ga-config" strategy="afterInteractive">
+        {`window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', '${GA_MEASUREMENT_ID}', ${gaConfig});`}
+      </Script>
+    </>
+  );
+}
