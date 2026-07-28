@@ -1,8 +1,92 @@
 # 작업 인수인계 (handoff)
 
 - 최종 갱신: 2026-07-28
-- 브랜치: `main` (문의·피드백은 feature/inquiry-feedback에서 작업 후 머지)
+- 브랜치: `main` + **미머지 feature 브랜치 3개** (아래 "진행 중인 브랜치" 참고)
 - 다음 담당: 다른 기기에서 이어서 작업
+
+## ⚠️ 진행 중인 브랜치 3개 — 먼저 읽을 것
+
+세 갈래 작업이 각자 다른 이유로 멈춰 있다. **전부 로컬 브랜치이므로 푸시하지 않으면
+다른 기기에서 보이지 않는다.** `deploy.yml`은 `push: branches: [main]`만 트리거하므로
+feature 브랜치를 푸시해도 배포는 일어나지 않는다 — 안전하게 올릴 수 있다.
+
+| 브랜치 | 상태 | 막고 있는 것 |
+|---|---|---|
+| `feature/ga-analytics` | 구현·리뷰·최종리뷰 완료 | **GA4 속성 생성 + repo Variable 등록** (사람) |
+| `feature/landing-intro` | 구현·리뷰·최종리뷰 완료 | GA 배포 순서 대기 |
+| `feature/privacy-page` | 설계만 완료 | **사업자 정보 6개 값** (사람) |
+
+**머지 순서가 고정돼 있다: `ga-analytics` → `landing-intro` → `privacy-page`.**
+`privacy-page`가 `landing-intro`에서 갈라져 나왔기 때문이다(랜딩 하단에 방침 링크를 걸어야
+하는데 `LandingHero.tsx`가 그 브랜치에만 있다). 코드 충돌은 없지만 `handoff.md`와
+`docs/featurelist.md`는 세 브랜치가 모두 고치므로 **나중에 머지하는 쪽이 텍스트 충돌을
+해결해야 한다**(`git merge-tree`로 확인함).
+
+### 1. `feature/ga-analytics` — GA4 계측
+
+`page_view`·`sign_up`·`share_click` 세 이벤트와 로그인 사용자 `user_id`를 수집한다.
+
+- 설계 `docs/superpowers/specs/2026-07-28-ga-analytics-design.md`
+- 계획 `docs/superpowers/plans/2026-07-28-ga-analytics.md`
+
+**푸시 전에 사람이 해야 할 것 (순서 중요):**
+
+1. GA4 속성 + 웹 데이터 스트림 생성 → 측정 ID `G-XXXXXXXXXX`.
+   이때 **데이터 보관을 2개월 → 14개월로** 바꿀 것. **소급 적용되지 않는다.**
+2. GitHub repo Settings → Secrets and variables → Actions → **Variables 탭**(Secrets 아님)에
+   `NEXT_PUBLIC_GA_ID` 등록.
+
+**등록이 코드 푸시보다 먼저다.** 값이 빌드 시점에 번들에 박히는데, 나중에 등록하면
+CI 경로 필터상 `frontend/**`가 안 바뀌는 한 프론트 잡이 돌지 않아 아무 일도 일어나지 않는다.
+그때는 `workflow_dispatch`를 써야 하는데 그건 백엔드까지 재배포한다.
+
+배포 후: `player_id`·`method`를 GA4 맞춤 측정기준으로 등록해야 리포트에 보인다.
+
+**최종 리뷰가 배포 전에 잡은 두 가지 (수정 완료, 알아둘 것):**
+
+- **토스 결제 자격증명이 GA4로 새어나갈 뻔했다.** gtag가 `page_location`으로 전체 URL을
+  자동 수집하는데, 토스 빌링 인증이 `/subscription?...&customerKey=<uuid>&authKey=<자격증명>`
+  으로 리다이렉트한다. `customerKey`는 Group 행에 영속되는 계정별 식별자다.
+  → `pageview()`가 `SENSITIVE_QUERY_KEYS`를 제거한 URL을 명시 전달한다.
+  **쿼리스트링에 자격증명·식별자를 담는 새 라우트를 만들면 이 목록에 추가할 것.**
+- **`track()`이 가입 성공을 실패로 뒤집을 수 있었다.** `Signup.tsx`의 `track("sign_up")`이
+  성공한 `POST /user` 뒤 try 블록 안에 있어서, throw하면 "회원가입에 실패했습니다"가 뜨는데
+  계정은 이미 생성된 상태였다. → `track()`·`setAnalyticsUser()` 내부 try/catch로 경계에서 강제.
+
+### 2. `feature/landing-intro` — 소개(랜딩) 화면
+
+로그아웃 방문자가 `/`에 오면 "그룹을 선택해주세요" 대신 제품 소개와 가입 CTA를 본다.
+
+- 설계 `docs/superpowers/specs/2026-07-28-landing-intro-design.md`
+- 계획 `docs/superpowers/plans/2026-07-28-landing-intro.md`
+
+**알아둘 것:**
+
+- **분기는 `page.tsx`의 `if (!selectedGroup)` 블록 *안에서* 갈라진다.** `!user`를 바깥에서
+  먼저 검사하면 안 된다 — `/group/all`이 공개 API라 비로그인 사용자도 헤더에서 그룹을 골라
+  기록을 볼 수 있는데, 그 경로가 막힌다.
+- **랜딩 이미지는 가명화한 로컬 DB에서 새로 캡처했다.** 매뉴얼 스크린샷에는 실제 사용자
+  이름이 있었고, 능력치 레이더 구현 이전 화면이라 캡션과도 어긋났다. 세 번째 이미지는
+  `/player/[id]/opengraph-image`가 만드는 실제 공유 카드다. 재캡처 절차는 계획서 Task 1에 있다.
+- **`<img>`에 `width`/`height` 속성을 주면서 CSS `aspect-ratio`로 박스를 잡을 때는
+  CSS에 `height: auto`를 반드시 넣을 것.** 안 넣으면 height 속성이 CSS height로 잡혀
+  aspect-ratio가 무시되고 `object-fit: cover`가 가로를 잘라낸다. 빌드·타입·리뷰를 전부
+  통과했는데도 이미지 절반이 날아가 있었다.
+- **`landing_cta_click`은 GA가 배포되기 전까지 아무것도 수집하지 않는다.** 그래서 GA를
+  먼저 올린다. 랜딩 전환율을 묻기 전에 이걸 확인할 것.
+
+### 3. `feature/privacy-page` — 개인정보처리방침 (설계만)
+
+- 설계 `docs/superpowers/specs/2026-07-28-privacy-policy-design.md`
+- 계획서 없음 — 아래 값을 받아야 쓸 수 있다.
+
+**사람이 채워야 하는 값**: 상호, 대표자 성명, 사업자등록번호, 사업장 주소,
+개인정보 보호책임자(성명·직책·이메일), 시행일.
+
+설계에서 확정된 것: `/privacy` 서버+클라이언트 컴포넌트 구조, 링크는 랜딩 하단과
+`/settings` 계정 카드, 방침 12개 절 + 이 서비스 고유의 두 절(팀원 정보 / 탈퇴 후 남는 것),
+그리고 **이메일 인증 기록 7일 정리 크론**. 인증 테이블이 발송 rate limit(24시간 창)에
+쓰이므로 `createdAt` 7일 기준으로 자른다 — 24시간 내 행을 지우면 한도 제한이 무너진다.
 
 ## 지금 어디까지 왔나
 
@@ -57,6 +141,9 @@ DTO 필수화)와 프론트(`EmailCodeVerification` 게이트)를 한 커밋에 
 - `MailService`에 private `send(to, subject, body)` 추출 — 인증 메일과 회신 메일이 공유.
 
 ## 남은 TODO (`docs/featurelist.md`)
+
+아래 `GA 적용`과 `메뉴얼 페이지를 소개 페이지로 변경`은 **코드가 이미 다 됐고 머지만 남았다** —
+위 "진행 중인 브랜치" 참고. 각 브랜치가 머지되면 자기 줄을 지운다.
 
 - [ ] 메인 페이지가 스크롤 안되게(특히 기록화면) 그리고 기록화면 가려지는 버튼 없게
 - [ ] 공유 카드에 들어가는 워딩들 개선
@@ -119,6 +206,11 @@ cd frontend && pnpm dev          # :3011
 - 루트 `.env` (docker compose용 `DB_USERNAME`/`DB_PASSWORD`/`DB_DATABASE`)
 
 pnpm 버전은 CI와 맞춰 `11.13.1`을 쓴다. pnpm 11.x는 Node 22.13+가 필요하다.
+
+**진행 중인 브랜치를 이어받으려면** 먼저 푸시돼 있어야 한다(`git push -u origin <브랜치>`).
+feature 브랜치 푸시는 배포를 일으키지 않는다 — `deploy.yml`이 `push: branches: [main]`만 본다.
+`.superpowers/sdd/`의 작업 로그(태스크별 리뷰 결과·스모크 기록)는 **git에 올라가지 않는
+로컬 스크래치**라 다른 기기에는 없다. 이 문서가 그 요약본이다.
 
 ## 주의사항 (반복해서 문제가 됐던 것들)
 
