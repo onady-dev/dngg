@@ -156,8 +156,6 @@ DTO 필수화)와 프론트(`EmailCodeVerification` 게이트)를 한 커밋에 
 
 - **우회 기간 가입 계정 감사** — 2026-07-20 ~ 07-27 사이에 이메일 소유 증명 없이 생성된
   계정이 있을 수 있다. 가입일 기준으로 훑어볼 필요가 있다. (`PROJECT_CONTEXT.md` 9절)
-- **SES 아이덴티티 `hny0611@naver.com`이 `VerificationStatus: FAILED`** — 발신용으로 쓸 수 없다.
-  수신은 프로덕션 승인으로 제약이 없다. 이 주소를 발신에 쓸 계획이면 재검증이 필요하다.
 - **Dockerfile Node 버전 스큐** — 운영 컨테이너는 `node:20`, CI `setup-node`는 22다.
   (`PROJECT_CONTEXT.md` 3.3)
 
@@ -165,11 +163,22 @@ DTO 필수화)와 프론트(`EmailCodeVerification` 게이트)를 한 커밋에 
 
 우선순위 순. 전부 이번 배포를 막지 않는다고 판단된 것들이다.
 
-1. **`Logger.error`의 스택이 프로젝트 전체에서 유실된다** — `nest-winston`은 2번째 인자를
-   메타 `stack`으로 넘기는데(`winston.classes.js:52`) `app.module.ts:48`의 winston printf는
-   `trace`를 읽는다. `SubscriptionService`·`UserService.withTransaction` 등 모든 호출부가 영향.
-   한 줄 수정이지만 전역 로그 출력이 바뀌므로 **별도 커밋으로** 처리할 것.
-   (문의 기능은 원본 사유를 로그 본문에 넣어 이미 면역)
+1. ~~**`Logger.error`의 스택이 프로젝트 전체에서 유실된다**~~ — **완료**,
+   브랜치 `fix/logger-error-stack` (미푸시). printf 본문을 `backend/src/common/log-format.ts`의
+   `formatLogLine`으로 추출하고 `stack`을 읽도록 고쳤다.
+
+   **한 줄 수정이 아니었다.** 두 가지가 걸려 있었다:
+   - `stack`은 **배열**(`stack: [trace || error.stack]`)이고, trace 없이 호출하면
+     `[undefined]`가 온다 — truthy라 그냥 렌더하면 `undefined`가 찍힌다.
+   - **`HttpExceptionFilter`가 `errorLog` 객체를 스택/컨텍스트 위치 인자에 넘기고 있었고,
+     그 안에 요청 `body`(가입·로그인 평문 비밀번호)가 들어 있었다.** printf가 `trace`를
+     읽던 동안에는 출력되지 않았을 뿐이다. `stack`을 읽는 순간 로그로 샌다.
+     → 필터가 문자열만 넘기도록 함께 고쳤고, `formatLogLine`도 문자열이 아닌
+     stack·context 항목은 버린다. **Nest `LoggerService`의 위치 인자
+     (`error(message, stack, context)` / `warn(message, context)`)에 구조화 객체를
+     넘기지 말 것.**
+
+   부수 효과로 4xx 로그의 `[[object Object]]` 컨텍스트도 사라진다.
 2. **`bootstrap()`에 `.catch` 없음** (`main.ts`) — 부팅 가드 에러가 unhandled rejection
    스택으로 뜬다. Node 20이 non-zero exit이라 동작은 맞지만 `docker logs`에서 한글 메시지가
    묻힌다. `bootstrap().catch(e => { console.error(e.message); process.exit(1); })`
