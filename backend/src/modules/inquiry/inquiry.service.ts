@@ -100,9 +100,17 @@ export class InquiryService {
       } catch (error) {
         // SES 원본 에러(수신 미검증 주소 등 인프라 정보 포함)는 응답에 싣지 않는다.
         // 서버 로그에는 원본을 남겨 운영자가 진단할 수 있게 한다.
+        //
+        // 원본 메시지를 두 번째 인자(trace)가 아니라 로그 메시지 본문에 넣는 이유:
+        // nest-winston은 두 번째 인자를 메타의 `stack`으로 넘기는데(winston.classes.js:52)
+        // app.module.ts의 winston printf는 `trace`를 읽는다. 그래서 이 프로젝트에서는
+        // Logger.error(msg, stack)의 스택이 출력되지 않는다. 원본을 본문에 넣지 않으면
+        // "발송 실패"만 남고 실패 이유(미검증 발신 주소·자격증명·스로틀링)를 알 수 없다.
         this.logger.error(
-          `문의 ${id} 답변 메일 발송 실패`,
-          error instanceof Error ? error.stack : String(error),
+          `문의 ${id} 답변 메일 발송 실패: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+          error instanceof Error ? error.stack : undefined,
         );
         throw new InternalServerErrorException(
           '회신 메일 발송에 실패했습니다.',
