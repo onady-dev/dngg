@@ -22,6 +22,24 @@ export function buildVerificationMail(
   };
 }
 
+// 운영(NODE_ENV=prod)에서 MAIL_FROM이 비어있으면 MailService.send가 조용히
+// 발송을 생략한다 — answer()의 트랜잭션 불변식(status==='answered'이면 메일이
+// 실제로 발송됨)이 지켜지지 않는다. 부팅 시점에 막아 그 상태로 뜨는 것을 방지한다.
+// dev 폴백은 그대로 두기 위해 dev/undefined에서는 아무 것도 하지 않는다.
+export function assertMailConfigured(
+  nodeEnv: string | undefined,
+  mailFrom: string | undefined,
+): void {
+  if (nodeEnv !== 'prod') {
+    return;
+  }
+  if (!mailFrom) {
+    throw new Error(
+      'MAIL_FROM이 설정되지 않았습니다. 운영에서는 회신·인증 메일이 조용히 발송되지 않으므로 부팅을 중단합니다.',
+    );
+  }
+}
+
 // 작성자가 메일만 보고 무엇에 대한 답변인지 알 수 있도록 원문을 함께 싣는다.
 export function buildInquiryAnswerMail(
   type: InquiryType,

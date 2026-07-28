@@ -1,5 +1,6 @@
 import { SendEmailCommand } from '@aws-sdk/client-ses';
 import {
+  assertMailConfigured,
   buildInquiryAnswerMail,
   buildVerificationMail,
   MailService,
@@ -15,6 +16,30 @@ function internals(service: MailService): MailServiceInternals {
 }
 
 describe('MailService', () => {
+  describe('assertMailConfigured', () => {
+    test('prod이고 MAIL_FROM이 undefined면 던진다', () => {
+      expect(() => assertMailConfigured('prod', undefined)).toThrow(
+        'MAIL_FROM이 설정되지 않았습니다. 운영에서는 회신·인증 메일이 조용히 발송되지 않으므로 부팅을 중단합니다.',
+      );
+    });
+
+    test('prod이고 MAIL_FROM이 빈 문자열이면 던진다', () => {
+      expect(() => assertMailConfigured('prod', '')).toThrow(
+        'MAIL_FROM이 설정되지 않았습니다. 운영에서는 회신·인증 메일이 조용히 발송되지 않으므로 부팅을 중단합니다.',
+      );
+    });
+
+    test('prod이고 MAIL_FROM이 설정되어 있으면 던지지 않는다', () => {
+      expect(() =>
+        assertMailConfigured('prod', 'no-reply@dngg.one'),
+      ).not.toThrow();
+    });
+
+    test('dev이고 MAIL_FROM이 없어도 던지지 않는다 (dev 폴백 유지)', () => {
+      expect(() => assertMailConfigured('dev', undefined)).not.toThrow();
+    });
+  });
+
   describe('buildVerificationMail', () => {
     test('signup 템플릿에 코드가 포함된다', () => {
       const { subject, body } = buildVerificationMail('signup', '123456');
