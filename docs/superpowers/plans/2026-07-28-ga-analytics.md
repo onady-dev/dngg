@@ -555,7 +555,7 @@ cd /Users/onady/project/dngg/frontend && pnpm dev
    무조건 하나 만들어서(`user.service.ts:48`) `sign_up` 수 = 신규 그룹 수다.
 
 `useSearchParams`를 쓰지 않은 것도 의도적이다 — 쓰면 Suspense 경계가 강제되고
-정적 라우트 12개가 동적으로 바뀐다. UTM은 gtag가 `document.location`에서 읽는다.
+정적 라우트(현재 10개)가 동적으로 바뀐다. UTM은 gtag가 `document.location`에서 읽는다.
 ```
 
 "미해결 이슈"에 추가:
