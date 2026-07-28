@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import styled from "styled-components";
 import Signup from "../components/Signup";
@@ -156,13 +156,7 @@ const SettingsPage = () => {
   const router = useRouter();
   const { user, logout } = useAuthStore((state) => state);
   const { groups, deleteGroup } = useGroupStore();
-  // 랜딩 CTA(/settings#signup)로 들어오면 로그인이 아니라 가입 폼에서 시작한다.
-  // useSearchParams를 쓰면 Suspense 경계가 강제되고 이 라우트의 정적 렌더가 깨지므로
-  // 해시를 쓴다. 서버에서는 window가 없어 "login"으로 떨어지는데, 이 컴포넌트는
-  // useMounted 게이트로 마운트 전까지 null을 렌더하므로 hydration 불일치가 없다.
-  const [view, setView] = useState<AuthView>(() =>
-    typeof window !== "undefined" && window.location.hash === "#signup" ? "signup" : "login"
-  );
+  const [view, setView] = useState<AuthView>("login");
   const [isDeleting, setIsDeleting] = useState(false);
   const [nameInput, setNameInput] = useState("");
   const [isSavingName, setIsSavingName] = useState(false);
@@ -170,6 +164,16 @@ const SettingsPage = () => {
   const { showToast } = useToast();
   const confirm = useConfirm();
   const mounted = useMounted();
+
+  // 랜딩 CTA(/settings#signup)로 들어오면 로그인이 아니라 가입 폼에서 시작한다.
+  // useState 초기화 함수로는 안 된다 — 클라이언트 사이드 내비게이션에서는 Next가
+  // 새 세그먼트를 렌더한 뒤에 History API로 URL을 갱신하므로, 초기화 시점의
+  // window.location.hash가 아직 비어 있다(하드 로드에서만 우연히 동작했다).
+  // 이 컴포넌트는 useMounted 게이트로 마운트 전까지 null을 렌더하고, 이 effect의
+  // 상태 갱신이 mounted 갱신과 같은 커밋에서 배치되므로 로그인 폼이 잠깐 보이지 않는다.
+  useEffect(() => {
+    if (window.location.hash === "#signup") setView("signup");
+  }, []);
 
   if (!mounted) return null;
 
