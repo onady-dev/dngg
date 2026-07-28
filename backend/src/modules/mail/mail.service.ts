@@ -26,11 +26,15 @@ export function buildVerificationMail(
 // 발송을 생략한다 — answer()의 트랜잭션 불변식(status==='answered'이면 메일이
 // 실제로 발송됨)이 지켜지지 않는다. 부팅 시점에 막아 그 상태로 뜨는 것을 방지한다.
 // dev 폴백은 그대로 두기 위해 dev/undefined에서는 아무 것도 하지 않는다.
+// 'prod'와 'production' 둘 다 운영으로 취급한다 — 코드베이스 자체가 표기를
+// 통일하지 못했다: docker-compose.yaml은 NODE_ENV=prod를 쓰지만
+// app.module.ts의 로그 레벨 분기는 'production'을 검사한다. 부팅 가드가
+// 유일한 방어선이므로 어느 쪽으로 떠도 걸리게 한다.
 export function assertMailConfigured(
   nodeEnv: string | undefined,
   mailFrom: string | undefined,
 ): void {
-  if (nodeEnv !== 'prod') {
+  if (nodeEnv !== 'prod' && nodeEnv !== 'production') {
     return;
   }
   if (!mailFrom) {

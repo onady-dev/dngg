@@ -38,6 +38,18 @@ describe('MailService', () => {
     test('dev이고 MAIL_FROM이 없어도 던지지 않는다 (dev 폴백 유지)', () => {
       expect(() => assertMailConfigured('dev', undefined)).not.toThrow();
     });
+
+    test('production이고 MAIL_FROM이 undefined면 던진다', () => {
+      expect(() => assertMailConfigured('production', undefined)).toThrow(
+        'MAIL_FROM이 설정되지 않았습니다. 운영에서는 회신·인증 메일이 조용히 발송되지 않으므로 부팅을 중단합니다.',
+      );
+    });
+
+    test('production이고 MAIL_FROM이 설정되어 있으면 던지지 않는다', () => {
+      expect(() =>
+        assertMailConfigured('production', 'no-reply@dngg.one'),
+      ).not.toThrow();
+    });
   });
 
   describe('buildVerificationMail', () => {
