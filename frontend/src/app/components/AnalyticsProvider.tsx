@@ -34,8 +34,8 @@ export default function AnalyticsProvider() {
   // 첫 실행으로 한 번만 나간다(중복 없음).
   //
   // useSearchParams는 일부러 쓰지 않는다 — 쓰면 Suspense 경계가 강제되고 정적 렌더가
-  // 깨진다. 쿼리스트링(UTM)은 gtag가 document.location에서 자동으로 읽으므로
-  // 공유 링크의 utm_* 파라미터는 최초 pageview에 그대로 담긴다.
+  // 깨진다. 쿼리스트링은 pageview()가 window.location에서 직접 읽으므로 공유 링크의
+  // utm_* 파라미터는 최초 pageview에 그대로 담긴다(민감 키만 제거된다 — analytics.ts 참고).
   useEffect(() => {
     if (!pathname) return;
     pageview(pathname);
