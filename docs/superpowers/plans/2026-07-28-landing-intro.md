@@ -27,9 +27,9 @@
 
 | 파일 | 상태 | 책임 |
 |---|---|---|
-| `frontend/public/landing/record.png` | 신규 에셋 | 실시간 기록 스크린샷 (800×500) |
-| `frontend/public/landing/rankings.png` | 신규 에셋 | 랭킹 스크린샷 (800×1213) |
-| `frontend/public/landing/ability.png` | 신규 에셋 | 능력치 스크린샷 (800×616) |
+| `frontend/public/landing/record.png` | 신규 에셋 | 실시간 기록 스크린샷 (800×537) |
+| `frontend/public/landing/rankings.png` | 신규 에셋 | 랭킹 스크린샷 (800×537) |
+| `frontend/public/landing/ability.png` | 신규 에셋 | 능력치 공유 카드 (800×420, 비율이 달라 자르지 않는다) |
 | `frontend/src/app/styles/LandingStyles.ts` | 신규 | 랜딩 스타일. 프로젝트 관행대로 `styles/*.ts` 분리 |
 | `frontend/src/app/components/LandingHero.tsx` | 신규 | 랜딩 본문 — 히어로·CTA·스크린샷 3단 |
 | `frontend/src/app/page.tsx` | 수정 (5줄) | 비로그인 분기 + import |
@@ -37,66 +37,44 @@
 
 ---
 
-### Task 1: 랜딩 이미지 에셋 생성
+### Task 1: 랜딩 이미지 에셋 생성 — ✅ 완료 (커밋 ca10c76, c7a3478)
 
 **Files:**
-- Create: `frontend/public/landing/record.png`
-- Create: `frontend/public/landing/rankings.png`
-- Create: `frontend/public/landing/ability.png`
+- Create: `frontend/public/landing/record.png` (800×537)
+- Create: `frontend/public/landing/rankings.png` (800×537)
+- Create: `frontend/public/landing/ability.png` (800×420)
 
 **Interfaces:**
-- Consumes: 없음 (첫 태스크)
-- Produces: Task 2의 `LandingHero.tsx`가 참조하는 세 경로 — `/landing/record.png`, `/landing/rankings.png`, `/landing/ability.png`
+- Produces: Task 2가 참조하는 세 경로 — `/landing/record.png`, `/landing/rankings.png`, `/landing/ability.png`
 
-`public/manual/screenshots/`의 **주석 없는** 실제 제품 샷을 폭 800px로 리사이즈해 복사한다. 원본은 그대로 둔다 — 메뉴얼이 계속 쓴다.
+이 태스크는 실행 중에 계획이 바뀌었다. 처음에는 `public/manual/screenshots/`의 기존 샷을
+리사이즈하기만 하려 했으나(ca10c76), 리뷰에서 두 가지가 드러나 새로 캡처했다(c7a3478):
 
-- [ ] **Step 1: 원본 3장이 있는지 확인한다**
+1. 기존 샷에 **실제 사용자 이름**이 그대로 있다(준형·큰승표·세우·희윤 등).
+2. 기존 샷은 2026-07-17에 찍혔고 **6각 능력치 레이더는 그 뒤에 구현**됐다 —
+   `08-player-detail.png`는 레이더가 아니라 누적 기록 테이블이라 캡션과 어긋났다.
 
-Run:
-```bash
-cd /Users/onady/project/dngg/frontend/public/manual/screenshots && ls -la 07-record-loaded.png 05-rankings-loaded.png 08-player-detail.png
-```
-Expected: 세 파일 모두 존재. 크기는 각각 약 54KB / 103KB / 108KB. 하나라도 없으면 멈추고 보고할 것.
+**실제로 한 절차** (재캡처가 필요하면 이대로 반복한다):
 
-- [ ] **Step 2: 폭 800px로 리사이즈해 `public/landing/`에 생성한다**
+1. 로컬 Postgres의 `player.name`·`game.homeTeamName`/`awayTeamName`·`group.name`을
+   가명으로 일괄 UPDATE. **원복 SQL을 먼저 덤프해 둘 것.** 운영 DB는 건드리지 않는다.
+   - 원복 시 `player`의 `UNIQUE(groupId, name)` 때문에 한 줄씩 되돌리면 중간 상태에서
+     충돌한다. `UPDATE player SET name='tmp'||id;`로 한 번 비운 뒤 원복 SQL을 돌릴 것.
+2. 백엔드(:3010)와 프론트 dev(:3011)를 띄운다.
+3. `ability` — `curl http://localhost:3011/player/24/opengraph-image > ability-card.png`.
+   `next/og`가 서버에서 렌더하므로 브라우저가 필요 없다.
+4. `record`·`rankings` — Playwright로 캡처한다. **로그인한 상태여야 한다** — 아니면
+   기록 화면에 "조회 전용" 배너가 붙고 "경기 기록 방법" 안내 모달이 화면을 덮는다.
+   그룹 선택은 `localStorage.setItem('selectedGroupId','1')`로 주입한다(`groupStore.ts`).
+   모달은 "시작하기" 버튼을 클릭해 닫는다.
+   - Playwright 패키지 버전과 캐시된 브라우저 빌드가 어긋나면
+     `chromium.launch({ executablePath: <캐시 경로> })`로 우회한다.
+5. `sips --resampleWidth 800`으로 셋 다 폭 800px로 맞춘다. **`-Z`는 쓰지 말 것** —
+   긴 변을 맞추므로 세로로 긴 이미지의 폭이 어긋난다.
+6. 로컬 DB를 원복하고 dev 서버를 내린다.
 
-`sips`는 macOS 기본 제공 도구다. **`-Z`가 아니라 `--resampleWidth`를 쓴다** — `-Z`는 긴 변을 맞추므로 세로로 긴 랭킹 스크린샷이 527px 폭으로 줄어들어 폭이 제각각이 된다.
+**검증 결과**: `record` 800×537, `rankings` 800×537, `ability` 800×420, 합계 **156KB**.
 
-Run:
-```bash
-cd /Users/onady/project/dngg/frontend/public/manual/screenshots
-mkdir -p ../../landing
-sips --resampleWidth 800 07-record-loaded.png  --out ../../landing/record.png
-sips --resampleWidth 800 05-rankings-loaded.png --out ../../landing/rankings.png
-sips --resampleWidth 800 08-player-detail.png   --out ../../landing/ability.png
-```
-
-- [ ] **Step 3: 치수와 용량을 검증한다**
-
-Run:
-```bash
-cd /Users/onady/project/dngg/frontend/public/landing && sips -g pixelWidth -g pixelHeight *.png && echo "--- 합계 ---" && du -ch *.png | tail -1
-```
-Expected:
-- `ability.png` 800×616
-- `rankings.png` 800×1213
-- `record.png` 800×500
-- 합계 약 **244K** — 설계의 300KB 예산 이내
-
-폭이 셋 다 800이 아니면 `-Z`를 쓴 것이다. 다시 하라.
-
-- [ ] **Step 4: 커밋**
-
-```bash
-cd /Users/onady/project/dngg
-git add frontend/public/landing
-git commit -m "chore: 랜딩용 제품 스크린샷 3장 추가
-
-public/manual/screenshots의 주석 없는 실제 화면을 폭 800px로 리사이즈했다.
-원본은 메뉴얼이 계속 쓰므로 그대로 둔다. 합계 244KB."
-```
-
----
 
 ### Task 2: `LandingHero` 컴포넌트 추가 및 `page.tsx` 분기 연결
 
@@ -175,13 +153,24 @@ export const Feature = styled.figure`
 export const Shot = styled.img`
   display: block;
   width: 100%;
-  /* 세로로 긴 랭킹 스크린샷도 같은 박스에 맞춘다 — 위쪽(순위 상단)이 남는다 */
+  /* 스크린샷 둘(비율 1.49)을 같은 박스에 맞춘다 — 아래가 잘리고 위쪽이 남는다 */
   aspect-ratio: 8 / 5;
   object-fit: cover;
   object-position: top;
   border: 1px solid #e2e8f0;
   border-radius: 0.5rem;
   background-color: #f7fafc;
+`;
+
+/* 능력치 공유 카드는 비율이 1.90이라 위 박스에 cover로 넣으면 좌우의 dn.gg 워터마크와
+   URL이 잘린다. 자르지 않고 자연 비율 그대로 렌더한다. */
+export const CardShot = styled.img`
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  background-color: #ffffff;
 `;
 
 export const Caption = styled.figcaption`
@@ -210,29 +199,34 @@ export const CaptionStrong = styled.strong`
 import { track } from "@/lib/analytics";
 import * as S from "../styles/LandingStyles";
 
-// 스크린샷은 public/manual/screenshots의 주석 없는 실제 화면을 폭 800px로 리사이즈해
-// public/landing/에 커밋한 것이다. next/image는 쓰지 않는다 — 이 프로젝트에 sharp가
-// 없어서 운영 next start의 이미지 최적화 경로가 깨진다.
+// 에셋은 가명화한 로컬 DB에서 새로 캡처해 public/landing/에 커밋한 것이다(Task 1 참고).
+// next/image는 쓰지 않는다 — 이 프로젝트에 sharp가 없어서 운영 next start의 이미지
+// 최적화 경로가 깨진다.
+//
+// variant "card"는 능력치 공유 카드다. 스크린샷과 비율이 달라 자르지 않고 렌더한다.
 const FEATURES = [
   {
     src: "/landing/record.png",
     alt: "경기 기록 화면 — 선수별 득점·리바운드·어시스트를 터치로 기록하는 모습",
     title: "실시간 터치 기록",
     body: "경기 중에 득점·리바운드·어시스트를 터치로 남깁니다.",
+    variant: "shot",
   },
   {
     src: "/landing/rankings.png",
     alt: "랭킹 화면 — 선수별 기록이 순위표로 정리된 모습",
     title: "자동 랭킹",
     body: "기록이 쌓이면 팀 랭킹이 저절로 정리됩니다.",
+    variant: "shot",
   },
   {
     src: "/landing/ability.png",
-    alt: "선수 상세 화면 — 6각 능력치 레이더 차트",
+    alt: "선수 능력치 공유 카드 — 6각 레이더 차트와 dn.gg 워터마크",
     title: "6각 능력치",
     body: "선수마다 능력치 카드가 만들어지고 링크 하나로 공유됩니다.",
+    variant: "card",
   },
-];
+] as const;
 
 export default function LandingHero() {
   return (
@@ -249,23 +243,28 @@ export default function LandingHero() {
       </S.Hero>
 
       <S.FeatureList>
-        {FEATURES.map((feature, index) => (
-          <S.Feature key={feature.src}>
-            {/* width/height를 표시 박스(aspect-ratio 8/5)와 같게 둬서 레이아웃 시프트를 막는다.
-                첫 장은 화면 안에 들어오므로 eager로 받는다. */}
-            <S.Shot
-              src={feature.src}
-              alt={feature.alt}
-              width={800}
-              height={500}
-              loading={index === 0 ? "eager" : "lazy"}
-            />
-            <S.Caption>
-              <S.CaptionStrong>{feature.title}</S.CaptionStrong>
-              {feature.body}
-            </S.Caption>
-          </S.Feature>
-        ))}
+        {FEATURES.map((feature, index) => {
+          const isCard = feature.variant === "card";
+          const Image = isCard ? S.CardShot : S.Shot;
+          return (
+            <S.Feature key={feature.src}>
+              {/* width/height를 실제 표시 박스와 같게 둬서 레이아웃 시프트를 막는다.
+                  스크린샷은 aspect-ratio 8/5 박스라 800×500, 카드는 자연 비율이라 800×420.
+                  첫 장은 화면 안에 들어오므로 eager로 받는다. */}
+              <Image
+                src={feature.src}
+                alt={feature.alt}
+                width={800}
+                height={isCard ? 420 : 500}
+                loading={index === 0 ? "eager" : "lazy"}
+              />
+              <S.Caption>
+                <S.CaptionStrong>{feature.title}</S.CaptionStrong>
+                {feature.body}
+              </S.Caption>
+            </S.Feature>
+          );
+        })}
       </S.FeatureList>
     </S.Container>
   );
