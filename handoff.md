@@ -56,11 +56,31 @@ DTO 필수화)와 프론트(`EmailCodeVerification` 게이트)를 한 커밋에 
   **서버 `.env`에 `MAIL_FROM`이 반드시 있어야 한다** (2026-07-28 확인: 설정됨).
 - `MailService`에 private `send(to, subject, body)` 추출 — 인증 메일과 회신 메일이 공유.
 
+### 완료 — 소개(랜딩) 화면
+
+로그아웃 방문자가 `/`에 오면 "그룹을 선택해주세요" 대신 제품 소개와 가입 CTA를 본다.
+마케팅 Phase 0의 랜딩페이지 항목(`docs/superpowers/plans/2026-07-19-marketing-phase0.md` D절).
+
+- 설계: `docs/superpowers/specs/2026-07-28-landing-intro-design.md`
+- 계획: `docs/superpowers/plans/2026-07-28-landing-intro.md`
+
+알아야 할 것 세 가지:
+
+1. **분기는 `page.tsx`의 `if (!selectedGroup)` 블록 *안에서* 갈라진다.** `!user`를 바깥에서
+   먼저 검사하면 안 된다 — `/group/all`이 공개 API라 비로그인 사용자도 헤더에서 그룹을 골라
+   기록을 볼 수 있는데, 그 경로가 막힌다.
+2. **메뉴얼(`/manual/index.html`)은 그대로 남아 있다.** 헤더 nav의 `manual` 아이콘과
+   로그인 사용자의 "그룹을 선택해주세요" 화면에서 여전히 연결된다. 랜딩에는 일부러 안 넣었다
+   (단일 CTA).
+3. **이미지는 `next/image`를 쓰지 않는다.** 이 프로젝트에 `sharp`가 없어 운영 `next start`의
+   이미지 최적화가 깨진다. `public/landing/`의 미리 리사이즈한 PNG를 평범한 `<img>`로 쓴다.
+   스크린샷을 갈아끼울 때 `sips --resampleWidth 800`으로 폭을 맞출 것(`-Z`는 긴 변을 맞춰서
+   세로로 긴 이미지의 폭이 어긋난다).
+
 ## 남은 TODO (`docs/featurelist.md`)
 
 - [ ] 메인 페이지가 스크롤 안되게(특히 기록화면) 그리고 기록화면 가려지는 버튼 없게
 - [ ] 공유 카드에 들어가는 워딩들 개선
-- [ ] 메뉴얼 페이지를 소개 페이지로 변경
 - [ ] GA 적용
 - [ ] 마케팅 이어서 진행
 - [ ] 배포중 접속 시 nginx 에러 페이지 나오는데 서버점검중 페이지로 변경
@@ -73,6 +93,17 @@ DTO 필수화)와 프론트(`EmailCodeVerification` 게이트)를 한 커밋에 
   수신은 프로덕션 승인으로 제약이 없다. 이 주소를 발신에 쓸 계획이면 재검증이 필요하다.
 - **Dockerfile Node 버전 스큐** — 운영 컨테이너는 `node:20`, CI `setup-node`는 22다.
   (`PROJECT_CONTEXT.md` 3.3)
+- **루트 도메인 OG 카드가 없다** — `layout.tsx`의 metadata에 `openGraph` 블록이 없어
+  `dngg.one`을 카톡·밴드에 붙여넣으면 미리보기가 비어 있다. 공유 루프의 진입 링크인데
+  카드가 없는 상태다. `src/app/opengraph-image.tsx`를 `player/[id]`와 같은 `next/og`
+  패턴으로 추가하면 된다. (랜딩 작업에서 의도적으로 범위 밖으로 뺐다 — `layout.tsx`를
+  건드리면 `feature/ga-analytics`와 충돌한다)
+- **GA 설계 문서에 `landing_cta_click`이 아직 없다** — 랜딩이 이벤트를 하나 늘렸는데
+  `docs/superpowers/specs/2026-07-28-ga-analytics-design.md` 4절의 이벤트 표는 3개 그대로다.
+  두 브랜치가 모두 `main`에 올라간 뒤 표에 추가할 것.
+- **네이버 SEO가 필요해지면** — `/`의 정적 HTML은 비어 있다(`page.tsx`의 `!mounted` 게이트).
+  Googlebot은 JS를 실행하지만 네이버 크롤러는 약하다. 랜딩을 게이트 앞에서 정적으로 렌더하는
+  방식으로 올릴 수 있고, 대가는 로그인 사용자가 홈 방문마다 랜딩을 한 프레임 보는 것이다.
 
 ## 문의·피드백 후속 과제 (머지 비차단 — 최종 리뷰에서 이월)
 
