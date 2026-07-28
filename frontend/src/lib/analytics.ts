@@ -10,6 +10,11 @@
 //
 // 파라미터 이름은 snake_case로 통일한다 — GA4 맞춤 측정기준이 파라미터 이름으로
 // 등록되고, 표준 파라미터(page_path 등)가 전부 snake_case다.
+//
+// 토스 결제 복귀 URL(?authKey=…&customerKey=…)이 page_location으로 GA4에 흘러드는 것을 막는다.
+// customerKey는 Group에 영속되는 계정별 식별자, authKey는 결제 인증 자격증명이다.
+// GA4로 한 번 나간 값은 회수할 수 없어서, 자동 수집에 맡기지 않고 명시적으로 덮어쓴다.
+const SENSITIVE_QUERY_KEYS = ["authKey", "customerKey", "token", "code"];
 
 type AnalyticsProps = Record<string, string | number | boolean | null | undefined>;
 
@@ -48,7 +53,18 @@ function ensureGtag(): NonNullable<Window["gtag"]> | null {
 export function track(event: string, props: AnalyticsProps = {}): void {
   const gtag = ensureGtag();
   if (gtag) {
-    gtag("event", event, props);
+    // 설계 §6 불변식: track()은 void이고 throw하지 않는다. gtag.js 로드 후에는
+    // window.gtag·dataLayer.push가 전부 구글 코드라 우리 제어 밖에서 던질 수 있고,
+    // 호출부(예: Signup.tsx)는 이미 성공한 흐름 뒤에 있어 여기서 throw하면 잘못된
+    // 실패 처리로 이어진다. 그래서 경계인 여기서 한 번만 감싼다 — 호출부는 신경 쓰지 않는다.
+    try {
+      gtag("event", event, props);
+    } catch (error) {
+      if (process.env.NODE_ENV !== "production") {
+        // eslint-disable-next-line no-console
+        console.debug("[track] gtag error", error);
+      }
+    }
     return;
   }
   if (process.env.NODE_ENV !== "production") {
@@ -58,13 +74,35 @@ export function track(event: string, props: AnalyticsProps = {}): void {
 }
 
 export function pageview(path: string): void {
-  // page_location(UTM 포함)은 gtag가 발화 시점의 document.location에서 자동으로 붙인다.
-  // 그래서 useSearchParams가 필요 없다 — 자세한 이유는 AnalyticsProvider 주석 참고.
-  track("page_view", { page_path: path });
+  // page_location(UTM 포함)은 기본적으로 gtag가 발화 시점의 document.location에서
+  // 자동으로 붙는다. 그래서 useSearchParams가 필요 없다 — 자세한 이유는
+  // AnalyticsProvider 주석 참고. UTM 파라미터는 SENSITIVE_QUERY_KEYS에 없으므로
+  // 아래에서도 그대로 살아남는다.
+  //
+  // 다만 토스 결제 복귀 등 민감 쿼리 파라미터가 섞인 URL은 자동 수집에 맡기지 않고
+  // page_location을 명시적으로 덮어써서 내보낸다. 이렇게 하면 gtag가 다음 클라이언트
+  // 사이드 히트의 referrer로 들고 가는 값도 함께 정제된다.
+  if (typeof window === "undefined") {
+    track("page_view", { page_path: path });
+    return;
+  }
+  const url = new URL(window.location.href);
+  for (const key of SENSITIVE_QUERY_KEYS) {
+    url.searchParams.delete(key);
+  }
+  track("page_view", { page_path: path, page_location: url.toString() });
 }
 
 export function setAnalyticsUser(id: string | null): void {
   const gtag = ensureGtag();
   if (!gtag) return;
-  gtag("set", { user_id: id });
+  // track()과 동일한 이유로 감싼다 — 설계 §6 불변식.
+  try {
+    gtag("set", { user_id: id });
+  } catch (error) {
+    if (process.env.NODE_ENV !== "production") {
+      // eslint-disable-next-line no-console
+      console.debug("[setAnalyticsUser] gtag error", error);
+    }
+  }
 }
