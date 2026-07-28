@@ -224,6 +224,43 @@ warn: This version of pnpm requires at least Node.js v22.13
 - **비밀번호 재설정(`resetPassword`)도 SES 발송에 의존**하므로 미승인 동안 동작하지 않았다. 우회 범위에는 포함하지 않았고, SES 승인으로 함께 정상화됐다.
 - 이 복구는 **백엔드·프론트가 반드시 동시에 배포**되어야 한다. `verificationToken`이 DTO 필수로 돌아갔기 때문에 한쪽만 배포되면 가입이 400/401로 깨진다 (3.x의 2026-07-18 장애와 동일 패턴). workflow_dispatch로 동시 배포할 것.
 
+### 5.5 문의·피드백 경로 (2026-07-28 배포)
+
+앱 내 `/inquiry` 폼으로 문의를 접수해 `inquiry` 테이블에 저장하고, `/admin` 문의 카드에서
+답변하면 SES로 회신 메일이 나간다. 배포 커밋 `c8f5e14` (백엔드·프론트 동일 sha).
+
+엔드포인트: `POST /inquiry` (jwt) / `GET /admin/inquiries` (jwt+admin) /
+`POST /admin/inquiries/:id/answer` (jwt+admin)
+
+**핵심 불변식 — 여기를 건드리기 전에 반드시 읽을 것:**
+
+- **답변 저장과 메일 발송은 한 트랜잭션이다.** 발송 실패 시 UPDATE가 롤백되어 `status`는
+  `pending`으로 남는다. 불변식: **`status === 'answered'`이면 회신 메일이 실제로 발송되었다.**
+  재답변(덮어쓰기 + 재발송)이 곧 재시도 경로다.
+  검증: `MAIL_FROM`을 미검증 주소로 두고 실제 SES 거부를 유도해 3건 모두 `pending` 유지 확인.
+- **`MAIL_FROM`이 비어 있으면 이 불변식이 깨진다.** `MailService.send`가 dev 폴백으로 조용히
+  no-op 하고 아무것도 던지지 않아, 트랜잭션이 그대로 커밋되기 때문이다. 그래서
+  `assertMailConfigured(nodeEnv, mailFrom)` 부팅 가드를 `main.ts`에 두었다 —
+  `NODE_ENV`가 `prod`/`production`인데 `MAIL_FROM`이 falsy면 **부팅을 중단**한다.
+  → **서버 `/usr/local/project/dngg/.env`에서 `MAIL_FROM`을 지우면 백엔드가 크래시 루프에
+  빠져 API 전체가 죽는다.** 메일만 죽는 게 아니다. compose가 `MAIL_FROM=${MAIL_FROM}`로
+  넘기므로 키가 없으면 빈 문자열이 되고, 가드는 빈 문자열도 걸러낸다.
+- **`Inquiry.user`에는 FK가 없다** (`createForeignKeyConstraints: false` + `nullable: true`).
+  `UserService.deleteUser`가 하드 삭제라 FK를 걸면 문의를 남긴 사용자의 탈퇴가 실패한다
+  (1절 Player FK 이슈와 같은 이유). 회신은 `user.email`이 아니라 작성 시점 스냅샷
+  `authorEmail`로 보내므로 탈퇴 계정의 문의에도 답장할 수 있다. **이 relation은 null일 수 있다.**
+- SES 원본 에러는 응답에 싣지 않는다 — `inquiry.service.ts`가 `InternalServerErrorException`으로
+  치환하고 원본은 로그에만 남긴다. 전역 `httpExceptionFilter`가 raw `Error.message`를 그대로
+  응답에 넣기 때문에 서비스 단에서 막아야 한다.
+
+**작업 중 발견한 프로젝트 전역 이슈 (미수정)**: `nest-winston`은 `Logger.error`의 2번째 인자를
+메타 `stack`으로 넘기는데(`winston.classes.js:52`) `app.module.ts:48`의 winston printf는
+`trace`를 읽는다. 그래서 **이 레포의 모든 `Logger.error(msg, stack)` 호출이 스택을 조용히
+버린다** (`SubscriptionService`, `UserService.withTransaction` 등). 문의 기능은 원본 사유를
+로그 본문에 넣어 우회했다. 나머지 후속 과제는 `handoff.md` 참고.
+
+범위 밖(YAGNI): 대화형 스레드, 앱 내 문의 내역 화면, 파일 첨부, 비로그인 문의, 레이트 리밋.
+
 ## 6. 운영 명령 메모
 
 ### 6.1 로컬 DB만 올리기
