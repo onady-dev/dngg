@@ -56,12 +56,33 @@ DTO 필수화)와 프론트(`EmailCodeVerification` 게이트)를 한 커밋에 
   **서버 `.env`에 `MAIL_FROM`이 반드시 있어야 한다** (2026-07-28 확인: 설정됨).
 - `MailService`에 private `send(to, subject, body)` 추출 — 인증 메일과 회신 메일이 공유.
 
+### 완료 — GA4 계측 (배포됨)
+
+`page_view`·`sign_up`·`share_click` 세 이벤트와 로그인 사용자 `user_id`를 수집한다.
+마케팅 Phase 0의 계측 항목(`docs/superpowers/plans/2026-07-19-marketing-phase0.md` E절).
+
+- 설계: `docs/superpowers/specs/2026-07-28-ga-analytics-design.md`
+- 계획: `docs/superpowers/plans/2026-07-28-ga-analytics.md`
+
+알아야 할 것 세 가지:
+
+1. **측정 ID는 빌드 시점에 박힌다.** GitHub repo **Variables**(Secret 아님)의
+   `NEXT_PUBLIC_GA_ID` → CI build-arg → Dockerfile ARG. 값을 바꾸면 프론트
+   이미지를 재빌드해야 하고, `frontend/**` 변경 없이 variable만 고치면 아무 일도
+   일어나지 않는다.
+2. **측정 ID가 비면 계측이 통째로 꺼진다** — 스크립트를 아예 붙이지 않는다.
+   로컬 오염 방지 장치지만, 운영에서 variable이 빠지면 조용히 무계측이 된다.
+3. **`group_created` 이벤트는 일부러 없다.** `POST /user`가 트랜잭션 안에서 그룹을
+   무조건 하나 만들어서(`user.service.ts:48`) `sign_up` 수 = 신규 그룹 수다.
+
+`useSearchParams`를 쓰지 않은 것도 의도적이다 — 쓰면 Suspense 경계가 강제되고
+정적 라우트 12개가 동적으로 바뀐다. UTM은 gtag가 `document.location`에서 읽는다.
+
 ## 남은 TODO (`docs/featurelist.md`)
 
 - [ ] 메인 페이지가 스크롤 안되게(특히 기록화면) 그리고 기록화면 가려지는 버튼 없게
 - [ ] 공유 카드에 들어가는 워딩들 개선
 - [ ] 메뉴얼 페이지를 소개 페이지로 변경
-- [ ] GA 적용
 - [ ] 마케팅 이어서 진행
 - [ ] 배포중 접속 시 nginx 에러 페이지 나오는데 서버점검중 페이지로 변경
 
@@ -73,6 +94,14 @@ DTO 필수화)와 프론트(`EmailCodeVerification` 게이트)를 한 커밋에 
   수신은 프로덕션 승인으로 제약이 없다. 이 주소를 발신에 쓸 계획이면 재검증이 필요하다.
 - **Dockerfile Node 버전 스큐** — 운영 컨테이너는 `node:20`, CI `setup-node`는 22다.
   (`PROJECT_CONTEXT.md` 3.3)
+- **개인정보처리방침 페이지가 없다** — GA4가 쿠키/식별자를 심으므로 국내
+  개인정보보호법상 고지 대상이다. 방침·약관 페이지가 아예 없는 상태로 계측을
+  시작했다(인지된 선택). `/privacy` 추가 필요.
+- **프론트엔드에 테스트 러너가 없다** — 계측 회귀를 자동으로 잡을 수 없고,
+  `pnpm lint`도 동작하지 않는다(`eslint.config.mjs` flat config만 있고 Next 14.1의
+  `next lint`는 `.eslintrc*`를 찾아 설정 마법사가 뜬다).
+- **이메일 인증 단계 이탈이 계측되지 않는다** — SES 복구 직후라 인증 요청→인증
+  완료→가입 완료 깔때기의 이탈 지점이 궁금해질 수 있다. 이번 범위에서 제외했다.
 
 ## 문의·피드백 후속 과제 (머지 비차단 — 최종 리뷰에서 이월)
 
