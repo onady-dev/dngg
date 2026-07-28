@@ -190,8 +190,14 @@ DTO 필수화)와 프론트(`EmailCodeVerification` 게이트)를 한 커밋에 
    `MAIL_FROM` 미설정으로 `dist/main.js`를 직접 돌려 배선을 확인했지만 **수동 스모크였다.**
    자동화하려면 빌드된 `dist/main.js`를 spawn해 종료 코드·stderr를 검증해야 하는데,
    CI는 `pnpm test` 전에 빌드하지 않으므로(`deploy.yml`) 그대로 넣으면 CI에서 깨진다.
-4. **`GET /admin/inquiries`에 페이지네이션·인덱스 없음** — 매 조회마다 전체 문의를
-   2000자 본문째로 가져온다. 초기 볼륨에선 무해. `status`/`createdAt` 인덱스도 없다.
+4. ~~**`GET /admin/inquiries`에 페이지네이션·인덱스 없음**~~ — **완료**, 같은 브랜치.
+   응답이 `{ rows, total, page, limit }` 봉투로 바뀌었다(기본 20건, 최대 100건).
+   `(status, createdAt)` 복합 인덱스 + `createdAt` 인덱스를 엔티티에 추가했고
+   `synchronize: true`라 백엔드 재시작 시 자동 생성된다(로컬에서 생성·EXPLAIN 확인).
+
+   **⚠️ 파괴적 변경이다 — 프론트·백엔드가 반드시 함께 배포돼야 한다.** 관리자 화면이
+   배열을 기대하다 봉투를 받으면 문의 카드가 깨진다. CI 경로 필터상 두 잡이 독립이므로
+   `workflow_dispatch`로 동시 배포할 것 (2026-07-18 혼합 배포 장애와 같은 구조).
 5. **관리자 답변 실패 토스트가 원인을 구분하지 않는다** — 404·400·네트워크 끊김도 전부
    "답변 메일 발송에 실패했습니다."로 표시된다. `error.response?.status`로 분기 필요.
 6. **`answer()`가 `manager.update`의 `affected`를 무시**하고 `findOne`이 락을 걸지 않는다.
