@@ -93,3 +93,57 @@ export const SmallButton = styled.button`
     background: #e5e7eb;
   }
 `;
+
+// 문의 카드 — 답변 인라인 영역
+// Table의 td에 white-space: nowrap이 걸려 있어 긴 텍스트용으로 따로 푼다.
+export const WrapCell = styled.td`
+  white-space: normal;
+`;
+
+export const Ellipsis = styled.span`
+  display: inline-block;
+  max-width: 18rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+`;
+
+export const AnswerBox = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem 0.4rem;
+  background: #f9fafb;
+`;
+
+export const AnswerArea = styled.textarea`
+  width: 100%;
+  min-height: 5.5rem;
+  padding: 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-family: inherit;
+  line-height: 1.5;
+  resize: vertical;
+`;
+
+export const PrimaryButton = styled.button`
+  align-self: flex-start;
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  &:hover {
+    background: #1d4ed8;
+  }
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`;

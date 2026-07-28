@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/axios";
@@ -36,6 +36,24 @@ interface SubscriptionOverview {
   }[];
 }
 
+interface InquiryRow {
+  id: number;
+  type: string;
+  content: string;
+  authorEmail: string;
+  status: "pending" | "answered";
+  answer: string | null;
+  answeredAt: string | null;
+  createdAt: string;
+}
+
+const INQUIRY_TYPE_LABELS: Record<string, string> = {
+  bug: "버그",
+  feature: "기능 제안",
+  billing: "결제·구독",
+  etc: "기타",
+};
+
 const AdminPage = () => {
   const mounted = useMounted();
   const router = useRouter();
@@ -69,6 +87,46 @@ const AdminPage = () => {
     queryFn: async () => (await api.get("/admin/subscriptions")).data,
     enabled: mounted && isAdmin,
   });
+
+  const { data: inquiries } = useQuery<InquiryRow[]>({
+    queryKey: ["admin", "inquiries"],
+    queryFn: async () => (await api.get("/admin/inquiries")).data,
+    enabled: mounted && isAdmin,
+  });
+
+  // 어느 행이 펼쳐져 있는지 + 그 행의 답변 초안
+  const [openInquiryId, setOpenInquiryId] = useState<number | null>(null);
+  const [answerDraft, setAnswerDraft] = useState("");
+
+  const answerMutation = useMutation({
+    mutationFn: async (payload: { id: number; answer: string }) =>
+      (
+        await api.post(`/admin/inquiries/${payload.id}/answer`, {
+          answer: payload.answer,
+        })
+      ).data,
+    onSuccess: () => {
+      showToast("답변을 보냈습니다.", "success");
+      setOpenInquiryId(null);
+      setAnswerDraft("");
+      queryClient.invalidateQueries({ queryKey: ["admin", "inquiries"] });
+    },
+    onError: () => {
+      // 백엔드가 롤백했으므로 이 문의는 여전히 pending이다. 성공한 척하지 않는다.
+      showToast("답변 메일 발송에 실패했습니다. 다시 시도해주세요.", "error");
+      queryClient.invalidateQueries({ queryKey: ["admin", "inquiries"] });
+    },
+  });
+
+  const handleToggleAnswer = (inquiry: InquiryRow) => {
+    if (openInquiryId === inquiry.id) {
+      setOpenInquiryId(null);
+      setAnswerDraft("");
+      return;
+    }
+    setOpenInquiryId(inquiry.id);
+    setAnswerDraft(inquiry.answer ?? "");
+  };
 
   const startMutation = useMutation({
     mutationFn: async () => (await api.post("/admin/monetization/start")).data,
@@ -229,6 +287,101 @@ const AdminPage = () => {
                   </td>
                   <td>{payment.failReason ?? ""}</td>
                 </tr>
+              ))}
+            </tbody>
+          </S.Table>
+        </S.TableWrap>
+      </S.Card>
+
+      <S.Card>
+        <S.CardTitle>문의·피드백</S.CardTitle>
+        <S.StatusLine>
+          {(() => {
+            const rows = inquiries ?? [];
+            const pending = rows.filter((row) => row.status === "pending");
+            return rows.length === 0
+              ? "접수된 문의 없음"
+              : `전체 ${rows.length}건 · 미답변 ${pending.length}건`;
+          })()}
+        </S.StatusLine>
+        <S.TableWrap>
+          <S.Table>
+            <thead>
+              <tr>
+                <th>접수일</th>
+                <th>유형</th>
+                <th>작성자</th>
+                <th>내용</th>
+                <th>상태</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {(inquiries ?? []).map((inquiry) => (
+                <React.Fragment key={inquiry.id}>
+                  <tr>
+                    <td>
+                      {new Date(inquiry.createdAt).toLocaleDateString("ko-KR")}
+                    </td>
+                    <td>
+                      {INQUIRY_TYPE_LABELS[inquiry.type] ?? inquiry.type}
+                    </td>
+                    <td>{inquiry.authorEmail}</td>
+                    <td>
+                      <S.Ellipsis title={inquiry.content}>
+                        {inquiry.content}
+                      </S.Ellipsis>
+                    </td>
+                    <td>
+                      {inquiry.status === "answered" ? (
+                        <S.Badge $tone="ok">답변 완료</S.Badge>
+                      ) : (
+                        <S.Badge $tone="warn">미답변</S.Badge>
+                      )}
+                    </td>
+                    <td>
+                      <S.SmallButton
+                        onClick={() => handleToggleAnswer(inquiry)}
+                      >
+                        {openInquiryId === inquiry.id
+                          ? "닫기"
+                          : inquiry.status === "answered"
+                            ? "재답변"
+                            : "답변"}
+                      </S.SmallButton>
+                    </td>
+                  </tr>
+                  {openInquiryId === inquiry.id && (
+                    <tr>
+                      <S.WrapCell colSpan={6}>
+                        <S.AnswerBox>
+                          <div>{inquiry.content}</div>
+                          <S.AnswerArea
+                            value={answerDraft}
+                            maxLength={5000}
+                            placeholder="작성자에게 보낼 답변을 입력하세요. 전송하면 메일로 발송됩니다."
+                            onChange={(e) => setAnswerDraft(e.target.value)}
+                          />
+                          <S.PrimaryButton
+                            disabled={
+                              answerMutation.isPending || !answerDraft.trim()
+                            }
+                            onClick={() =>
+                              answerMutation.mutate({
+                                id: inquiry.id,
+                                answer: answerDraft.trim(),
+                              })
+                            }
+                          >
+                            {answerMutation.isPending
+                              ? "발송 중..."
+                              : "답변 메일 보내기"}
+                          </S.PrimaryButton>
+                        </S.AnswerBox>
+                      </S.WrapCell>
+                    </tr>
+                  )}
+                </React.Fragment>
               ))}
             </tbody>
           </S.Table>
