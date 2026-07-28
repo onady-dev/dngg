@@ -41,7 +41,7 @@ export default function LandingHero() {
           경기 끝나고 스탯 정리하느라 남지 마세요. 터치 몇 번이면 랭킹과 6각 능력치가 자동으로
           만들어집니다.
         </S.Subtitle>
-        <S.Cta href="/settings" onClick={() => track("landing_cta_click")}>
+        <S.Cta href="/settings#signup" onClick={() => track("landing_cta_click")}>
           무료로 시작하기
         </S.Cta>
       </S.Hero>
