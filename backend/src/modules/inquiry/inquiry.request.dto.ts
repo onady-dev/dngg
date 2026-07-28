@@ -1,11 +1,16 @@
 import {
   IsIn,
+  IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
+  Max,
   MaxLength,
+  Min,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import {
+  INQUIRY_PAGE_SIZE_MAX,
   INQUIRY_STATUSES,
   INQUIRY_TYPES,
   InquiryStatus,
@@ -38,4 +43,20 @@ export class ListInquiryQueryDto {
   @IsOptional()
   @IsIn(INQUIRY_STATUSES)
   status?: InquiryStatus;
+
+  // 쿼리 파라미터는 항상 문자열로 도착하므로 @Type으로 숫자 변환을 명시한다.
+  // 없으면 @IsInt가 "2"에 걸려 정상 요청이 400이 된다.
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  // 상한이 없으면 limit=999999로 페이지네이션을 통째로 우회할 수 있다.
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(INQUIRY_PAGE_SIZE_MAX)
+  limit?: number;
 }

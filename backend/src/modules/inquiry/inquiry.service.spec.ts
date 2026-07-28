@@ -4,6 +4,7 @@ import {
 } from '@nestjs/common';
 import { Inquiry } from 'src/entities/Inquiry.entity';
 import { InquiryService } from './inquiry.service';
+import { INQUIRY_PAGE_SIZE_DEFAULT } from './inquiry.constants';
 
 const NOW = new Date('2026-07-28T09:00:00.000Z');
 const AUTHOR = { userId: 42, email: 'writer@example.com' };
@@ -16,7 +17,7 @@ const makeService = (opts: { inquiry?: any; mailError?: Error } = {}) => {
       createdAt: NOW,
       ...obj,
     })),
-    find: jest.fn(async () => []),
+    findAndCount: jest.fn(async () => [[], 0]),
   };
 
   const manager = {
@@ -81,24 +82,49 @@ describe('InquiryService.list', () => {
 
     await service.list();
 
-    expect(inquiryRepo.find).toHaveBeenCalledWith({
+    expect(inquiryRepo.findAndCount).toHaveBeenCalledWith({
       where: {},
       order: { createdAt: 'DESC' },
+      skip: 0,
+      take: INQUIRY_PAGE_SIZE_DEFAULT,
     });
   });
 
   test('status가 있으면 필터를 건다', async () => {
     const { service, inquiryRepo } = makeService();
 
-    await service.list('pending');
+    await service.list({ status: 'pending' });
 
-    expect(inquiryRepo.find).toHaveBeenCalledWith({
+    expect(inquiryRepo.findAndCount).toHaveBeenCalledWith({
       where: { status: 'pending' },
       order: { createdAt: 'DESC' },
+      skip: 0,
+      take: INQUIRY_PAGE_SIZE_DEFAULT,
     });
   });
 
-  // find가 항상 []을 반환하는 다른 list 테스트들은 .map()을 실행하지 않는다 —
+  test('page는 1-기반이며 skip으로 환산된다', async () => {
+    const { service, inquiryRepo } = makeService();
+
+    await service.list({ page: 3, limit: 10 });
+
+    expect(inquiryRepo.findAndCount).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: 20, take: 10 }),
+    );
+  });
+
+  test('전체 건수를 함께 돌려준다 — 프론트가 더 불러올 게 남았는지 판단한다', async () => {
+    const { service, inquiryRepo } = makeService();
+    inquiryRepo.findAndCount.mockResolvedValueOnce([[], 137] as any);
+
+    const result = await service.list({ page: 2, limit: 20 });
+
+    expect(result.total).toBe(137);
+    expect(result.page).toBe(2);
+    expect(result.limit).toBe(20);
+  });
+
+  // findAndCount가 항상 []을 반환하는 다른 list 테스트들은 .map()을 실행하지 않는다 —
   // 그 상태로는 `return rows;`처럼 user·userId·password를 그대로 흘리는
   // 버그도 통과한다. 실제 행을 흘려 넣어 화이트리스트 투영을 검증한다.
   test('InquiryAdminRow 화이트리스트만 반환한다 (user relation·userId 등 원본 필드는 제외)', async () => {
@@ -116,11 +142,11 @@ describe('InquiryService.list', () => {
       createdAt: NOW,
       updatedAt: NOW,
     };
-    inquiryRepo.find.mockResolvedValueOnce([rawRow] as any);
+    inquiryRepo.findAndCount.mockResolvedValueOnce([[rawRow], 1] as any);
 
     const result = await service.list();
 
-    expect(result).toEqual([
+    expect(result.rows).toEqual([
       {
         id: 7,
         type: 'bug',

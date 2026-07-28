@@ -147,3 +147,24 @@ export const PrimaryButton = styled.button`
     cursor: not-allowed;
   }
 `;
+
+// 문의 목록 페이지네이션 — 테이블 아래 전체 폭 "더 보기"
+export const MoreButton = styled.button`
+  width: 100%;
+  margin-top: 0.75rem;
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  &:hover:not(:disabled) {
+    background: #e5e7eb;
+  }
+  &:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+`;

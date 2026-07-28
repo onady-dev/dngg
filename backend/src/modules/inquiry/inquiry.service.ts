@@ -8,7 +8,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { Inquiry } from 'src/entities/Inquiry.entity';
 import { MailService } from '../mail/mail.service';
-import { InquiryStatus, InquiryType } from './inquiry.constants';
+import {
+  INQUIRY_PAGE_SIZE_DEFAULT,
+  InquiryStatus,
+  InquiryType,
+} from './inquiry.constants';
 import { AnswerInquiryDto, CreateInquiryDto } from './inquiry.request.dto';
 
 // 관리자 전용 응답 — authorEmail을 포함한다.
@@ -21,6 +25,13 @@ export interface InquiryAdminRow {
   answer: string | null;
   answeredAt: Date | null;
   createdAt: Date;
+}
+
+export interface InquiryListPage {
+  rows: InquiryAdminRow[];
+  total: number;
+  page: number;
+  limit: number;
 }
 
 @Injectable()
@@ -51,21 +62,36 @@ export class InquiryService {
     return { id: saved.id, createdAt: saved.createdAt };
   }
 
-  async list(status?: InquiryStatus): Promise<InquiryAdminRow[]> {
-    const rows = await this.inquiryRepo.find({
-      where: status ? { status } : {},
+  // 전체를 한 번에 내려주면 본문(최대 2000자)까지 통째로 실려 나간다.
+  // total을 함께 주어 프론트가 더 불러올 게 남았는지 판단할 수 있게 한다.
+  async list(
+    params: { status?: InquiryStatus; page?: number; limit?: number } = {},
+  ): Promise<InquiryListPage> {
+    const page = params.page ?? 1;
+    const limit = params.limit ?? INQUIRY_PAGE_SIZE_DEFAULT;
+
+    const [rows, total] = await this.inquiryRepo.findAndCount({
+      where: params.status ? { status: params.status } : {},
       order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
     });
-    return rows.map((row) => ({
-      id: row.id,
-      type: row.type,
-      content: row.content,
-      authorEmail: row.authorEmail,
-      status: row.status,
-      answer: row.answer,
-      answeredAt: row.answeredAt,
-      createdAt: row.createdAt,
-    }));
+
+    return {
+      rows: rows.map((row) => ({
+        id: row.id,
+        type: row.type,
+        content: row.content,
+        authorEmail: row.authorEmail,
+        status: row.status,
+        answer: row.answer,
+        answeredAt: row.answeredAt,
+        createdAt: row.createdAt,
+      })),
+      total,
+      page,
+      limit,
+    };
   }
 
   // 답변 저장과 회신 메일 발송을 한 트랜잭션에 묶는다.

@@ -2,7 +2,12 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { api } from "@/lib/axios";
 import { useAuthStore } from "@/app/stores/useAuthStore";
 import { useGroupStore } from "@/app/stores/groupStore";
@@ -47,6 +52,15 @@ interface InquiryRow {
   createdAt: string;
 }
 
+interface InquiryPage {
+  rows: InquiryRow[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+const INQUIRY_PAGE_SIZE = 20;
+
 const INQUIRY_TYPE_LABELS: Record<string, string> = {
   bug: "버그",
   feature: "기능 제안",
@@ -88,11 +102,44 @@ const AdminPage = () => {
     enabled: mounted && isAdmin,
   });
 
-  const { data: inquiries } = useQuery<InquiryRow[]>({
-    queryKey: ["admin", "inquiries"],
-    queryFn: async () => (await api.get("/admin/inquiries")).data,
+  const {
+    data: inquiryPages,
+    fetchNextPage: fetchMoreInquiries,
+    hasNextPage: hasMoreInquiries,
+    isFetchingNextPage: isFetchingMoreInquiries,
+  } = useInfiniteQuery<InquiryPage>({
+    queryKey: ["admin", "inquiries", "list"],
+    queryFn: async ({ pageParam }) =>
+      (
+        await api.get("/admin/inquiries", {
+          params: { page: pageParam, limit: INQUIRY_PAGE_SIZE },
+        })
+      ).data,
+    initialPageParam: 1,
+    // 지금까지 불러온 행 수가 전체보다 적을 때만 다음 페이지가 있다.
+    getNextPageParam: (lastPage, allPages) => {
+      const loaded = allPages.reduce((sum, page) => sum + page.rows.length, 0);
+      return loaded < lastPage.total ? allPages.length + 1 : undefined;
+    },
     enabled: mounted && isAdmin,
   });
+
+  const inquiries = inquiryPages?.pages.flatMap((page) => page.rows) ?? [];
+  const inquiryTotal = inquiryPages?.pages[0]?.total ?? 0;
+
+  // 미답변 건수는 불러온 페이지가 아니라 전체 기준이어야 한다.
+  // status 필터에 total이 실려 오므로 1건만 요청해 total만 읽는다.
+  const { data: pendingInquiryPage } = useQuery<InquiryPage>({
+    queryKey: ["admin", "inquiries", "pending-count"],
+    queryFn: async () =>
+      (
+        await api.get("/admin/inquiries", {
+          params: { status: "pending", limit: 1 },
+        })
+      ).data,
+    enabled: mounted && isAdmin,
+  });
+  const pendingInquiryTotal = pendingInquiryPage?.total ?? 0;
 
   // 어느 행이 펼쳐져 있는지 + 행별 답변 초안(행마다 독립적으로 유지)
   const [openInquiryId, setOpenInquiryId] = useState<number | null>(null);
@@ -330,13 +377,12 @@ const AdminPage = () => {
       <S.Card>
         <S.CardTitle>문의·피드백</S.CardTitle>
         <S.StatusLine>
-          {(() => {
-            const rows = inquiries ?? [];
-            const pending = rows.filter((row) => row.status === "pending");
-            return rows.length === 0
-              ? "접수된 문의 없음"
-              : `전체 ${rows.length}건 · 미답변 ${pending.length}건`;
-          })()}
+          {inquiryTotal === 0
+            ? "접수된 문의 없음"
+            : `전체 ${inquiryTotal}건 · 미답변 ${pendingInquiryTotal}건` +
+              (inquiries.length < inquiryTotal
+                ? ` · ${inquiries.length}건 표시 중`
+                : "")}
         </S.StatusLine>
         <S.TableWrap>
           <S.Table>
@@ -351,7 +397,7 @@ const AdminPage = () => {
               </tr>
             </thead>
             <tbody>
-              {(inquiries ?? []).map((inquiry) => (
+              {inquiries.map((inquiry) => (
                 <React.Fragment key={inquiry.id}>
                   <tr>
                     <td>
@@ -430,6 +476,14 @@ const AdminPage = () => {
             </tbody>
           </S.Table>
         </S.TableWrap>
+        {hasMoreInquiries && (
+          <S.MoreButton
+            disabled={isFetchingMoreInquiries}
+            onClick={() => void fetchMoreInquiries()}
+          >
+            {isFetchingMoreInquiries ? "불러오는 중..." : "더 보기"}
+          </S.MoreButton>
+        )}
       </S.Card>
     </S.Container>
   );

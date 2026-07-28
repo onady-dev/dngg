@@ -2,6 +2,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
@@ -13,6 +14,11 @@ import {
   InquiryType,
 } from '../modules/inquiry/inquiry.constants';
 
+// 관리자 목록의 두 질의를 그대로 덮는다: 전체 최신순(createdAt), status 필터 + 최신순.
+// 복합 인덱스의 선두가 status라 status 단독 조회도 이 인덱스를 탄다.
+// synchronize: true라 백엔드 재시작 시 실제 DB에 자동 생성된다.
+@Index(['status', 'createdAt'])
+@Index(['createdAt'])
 @Entity()
 export class Inquiry {
   @PrimaryGeneratedColumn()

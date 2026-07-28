@@ -26,7 +26,7 @@ export class InquiryAdminController {
 
   @Get()
   list(@Query() query: ListInquiryQueryDto) {
-    return this.inquiryService.list(query.status);
+    return this.inquiryService.list(query);
   }
 
   @Post(':id/answer')
