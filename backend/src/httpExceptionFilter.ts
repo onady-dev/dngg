@@ -22,7 +22,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
-    const { method, originalUrl, body, headers } = request;
+    const { method, originalUrl } = request;
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let responseBody: any = { message: 'Internal server error' };
@@ -48,30 +48,20 @@ export class HttpExceptionFilter implements ExceptionFilter {
         ? responseBody['message']
         : responseBody;
 
-    const errorLog = {
-      method,
-      url: originalUrl,
-      status,
-      message,
-      body,
-      headers: {
-        'user-agent': headers['user-agent'],
-        'x-forwarded-for': headers['x-forwarded-for'],
-      },
-      stack: exception instanceof Error ? exception.stack : undefined,
-    };
+    // Nest LoggerService의 위치 인자는 error(message, stack, context) / warn(message, context)다.
+    // 여기에 구조화 메타 객체를 넘기면 스택이 유실될 뿐 아니라, 요청 body(가입·로그인 평문
+    // 비밀번호)가 로그 파이프라인으로 새어 들어간다. 문자열만 넘긴다.
+    const where = `${method} ${originalUrl} ${status} ${message}`;
 
     if (status >= 500) {
       this.logger.error(
-        `[Server Error] ${method} ${originalUrl} ${status} ${message}\n${exception instanceof Error ? exception.stack : ''}`,
-        errorLog,
+        `[Server Error] ${where}`,
+        exception instanceof Error ? exception.stack : undefined,
+        HttpExceptionFilter.name,
       );
     } else if (status >= 400) {
       if (originalUrl !== '/') {
-        this.logger.warn(
-          `[Client Error] ${method} ${originalUrl} ${status} ${message}`,
-          errorLog,
-        );
+        this.logger.warn(`[Client Error] ${where}`, HttpExceptionFilter.name);
       }
     }
 

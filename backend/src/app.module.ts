@@ -16,6 +16,7 @@ import { TeamModule } from './modules/team/team.module';
 import { SubscriptionModule } from './modules/subscription/subscription.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { InquiryModule } from './modules/inquiry/inquiry.module';
+import { formatLogLine } from './common/log-format';
 import * as winston from 'winston';
 
 const { combine, timestamp, printf, colorize } = winston.format;
@@ -46,15 +47,7 @@ const { combine, timestamp, printf, colorize } = winston.format;
               format: 'YYYY-MM-DD HH:mm:ss.SSS',
             }),
             colorize(),
-            printf(({ timestamp, level, message, context, trace }) => {
-              const messageStr =
-                typeof message === 'object'
-                  ? JSON.stringify(message, null, 2)
-                  : message;
-              const contextStr = context ? `[${context}] ` : '';
-              const traceStr = trace ? `\n${trace}` : '';
-              return `${timestamp} [${level}] ${contextStr}${messageStr}${traceStr}`;
-            }),
+            printf(formatLogLine),
           ),
         }),
       ],
