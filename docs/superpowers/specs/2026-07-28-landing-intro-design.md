@@ -1,0 +1,165 @@
+# 소개(랜딩) 화면 — 설계
+
+- 작성일: 2026-07-28
+- 대상: `frontend/` (Next.js 14 App Router)
+- 상태: 설계 승인됨
+- 배경: `docs/featurelist.md`의 "메뉴얼 페이지를 소개 페이지로 변경",
+  `docs/superpowers/plans/2026-07-19-marketing-phase0.md` D절(랜딩페이지)
+- 브랜치: `feature/landing-intro` (base: `main` 7f0c636)
+
+## 0. 왜 지금인가
+
+마케팅 Phase 0의 완료 기준에 랜딩페이지가 있고, Phase 1(총무 1:1 부트스트랩)에서 총무에게
+보낼 링크가 필요하다. 지금은 보낼 만한 URL이 없다.
+
+**현재 로그아웃 상태로 `dngg.one`에 처음 들어오면 "그룹을 선택해주세요"가 뜬다**
+(`frontend/src/app/page.tsx:387`). 가진 적도 없는 그룹을 고르라는 화면이 사실상의 랜딩이다.
+마케팅 링크를 타고 온 사람이 보는 첫 화면이 이것이다.
+
+## 1. 현재 상태 (조사 결과)
+
+- 메뉴얼은 `frontend/public/manual/index.html` — 33KB 정적 HTML + 스크린샷 39장
+  (데스크톱·모바일 주석본). `Header.tsx:115`의 nav 아이콘과 홈의
+  "📖 처음이신가요? 사용 가이드 보기" 버튼(`page.tsx:397`)에서 연결된다.
+- `page.tsx`는 `"use client"`이고 470줄이다. `page.tsx:383`에 `if (!mounted) return null;`이
+  있어 — auth가 localStorage 기반이라 hydration 안전을 위해 — **`/`의 정적 HTML은 비어 있다.**
+- **비로그인 사용자도 헤더에서 그룹을 골라 기록을 볼 수 있다.** `/group/all`이 공개 API고
+  `canManage`(`page.tsx:102`)가 쓰기 기능만 막는다.
+- `next/image`는 이 프로젝트에서 한 번도 쓰이지 않았고 `sharp`가 의존성에도 `node_modules`
+  에도 없다. Next 14는 `next start`의 이미지 최적화에 `sharp`를 요구한다.
+- 루트 `layout.tsx`의 metadata에 `openGraph` 블록이 없다 — `dngg.one`을 카톡·밴드에
+  붙여넣으면 미리보기 카드가 비어 있다. (`/player/[id]`는 `opengraph-image.tsx`가 있어 정상)
+- 프론트엔드에 테스트 러너가 없다(`package.json` scripts: `dev`/`build`/`start`/`lint`).
+
+## 2. 결정 사항
+
+| 항목 | 결정 | 근거 |
+|---|---|---|
+| 대상 화면 | 로그아웃 홈(`/`) | 마케팅 링크가 실제로 당도하는 URL. 메뉴얼 URL은 앱 안에서만 도달한다 |
+| 메뉴얼 | 그대로 둔다 | 이미 쓰는 사람을 위한 문서. 랜딩과 목적이 다르다 |
+| 렌더 방식 | 클라이언트 분기 (`!mounted` 게이트 유지) | 로그인 사용자 경험 무변경. 랜딩을 정적 HTML에 넣으면 홈 방문마다 한 프레임 번쩍인다 |
+| CTA | 가입 단일 (`/settings`) | `/settings`가 로그인·가입 겸용이라 기존 사용자까지 자연히 커버 |
+| 이미지 | 미리 리사이즈한 정적 PNG + 평범한 `<img>` | `next/image`는 `sharp` 부재로 운영에서 깨질 위험 |
+| OG 카드 | 이번 범위 밖 (후속 TODO) | 디자인 판단이 들어가는 별개 작업. 빼면 `layout.tsx`를 안 건드려 GA 브랜치와 병렬 가능 |
+| 사용 가이드 링크 | 랜딩에 넣지 않음 | 단일 CTA 결정과 배치된다. 헤더 nav의 `manual` 아이콘으로 경로는 남는다 |
+
+## 3. 아키텍처
+
+### 3.1 상태 분기
+
+`page.tsx`의 기존 `if (!selectedGroup)` 블록 안에서 갈라진다. 그 앞뒤는 건드리지 않는다.
+
+```
+if (!mounted) return null;              // 변경 없음
+if (!selectedGroup) {
+  return user
+    ? <기존 "그룹을 선택해주세요" 화면>   // 변경 없음
+    : <LandingHero />;                  // 신규
+}
+```
+
+**`!user`를 바깥에서 먼저 검사하면 안 된다.** 비로그인 사용자가 그룹을 골라 기록을
+둘러보는 경로(1절)가 막힌다. 계정이 없고 그룹도 안 고른 사람에게만 랜딩을 보여준다.
+
+네 상태의 결과:
+
+| 상태 | 화면 |
+|---|---|
+| 비로그인 + 그룹 미선택 | **랜딩 (신규)** |
+| 비로그인 + 그룹 선택 | 기존 기록 화면 (변경 없음) |
+| 로그인 + 그룹 미선택 | 기존 "그룹을 선택해주세요" (변경 없음) |
+| 로그인 + 그룹 선택 | 기존 홈 (변경 없음) |
+
+### 3.2 파일
+
+| 파일 | 상태 | 책임 |
+|---|---|---|
+| `frontend/src/app/components/LandingHero.tsx` | 신규 (~90줄) | 랜딩 본문 — 히어로·스크린샷 3단·CTA |
+| `frontend/src/app/styles/LandingStyles.ts` | 신규 | 스타일. 프로젝트 관행대로 `styles/*.ts`로 분리 |
+| `frontend/src/app/page.tsx` | 수정 (3줄) | 위 분기 + import |
+| `frontend/public/landing/*.png` | 신규 에셋 | 리사이즈한 제품 스크린샷 3장 |
+
+`page.tsx`가 이미 470줄이라 랜딩을 인라인하지 않는다. `page.tsx` 안의 `GuideButton`
+styled 정의는 로그인 사용자 화면에서 계속 쓰이므로 건드리지 않는다.
+
+### 3.3 이미지
+
+`public/manual/screenshots/`의 **주석 없는** 실제 제품 샷을 재활용한다. `sips`로 폭 800px로
+줄여 `public/landing/`에 커밋하고, `<img>`에 `width`/`height`/`loading="lazy"`를 명시한다
+(레이아웃 시프트 방지 + 첫 화면 밖 이미지 지연 로드).
+
+`01-home-with-group.png`는 **2.3MB**라 쓰지 않는다.
+
+## 4. 콘텐츠
+
+문구는 승인된 `docs/superpowers/specs/2026-07-19-marketing-gtm-design.md` 1절의 메시지를
+화면 카피로 옮긴 것이다.
+
+### 히어로
+
+- **H1**: 동호회 농구, 기억이 아니라 기록으로
+- **부제**: 경기 끝나고 스탯 정리하느라 남지 마세요. 터치 몇 번이면 랭킹과 6각 능력치가
+  자동으로 만들어집니다.
+- **CTA**: 무료로 시작하기 → `/settings`
+
+### 스크린샷 3단
+
+모바일 우선 — 세로 1열, 데스크톱에서만 넓어진다. Phase 0 D절이 지정한 세 가지
+(실시간 기록·랭킹·능력치 레이더)와 일치한다.
+
+| 순서 | 문구 | 원본 에셋 (크기) |
+|---|---|---|
+| 1 | 실시간 터치 기록 — 경기 중에 득점·리바운드·어시스트를 터치로 남깁니다 | `07-record-loaded.png` (54KB) |
+| 2 | 자동 랭킹 — 기록이 쌓이면 팀 랭킹이 저절로 정리됩니다 | `05-rankings-loaded.png` (103KB) |
+| 3 | 6각 능력치 — 선수마다 능력치 카드가 만들어지고 링크 하나로 공유됩니다 | `08-player-detail.png` (108KB) |
+
+## 5. 계측
+
+**`landing_cta_click`** (파라미터 없음) — CTA 클릭 시 `track()` 호출.
+
+랜딩 노출 → CTA 클릭 → `sign_up`이 이 작업의 성패를 재는 깔때기다. 중간 단계가 없으면
+"랜딩이 안 먹혔는지, 가입 폼에서 이탈했는지"를 구분할 수 없다.
+
+이것은 `docs/superpowers/specs/2026-07-28-ga-analytics-design.md` 4절이 정한 이벤트 3개의
+확장이다. **두 브랜치의 머지 순서와 무관하게 동작한다** — `track()`은 GA 작업 이전부터
+같은 시그니처로 `frontend/src/lib/analytics.ts`에 존재했고, GA 작업은 내부 전송만 바꿨다.
+
+두 브랜치가 모두 `main`에 올라간 뒤 GA 설계 문서의 이벤트 표에 이 항목을 추가한다.
+
+## 6. 브랜치 순서
+
+`feature/ga-analytics`가 `layout.tsx`·`analytics.ts`·`Signup.tsx`·`ShareButton.tsx`·
+`Dockerfile`·`deploy.yml`을 수정한 채 GA4 콘솔 작업을 기다리고 있다.
+
+이 작업은 **그중 어느 파일도 건드리지 않는다** (OG 카드를 범위에서 뺀 이유가 이것이다).
+`page.tsx`는 GA 브랜치가 손대지 않으므로 충돌 지점이 없다. 두 브랜치는 병렬로 진행하고
+머지 순서는 자유다.
+
+## 7. 에러 처리
+
+랜딩은 데이터를 가져오지 않는다 — 정적 텍스트와 이미지뿐이라 로딩·에러 상태가 없다.
+
+- 이미지 로드 실패 시 `alt` 텍스트가 남는다. 별도 폴백을 두지 않는다.
+- `track("landing_cta_click")`은 `void`이고 throw하지 않으므로 CTA 이동을 막을 수 없다.
+  CTA는 `next/link`의 선언적 이동이라 계측 결과와 무관하게 동작한다.
+
+## 8. 검증
+
+프론트엔드에 테스트 러너가 없다(1절). GA 작업과 같은 이유로 이번에도 러너를 들이지 않는다
+— 검증 게이트는 `pnpm build`와 수동 브라우저 스모크다.
+
+1. **정적 렌더 유지** — `npx next build`의 라우트 표에서 `/`가 `○ (Static)`으로 남아야 한다.
+   랜딩은 새 훅을 쓰지 않으므로 유지돼야 한다.
+2. **네 상태 스모크** (3.1의 표) — 특히 **비로그인 + 그룹 선택 시 기존 기록 화면이
+   그대로 나오는지**가 회귀 확인 지점이다.
+3. **모바일 폭 375px** — 스크린샷이 가로로 넘치지 않고 CTA가 화면 안에 들어오는지.
+4. **이미지 용량** — `public/landing/` 합계가 300KB를 넘지 않는지.
+
+## 9. 이 작업이 만드는 후속 TODO
+
+- **루트 도메인 OG 카드** — 루트 `layout.tsx`에 `openGraph`가 없어 `dngg.one`을 카톡·밴드에
+  붙여넣으면 미리보기가 비어 있다. 공유 루프의 진입 링크가 맨 도메인인데 카드가 없다.
+  `src/app/opengraph-image.tsx`를 `player/[id]`와 같은 `next/og` 패턴으로 추가하면 된다.
+- **GA 설계 문서에 `landing_cta_click` 반영** — 두 브랜치가 모두 `main`에 올라간 뒤.
+- **네이버 SEO가 우선순위가 되면** — 랜딩을 `!mounted` 게이트 앞에서 정적으로 렌더하는
+  방식으로 올릴 수 있다. 대가는 로그인 사용자가 홈 방문마다 랜딩을 한 프레임 보는 것이다.
