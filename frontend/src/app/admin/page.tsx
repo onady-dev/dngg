@@ -94,9 +94,11 @@ const AdminPage = () => {
     enabled: mounted && isAdmin,
   });
 
-  // 어느 행이 펼쳐져 있는지 + 그 행의 답변 초안
+  // 어느 행이 펼쳐져 있는지 + 행별 답변 초안(행마다 독립적으로 유지)
   const [openInquiryId, setOpenInquiryId] = useState<number | null>(null);
-  const [answerDraft, setAnswerDraft] = useState("");
+  const [answerDrafts, setAnswerDrafts] = useState<Record<number, string>>(
+    {},
+  );
 
   const answerMutation = useMutation({
     mutationFn: async (payload: { id: number; answer: string }) =>
@@ -105,10 +107,17 @@ const AdminPage = () => {
           answer: payload.answer,
         })
       ).data,
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       showToast("답변을 보냈습니다.", "success");
-      setOpenInquiryId(null);
-      setAnswerDraft("");
+      // 그 사이 다른 행을 열었을 수 있으니, 방금 보낸 행이 여전히 열려있을 때만 닫는다.
+      setOpenInquiryId((current) =>
+        current === variables.id ? null : current,
+      );
+      setAnswerDrafts((prev) => {
+        const next = { ...prev };
+        delete next[variables.id];
+        return next;
+      });
       queryClient.invalidateQueries({ queryKey: ["admin", "inquiries"] });
     },
     onError: () => {
@@ -121,11 +130,19 @@ const AdminPage = () => {
   const handleToggleAnswer = (inquiry: InquiryRow) => {
     if (openInquiryId === inquiry.id) {
       setOpenInquiryId(null);
-      setAnswerDraft("");
+      setAnswerDrafts((prev) => {
+        const next = { ...prev };
+        delete next[inquiry.id];
+        return next;
+      });
       return;
     }
     setOpenInquiryId(inquiry.id);
-    setAnswerDraft(inquiry.answer ?? "");
+    setAnswerDrafts((prev) =>
+      inquiry.id in prev
+        ? prev
+        : { ...prev, [inquiry.id]: inquiry.answer ?? "" },
+    );
   };
 
   const startMutation = useMutation({
@@ -351,36 +368,46 @@ const AdminPage = () => {
                       </S.SmallButton>
                     </td>
                   </tr>
-                  {openInquiryId === inquiry.id && (
-                    <tr>
-                      <S.WrapCell colSpan={6}>
-                        <S.AnswerBox>
-                          <div>{inquiry.content}</div>
-                          <S.AnswerArea
-                            value={answerDraft}
-                            maxLength={5000}
-                            placeholder="작성자에게 보낼 답변을 입력하세요. 전송하면 메일로 발송됩니다."
-                            onChange={(e) => setAnswerDraft(e.target.value)}
-                          />
-                          <S.PrimaryButton
-                            disabled={
-                              answerMutation.isPending || !answerDraft.trim()
-                            }
-                            onClick={() =>
-                              answerMutation.mutate({
-                                id: inquiry.id,
-                                answer: answerDraft.trim(),
-                              })
-                            }
-                          >
-                            {answerMutation.isPending
-                              ? "발송 중..."
-                              : "답변 메일 보내기"}
-                          </S.PrimaryButton>
-                        </S.AnswerBox>
-                      </S.WrapCell>
-                    </tr>
-                  )}
+                  {openInquiryId === inquiry.id &&
+                    (() => {
+                      const draft = answerDrafts[inquiry.id] ?? "";
+                      const isSendingThisRow =
+                        answerMutation.isPending &&
+                        answerMutation.variables?.id === inquiry.id;
+                      return (
+                        <tr>
+                          <S.WrapCell colSpan={6}>
+                            <S.AnswerBox>
+                              <div>{inquiry.content}</div>
+                              <S.AnswerArea
+                                value={draft}
+                                maxLength={5000}
+                                placeholder="작성자에게 보낼 답변을 입력하세요. 전송하면 메일로 발송됩니다."
+                                onChange={(e) =>
+                                  setAnswerDrafts((prev) => ({
+                                    ...prev,
+                                    [inquiry.id]: e.target.value,
+                                  }))
+                                }
+                              />
+                              <S.PrimaryButton
+                                disabled={isSendingThisRow || !draft.trim()}
+                                onClick={() =>
+                                  answerMutation.mutate({
+                                    id: inquiry.id,
+                                    answer: draft.trim(),
+                                  })
+                                }
+                              >
+                                {isSendingThisRow
+                                  ? "발송 중..."
+                                  : "답변 메일 보내기"}
+                              </S.PrimaryButton>
+                            </S.AnswerBox>
+                          </S.WrapCell>
+                        </tr>
+                      );
+                    })()}
                 </React.Fragment>
               ))}
             </tbody>

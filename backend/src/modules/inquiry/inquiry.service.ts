@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { Inquiry } from 'src/entities/Inquiry.entity';
@@ -20,6 +25,8 @@ export interface InquiryAdminRow {
 
 @Injectable()
 export class InquiryService {
+  private readonly logger = new Logger(InquiryService.name);
+
   constructor(
     @InjectRepository(Inquiry)
     private readonly inquiryRepo: Repository<Inquiry>,
@@ -83,12 +90,24 @@ export class InquiryService {
       });
 
       // user relation이 아니라 작성 시점 스냅샷으로 보낸다 (탈퇴 사용자 대응).
-      await this.mailService.sendInquiryAnswer(
-        inquiry.authorEmail,
-        inquiry.type,
-        inquiry.content,
-        dto.answer,
-      );
+      try {
+        await this.mailService.sendInquiryAnswer(
+          inquiry.authorEmail,
+          inquiry.type,
+          inquiry.content,
+          dto.answer,
+        );
+      } catch (error) {
+        // SES 원본 에러(수신 미검증 주소 등 인프라 정보 포함)는 응답에 싣지 않는다.
+        // 서버 로그에는 원본을 남겨 운영자가 진단할 수 있게 한다.
+        this.logger.error(
+          `문의 ${id} 답변 메일 발송 실패`,
+          error instanceof Error ? error.stack : String(error),
+        );
+        throw new InternalServerErrorException(
+          '회신 메일 발송에 실패했습니다.',
+        );
+      }
 
       return { id, status: 'answered' as InquiryStatus, answeredAt: now };
     });

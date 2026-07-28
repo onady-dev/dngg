@@ -1,4 +1,7 @@
-import { NotFoundException } from '@nestjs/common';
+import {
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Inquiry } from 'src/entities/Inquiry.entity';
 import { InquiryService } from './inquiry.service';
 
@@ -174,9 +177,16 @@ describe('InquiryService.answer', () => {
       mailError: new Error('SES down'),
     });
 
-    await expect(
-      service.answer(5, { answer: '수정하겠습니다' }, NOW),
-    ).rejects.toThrow('SES down');
+    let caught: unknown;
+    try {
+      await service.answer(5, { answer: '수정하겠습니다' }, NOW);
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(InternalServerErrorException);
+    // SES 원본 에러 메시지(수신 미검증 주소 등 인프라 정보)는 응답에 실리지 않는다.
+    expect((caught as Error).message).not.toContain('SES down');
 
     // UPDATE는 호출됐지만 커밋되지 않았다 = 롤백되어 status는 pending
     expect(manager.update).toHaveBeenCalled();
