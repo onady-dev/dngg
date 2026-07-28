@@ -153,6 +153,9 @@ export const Feature = styled.figure`
 export const Shot = styled.img`
   display: block;
   width: 100%;
+  /* height 속성(500)이 CSS height로 잡히면 aspect-ratio가 무시되고 세로로 긴 박스가
+     된다 — 그러면 cover가 가로를 잘라 화면 절반이 날아간다. auto로 풀어줘야 한다. */
+  height: auto;
   /* 스크린샷 둘(비율 1.49)을 같은 박스에 맞춘다 — 아래가 잘리고 위쪽이 남는다 */
   aspect-ratio: 8 / 5;
   object-fit: cover;
