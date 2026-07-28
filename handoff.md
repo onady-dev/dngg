@@ -64,7 +64,7 @@ DTO 필수화)와 프론트(`EmailCodeVerification` 게이트)를 한 커밋에 
 - 설계: `docs/superpowers/specs/2026-07-28-landing-intro-design.md`
 - 계획: `docs/superpowers/plans/2026-07-28-landing-intro.md`
 
-알아야 할 것 세 가지:
+알아야 할 것 네 가지:
 
 1. **분기는 `page.tsx`의 `if (!selectedGroup)` 블록 *안에서* 갈라진다.** `!user`를 바깥에서
    먼저 검사하면 안 된다 — `/group/all`이 공개 API라 비로그인 사용자도 헤더에서 그룹을 골라
@@ -75,7 +75,15 @@ DTO 필수화)와 프론트(`EmailCodeVerification` 게이트)를 한 커밋에 
 3. **이미지는 `next/image`를 쓰지 않는다.** 이 프로젝트에 `sharp`가 없어 운영 `next start`의
    이미지 최적화가 깨진다. `public/landing/`의 미리 리사이즈한 PNG를 평범한 `<img>`로 쓴다.
    스크린샷을 갈아끼울 때 `sips --resampleWidth 800`으로 폭을 맞출 것(`-Z`는 긴 변을 맞춰서
-   세로로 긴 이미지의 폭이 어긋난다).
+   세로로 긴 이미지의 폭이 어긋난다). 그리고 `<img>`에 `width`/`height` 속성을 주면서
+   CSS `aspect-ratio`로 박스를 잡을 때는 **CSS에 `height: auto`를 반드시 넣어야 한다** —
+   안 넣으면 height 속성이 CSS height로 잡혀 aspect-ratio가 무시되고 `object-fit: cover`가
+   가로를 잘라낸다(실제로 겪었다).
+4. **`landing_cta_click`은 GA가 배포되기 전까지 아무것도 수집하지 않는다.** 현재
+   `analytics.ts`의 `track()`은 `NEXT_PUBLIC_ANALYTICS_URL`이 있을 때만 전송하는데 그 값은
+   어디에도 주입되지 않고, 콘솔 폴백은 `NODE_ENV !== "production"` 조건이라 운영 번들에서는
+   완전한 no-op이다. `feature/ga-analytics`가 머지되고 `NEXT_PUBLIC_GA_ID`가 repo variable로
+   설정된 뒤에야 실제로 쌓인다. 랜딩 전환율을 물어보기 전에 이걸 먼저 확인할 것.
 
 ## 남은 TODO (`docs/featurelist.md`)
 
