@@ -512,7 +512,9 @@ cd /Users/onady/project/dngg/frontend && pnpm dev
 
 브라우저에서 `http://localhost:3011` 접속 후 GA4 콘솔 → 관리 → **DebugView**에서 확인:
 
-1. `page_view`가 `page_path`와 함께 들어온다. 다른 메뉴로 이동하면 **또 한 번** 들어온다(라우트 변경 추적 확인). 한 번의 이동에 두 개가 찍히면 중복이다 — 보고할 것.
+1. `page_view`가 `page_path`와 함께 들어온다. 다른 메뉴로 이동하면 **또 한 번** 들어온다(라우트 변경 추적 확인).
+
+   ⚠️ **dev에서는 이벤트가 두 번씩 찍히는 게 정상이다.** `next.config.mjs`에 `reactStrictMode: true`가 켜져 있어 React 18이 effect를 마운트→언마운트→재마운트한다. **개발 모드 전용 현상이고 운영 빌드에는 없다** — 중복으로 오판하지 말 것. 진짜 중복 여부는 Step 10의 운영 스모크에서 판단한다.
 2. 로그인하면 이후 이벤트에 `user_id`가 붙는다. 로그아웃하면 떨어진다.
 3. 선수 상세에서 공유 버튼 → `share_click`이 `player_id`·`method`와 함께 들어온다.
 4. (선택) 새 계정으로 가입 → `sign_up`. 실제 인증 메일이 나가므로 부담되면 운영 스모크로 미룬다.
