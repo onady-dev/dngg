@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/axios";
@@ -36,6 +36,24 @@ interface SubscriptionOverview {
   }[];
 }
 
+interface InquiryRow {
+  id: number;
+  type: string;
+  content: string;
+  authorEmail: string;
+  status: "pending" | "answered";
+  answer: string | null;
+  answeredAt: string | null;
+  createdAt: string;
+}
+
+const INQUIRY_TYPE_LABELS: Record<string, string> = {
+  bug: "버그",
+  feature: "기능 제안",
+  billing: "결제·구독",
+  etc: "기타",
+};
+
 const AdminPage = () => {
   const mounted = useMounted();
   const router = useRouter();
@@ -69,6 +87,80 @@ const AdminPage = () => {
     queryFn: async () => (await api.get("/admin/subscriptions")).data,
     enabled: mounted && isAdmin,
   });
+
+  const { data: inquiries } = useQuery<InquiryRow[]>({
+    queryKey: ["admin", "inquiries"],
+    queryFn: async () => (await api.get("/admin/inquiries")).data,
+    enabled: mounted && isAdmin,
+  });
+
+  // 어느 행이 펼쳐져 있는지 + 행별 답변 초안(행마다 독립적으로 유지)
+  const [openInquiryId, setOpenInquiryId] = useState<number | null>(null);
+  const [answerDrafts, setAnswerDrafts] = useState<Record<number, string>>(
+    {},
+  );
+  // 공유 useMutation 하나로 여러 행을 동시에 보낼 수 있어 mutation.variables는
+  // "가장 최근에 발사된 요청"만 가리킨다 — 행별 in-flight 여부는 별도로 추적한다.
+  const [inFlightInquiryIds, setInFlightInquiryIds] = useState<Set<number>>(
+    new Set(),
+  );
+
+  const answerMutation = useMutation({
+    mutationFn: async (payload: { id: number; answer: string }) =>
+      (
+        await api.post(`/admin/inquiries/${payload.id}/answer`, {
+          answer: payload.answer,
+        })
+      ).data,
+    onMutate: (variables) => {
+      setInFlightInquiryIds((prev) => new Set(prev).add(variables.id));
+    },
+    onSuccess: (_data, variables) => {
+      showToast("답변을 보냈습니다.", "success");
+      // 그 사이 다른 행을 열었을 수 있으니, 방금 보낸 행이 여전히 열려있을 때만 닫는다.
+      setOpenInquiryId((current) =>
+        current === variables.id ? null : current,
+      );
+      setAnswerDrafts((prev) => {
+        const next = { ...prev };
+        delete next[variables.id];
+        return next;
+      });
+      queryClient.invalidateQueries({ queryKey: ["admin", "inquiries"] });
+    },
+    onError: () => {
+      // 백엔드가 롤백했으므로 이 문의는 여전히 pending이다. 성공한 척하지 않는다.
+      showToast("답변 메일 발송에 실패했습니다. 다시 시도해주세요.", "error");
+      queryClient.invalidateQueries({ queryKey: ["admin", "inquiries"] });
+    },
+    onSettled: (_data, _error, variables) => {
+      // 성공/실패 모두 해당 행의 in-flight 상태를 해제한다 — 다른 행의 동시
+      // 진행 상태를 덮어쓰지 않도록 함수형 업데이트로 처리.
+      setInFlightInquiryIds((prev) => {
+        const next = new Set(prev);
+        next.delete(variables.id);
+        return next;
+      });
+    },
+  });
+
+  const handleToggleAnswer = (inquiry: InquiryRow) => {
+    if (openInquiryId === inquiry.id) {
+      setOpenInquiryId(null);
+      setAnswerDrafts((prev) => {
+        const next = { ...prev };
+        delete next[inquiry.id];
+        return next;
+      });
+      return;
+    }
+    setOpenInquiryId(inquiry.id);
+    setAnswerDrafts((prev) =>
+      inquiry.id in prev
+        ? prev
+        : { ...prev, [inquiry.id]: inquiry.answer ?? "" },
+    );
+  };
 
   const startMutation = useMutation({
     mutationFn: async () => (await api.post("/admin/monetization/start")).data,
@@ -229,6 +321,111 @@ const AdminPage = () => {
                   </td>
                   <td>{payment.failReason ?? ""}</td>
                 </tr>
+              ))}
+            </tbody>
+          </S.Table>
+        </S.TableWrap>
+      </S.Card>
+
+      <S.Card>
+        <S.CardTitle>문의·피드백</S.CardTitle>
+        <S.StatusLine>
+          {(() => {
+            const rows = inquiries ?? [];
+            const pending = rows.filter((row) => row.status === "pending");
+            return rows.length === 0
+              ? "접수된 문의 없음"
+              : `전체 ${rows.length}건 · 미답변 ${pending.length}건`;
+          })()}
+        </S.StatusLine>
+        <S.TableWrap>
+          <S.Table>
+            <thead>
+              <tr>
+                <th>접수일</th>
+                <th>유형</th>
+                <th>작성자</th>
+                <th>내용</th>
+                <th>상태</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {(inquiries ?? []).map((inquiry) => (
+                <React.Fragment key={inquiry.id}>
+                  <tr>
+                    <td>
+                      {new Date(inquiry.createdAt).toLocaleDateString("ko-KR")}
+                    </td>
+                    <td>
+                      {INQUIRY_TYPE_LABELS[inquiry.type] ?? inquiry.type}
+                    </td>
+                    <td>{inquiry.authorEmail}</td>
+                    <td>
+                      <S.Ellipsis title={inquiry.content}>
+                        {inquiry.content}
+                      </S.Ellipsis>
+                    </td>
+                    <td>
+                      {inquiry.status === "answered" ? (
+                        <S.Badge $tone="ok">답변 완료</S.Badge>
+                      ) : (
+                        <S.Badge $tone="warn">미답변</S.Badge>
+                      )}
+                    </td>
+                    <td>
+                      <S.SmallButton
+                        onClick={() => handleToggleAnswer(inquiry)}
+                      >
+                        {openInquiryId === inquiry.id
+                          ? "닫기"
+                          : inquiry.status === "answered"
+                            ? "재답변"
+                            : "답변"}
+                      </S.SmallButton>
+                    </td>
+                  </tr>
+                  {openInquiryId === inquiry.id &&
+                    (() => {
+                      const draft = answerDrafts[inquiry.id] ?? "";
+                      const isSendingThisRow = inFlightInquiryIds.has(
+                        inquiry.id,
+                      );
+                      return (
+                        <tr>
+                          <S.WrapCell colSpan={6}>
+                            <S.AnswerBox>
+                              <div>{inquiry.content}</div>
+                              <S.AnswerArea
+                                value={draft}
+                                maxLength={5000}
+                                placeholder="작성자에게 보낼 답변을 입력하세요. 전송하면 메일로 발송됩니다."
+                                onChange={(e) =>
+                                  setAnswerDrafts((prev) => ({
+                                    ...prev,
+                                    [inquiry.id]: e.target.value,
+                                  }))
+                                }
+                              />
+                              <S.PrimaryButton
+                                disabled={isSendingThisRow || !draft.trim()}
+                                onClick={() =>
+                                  answerMutation.mutate({
+                                    id: inquiry.id,
+                                    answer: draft.trim(),
+                                  })
+                                }
+                              >
+                                {isSendingThisRow
+                                  ? "발송 중..."
+                                  : "답변 메일 보내기"}
+                              </S.PrimaryButton>
+                            </S.AnswerBox>
+                          </S.WrapCell>
+                        </tr>
+                      );
+                    })()}
+                </React.Fragment>
               ))}
             </tbody>
           </S.Table>

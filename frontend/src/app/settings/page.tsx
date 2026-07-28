@@ -258,6 +258,9 @@ const SettingsPage = () => {
         <SubscriptionButton onClick={() => router.push("/subscription")}>
           구독 관리
         </SubscriptionButton>
+        <SubscriptionButton onClick={() => router.push("/inquiry")}>
+          문의·피드백
+        </SubscriptionButton>
         {user?.role === "admin" && (
           <SubscriptionButton onClick={() => router.push("/admin")}>
             관리자 페이지

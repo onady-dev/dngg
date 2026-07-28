@@ -2,8 +2,11 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
+import { assertMailConfigured } from './modules/mail/mail.service';
 
 async function bootstrap() {
+  assertMailConfigured(process.env.NODE_ENV, process.env.MAIL_FROM);
+
   const app = await NestFactory.create(AppModule, {
     bufferLogs: true,
   });

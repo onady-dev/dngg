@@ -1,7 +1,7 @@
 # 작업 인수인계 (handoff)
 
 - 최종 갱신: 2026-07-28
-- 브랜치: `main`
+- 브랜치: `main` (문의·피드백은 feature/inquiry-feedback에서 작업 후 머지)
 - 다음 담당: 다른 기기에서 이어서 작업
 
 ## 지금 어디까지 왔나
@@ -17,47 +17,47 @@ DTO 필수화)와 프론트(`EmailCodeVerification` 게이트)를 한 커밋에 
 - CI Deploy 런 성공 (2026-07-27 08:44 UTC)
 - 상세는 `PROJECT_CONTEXT.md` 5.4 참고
 
-### 완료 — 문의·피드백 경로 설계 (구현 전)
+### 완료 — 문의·피드백 경로 (구현 완료)
 
-브레인스토밍을 마치고 설계 문서를 확정했다.
+로그인 사용자가 `/inquiry` 폼에서 문의를 남기면 `inquiry` 테이블에 저장되고,
+관리자가 `/admin`의 문의 카드에서 답변하면 SES로 작성자에게 회신 메일이 나간다.
 
-**→ `docs/superpowers/specs/2026-07-28-inquiry-feedback-design.md`**
-
-다음 기기에서는 **이 스펙 문서를 먼저 읽는 것으로 시작하면 된다.**
-
-확정된 결정 요약:
+- 설계: `docs/superpowers/specs/2026-07-28-inquiry-feedback-design.md`
+- 계획: `docs/superpowers/plans/2026-07-28-inquiry-feedback.md`
+- 작업 로그: `.superpowers/sdd/progress.md` — 태스크별 리뷰 결과·스모크 기록.
+  **git에 올라가지 않는 로컬 스크래치**이므로 다른 기기에는 없다. 이 문서가 요약본이다.
 
 | 항목 | 결정 |
 |---|---|
 | 수신 경로 | 앱 내 폼 → DB 저장 → `/admin`에서 조회 |
 | 접근 권한 | 로그인 사용자만 |
-| 폼 항목 | 유형(bug/feature/billing/etc) + 내용 |
-| 진입점 | `/settings` 계정 카드의 버튼 |
+| 폼 항목 | 유형(bug/feature/billing/etc) + 내용(2000자) |
+| 진입점 | `/settings` 계정 카드의 `문의·피드백` 버튼 |
 | 회신 | 관리자가 `/admin`에서 답변 입력 → SES 메일 발송 |
 | 데이터 모델 | 단일 `Inquiry` 엔티티 (답변 1회, 대화 스레드 없음) |
 
-설계의 핵심 두 가지:
+**엔드포인트**: `POST /inquiry` (jwt) / `GET /admin/inquiries` (jwt+admin) /
+`POST /admin/inquiries/:id/answer` (jwt+admin)
 
-1. **답변 저장과 메일 발송을 한 트랜잭션에 묶는다.** 발송 실패 시 롤백되어 `pending`으로
-   남으므로, "관리자는 답변했다고 생각하는데 사용자는 못 받은" 조용한 실패가 구조적으로 막힌다.
-2. **`Inquiry.user`에 FK를 걸지 않고 `authorEmail` 스냅샷을 따로 저장한다.**
+설계의 핵심 두 가지 — 여기를 건드릴 때 반드시 알아야 할 것:
+
+1. **답변 저장과 메일 발송이 한 트랜잭션이다.** 발송 실패 시 롤백되어 `pending`으로 남는다.
+   불변식: **`status === 'answered'`이면 회신 메일이 실제로 발송되었다.** 재답변(덮어쓰기 +
+   재발송)이 곧 재시도 경로다. 실제 SES로 발송 실패를 유도해 3회 모두 `pending` 유지를 확인했다.
+2. **`Inquiry.user`에 FK가 없고 `authorEmail` 스냅샷으로 회신한다.**
    `UserService.deleteUser`가 하드 삭제라 FK를 걸면 탈퇴가 실패한다.
-   `Log.player`·`InGamePlayer.player`와 같은 관행이다.
+   `Log.player`·`InGamePlayer.player`와 같은 관행. 탈퇴한 사용자의 문의에도 답장할 수 있다.
 
-## 다음에 할 일
+부수적으로 추가된 것:
 
-1. **스펙 리뷰** — `docs/superpowers/specs/2026-07-28-inquiry-feedback-design.md`를 읽고
-   바꾸고 싶은 부분이 있는지 확인한다.
-2. **구현 계획 작성** — `writing-plans` 스킬로 스펙을 실행 계획으로 옮긴다.
-   결과물은 `docs/superpowers/plans/2026-07-28-inquiry-feedback.md`가 된다.
-   (`docs/superpowers/plans/` 아래 기존 계획서들이 포맷 참고가 된다)
-3. **TDD로 구현** — 스펙의 "테스트 계획" 절에 케이스가 정리되어 있다.
-   특히 *메일 발송 실패 시 롤백되어 `pending`으로 남는다*가 핵심 케이스다.
-4. **배포** — 백엔드·프론트가 함께 가야 한다. CI에서 두 잡이 같은 sha로 배포되는지 확인할 것.
+- **`assertMailConfigured` 부팅 가드** (`mail.service.ts` → `main.ts`) — `NODE_ENV`가
+  `prod`/`production`인데 `MAIL_FROM`이 비어 있으면 부팅을 중단한다. 이게 없으면
+  `MailService.send`의 dev 폴백이 조용히 no-op 해서 위 불변식이 깨진다.
+  **서버 `.env`에 `MAIL_FROM`이 반드시 있어야 한다** (2026-07-28 확인: 설정됨).
+- `MailService`에 private `send(to, subject, body)` 추출 — 인증 메일과 회신 메일이 공유.
 
 ## 남은 TODO (`docs/featurelist.md`)
 
-- [ ] 문의, 피드백 받을 경로 추가 ← **지금 이 작업. 설계 완료, 구현 대기**
 - [ ] 메인 페이지가 스크롤 안되게(특히 기록화면) 그리고 기록화면 가려지는 버튼 없게
 - [ ] 공유 카드에 들어가는 워딩들 개선
 - [ ] 메뉴얼 페이지를 소개 페이지로 변경
@@ -73,6 +73,31 @@ DTO 필수화)와 프론트(`EmailCodeVerification` 게이트)를 한 커밋에 
   수신은 프로덕션 승인으로 제약이 없다. 이 주소를 발신에 쓸 계획이면 재검증이 필요하다.
 - **Dockerfile Node 버전 스큐** — 운영 컨테이너는 `node:20`, CI `setup-node`는 22다.
   (`PROJECT_CONTEXT.md` 3.3)
+
+## 문의·피드백 후속 과제 (머지 비차단 — 최종 리뷰에서 이월)
+
+우선순위 순. 전부 이번 배포를 막지 않는다고 판단된 것들이다.
+
+1. **`Logger.error`의 스택이 프로젝트 전체에서 유실된다** — `nest-winston`은 2번째 인자를
+   메타 `stack`으로 넘기는데(`winston.classes.js:52`) `app.module.ts:48`의 winston printf는
+   `trace`를 읽는다. `SubscriptionService`·`UserService.withTransaction` 등 모든 호출부가 영향.
+   한 줄 수정이지만 전역 로그 출력이 바뀌므로 **별도 커밋으로** 처리할 것.
+   (문의 기능은 원본 사유를 로그 본문에 넣어 이미 면역)
+2. **`bootstrap()`에 `.catch` 없음** (`main.ts`) — 부팅 가드 에러가 unhandled rejection
+   스택으로 뜬다. Node 20이 non-zero exit이라 동작은 맞지만 `docker logs`에서 한글 메시지가
+   묻힌다. `bootstrap().catch(e => { console.error(e.message); process.exit(1); })`
+3. **`main.ts`가 `assertMailConfigured`를 호출한다는 것 자체는 테스트가 없다** — 그 줄이
+   지워지면 가드가 조용히 무력화되는데 테스트는 초록이다.
+4. **`GET /admin/inquiries`에 페이지네이션·인덱스 없음** — 매 조회마다 전체 문의를
+   2000자 본문째로 가져온다. 초기 볼륨에선 무해. `status`/`createdAt` 인덱스도 없다.
+5. **관리자 답변 실패 토스트가 원인을 구분하지 않는다** — 404·400·네트워크 끊김도 전부
+   "답변 메일 발송에 실패했습니다."로 표시된다. `error.response?.status`로 분기 필요.
+6. **`answer()`가 `manager.update`의 `affected`를 무시**하고 `findOne`이 락을 걸지 않는다.
+   현재 문의 삭제 경로가 없어 도달 불가. 삭제 기능이 생기면 `pessimistic_write` 필요.
+7. **`data-source.ts`의 엔티티 목록에 `Inquiry`가 없다**(`Subscription`·`Team` 등도 마찬가지).
+   `synchronize: false`로 전환할 때 `migration:generate`가 `DROP TABLE inquiry`를 뱉는다.
+8. **admin 카드 4개가 조회 실패와 "데이터 없음"을 구분하지 않는다** — 기존 3개와 동일한
+   패턴이라 하나만 고치면 오히려 불일치. 네 개를 함께 고칠 것.
 
 ## 다른 기기에서 세팅하기
 
