@@ -11,6 +11,7 @@ import * as S from "./styles/HomeStyles";
 import { Player } from "@/types/player";
 import styled from "styled-components";
 import OnboardingChecklist from "./components/OnboardingChecklist";
+import LandingHero from "./components/LandingHero";
 
 const PAGE_SIZE = 5;
 
@@ -385,6 +386,12 @@ export default function Home() {
   }
 
   if (!selectedGroup) {
+    // 계정이 없고 그룹도 안 고른 방문자에게만 소개 화면을 보여준다.
+    // 비로그인 사용자도 헤더에서 그룹을 고르면 기록을 볼 수 있으므로(/group/all이 공개 API),
+    // !user를 이 블록 바깥에서 검사하면 그 경로가 막힌다.
+    if (!user) {
+      return <LandingHero />;
+    }
     return (
       <S.NoGroupContainer>
         <S.NoGroupContent>
