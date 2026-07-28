@@ -74,6 +74,10 @@ DTO 필수화)와 프론트(`EmailCodeVerification` 게이트)를 한 커밋에 
    로컬 오염 방지 장치지만, 운영에서 variable이 빠지면 조용히 무계측이 된다.
 3. **`group_created` 이벤트는 일부러 없다.** `POST /user`가 트랜잭션 안에서 그룹을
    무조건 하나 만들어서(`user.service.ts:48`) `sign_up` 수 = 신규 그룹 수다.
+4. **`page_location`은 민감 쿼리 파라미터를 제거하고 명시적으로 보낸다.** 토스 결제
+   복귀 URL의 `authKey`·`customerKey`가 자동 수집을 통해 GA4로 새 나가는 것을 막으려고
+   `analytics.ts`의 `SENSITIVE_QUERY_KEYS`로 걸러낸다. 새 라우트가 쿼리스트링에 자격증명·
+   식별자를 담아 리다이렉트를 받는다면 이 목록에 추가해야 한다.
 
 `useSearchParams`를 쓰지 않은 것도 의도적이다 — 쓰면 Suspense 경계가 강제되고
 정적 라우트(현재 10개)가 동적으로 바뀐다. UTM은 gtag가 `document.location`에서 읽는다.

@@ -122,6 +122,13 @@ React effect가 `afterInteractive` 스크립트보다 먼저 돌 수 있어서, 
 - **PII 금지.** 이메일·이름·**그룹명**은 파라미터에 절대 넣지 않는다. 그룹명은 사용자가
   입력한 실제 팀 이름이라 식별 정보에 해당하고, GA4는 PII 전송을 계정 정지 사유로 본다.
   `user_id`는 숫자 ID만 보낸다. 이 규칙을 `analytics.ts` 주석에 명시한다.
+- **`page_location`은 민감 쿼리 파라미터를 제거한 뒤 명시적으로 보낸다.** 토스 결제
+  리다이렉트 복귀 URL(`/subscription?...&customerKey=…&authKey=…`, 실패 시
+  `?fail=1&code=…&message=…`)이 자동 수집되면 `customerKey`(Group에 영속되는 계정별
+  식별자)와 `authKey`(결제 인증 자격증명)가 그대로 GA4로 나간다. `pageview()`가
+  `SENSITIVE_QUERY_KEYS`(`authKey`·`customerKey`·`token`·`code`)를 제거한 URL을
+  `page_location`으로 명시 전달해 gtag의 자동값을 덮어쓴다. UTM 파라미터는 이 목록에
+  없으므로 의도적으로 그대로 남는다 — 채널 분석에 필요하기 때문이다.
 
 ### 알려진 정상 동작
 
