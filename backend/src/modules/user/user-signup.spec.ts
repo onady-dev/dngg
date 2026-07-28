@@ -128,14 +128,12 @@ describe('createUser 유니크 위반 처리', () => {
 
   test('중복 그룹명이면 400 Group name already exists', async () => {
     const queryRunner = makeQueryRunner();
-    queryRunner.manager.save = jest
-      .fn()
-      .mockRejectedValue(
-        Object.assign(new Error('duplicate key'), {
-          code: '23505',
-          table: 'group',
-        }),
-      );
+    queryRunner.manager.save = jest.fn().mockRejectedValue(
+      Object.assign(new Error('duplicate key'), {
+        code: '23505',
+        table: 'group',
+      }),
+    );
     const service = makeService(queryRunner);
 
     await expect(service.createUser(baseDto)).rejects.toMatchObject({
