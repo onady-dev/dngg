@@ -99,6 +99,11 @@ const AdminPage = () => {
   const [answerDrafts, setAnswerDrafts] = useState<Record<number, string>>(
     {},
   );
+  // 공유 useMutation 하나로 여러 행을 동시에 보낼 수 있어 mutation.variables는
+  // "가장 최근에 발사된 요청"만 가리킨다 — 행별 in-flight 여부는 별도로 추적한다.
+  const [inFlightInquiryIds, setInFlightInquiryIds] = useState<Set<number>>(
+    new Set(),
+  );
 
   const answerMutation = useMutation({
     mutationFn: async (payload: { id: number; answer: string }) =>
@@ -107,6 +112,9 @@ const AdminPage = () => {
           answer: payload.answer,
         })
       ).data,
+    onMutate: (variables) => {
+      setInFlightInquiryIds((prev) => new Set(prev).add(variables.id));
+    },
     onSuccess: (_data, variables) => {
       showToast("답변을 보냈습니다.", "success");
       // 그 사이 다른 행을 열었을 수 있으니, 방금 보낸 행이 여전히 열려있을 때만 닫는다.
@@ -124,6 +132,15 @@ const AdminPage = () => {
       // 백엔드가 롤백했으므로 이 문의는 여전히 pending이다. 성공한 척하지 않는다.
       showToast("답변 메일 발송에 실패했습니다. 다시 시도해주세요.", "error");
       queryClient.invalidateQueries({ queryKey: ["admin", "inquiries"] });
+    },
+    onSettled: (_data, _error, variables) => {
+      // 성공/실패 모두 해당 행의 in-flight 상태를 해제한다 — 다른 행의 동시
+      // 진행 상태를 덮어쓰지 않도록 함수형 업데이트로 처리.
+      setInFlightInquiryIds((prev) => {
+        const next = new Set(prev);
+        next.delete(variables.id);
+        return next;
+      });
     },
   });
 
@@ -371,9 +388,9 @@ const AdminPage = () => {
                   {openInquiryId === inquiry.id &&
                     (() => {
                       const draft = answerDrafts[inquiry.id] ?? "";
-                      const isSendingThisRow =
-                        answerMutation.isPending &&
-                        answerMutation.variables?.id === inquiry.id;
+                      const isSendingThisRow = inFlightInquiryIds.has(
+                        inquiry.id,
+                      );
                       return (
                         <tr>
                           <S.WrapCell colSpan={6}>
