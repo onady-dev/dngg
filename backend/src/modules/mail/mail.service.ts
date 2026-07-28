@@ -1,6 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { SendEmailCommand, SESClient } from '@aws-sdk/client-ses';
 import { VerificationPurpose } from '../user/email-verification.constants';
+import {
+  INQUIRY_TYPE_LABELS,
+  InquiryType,
+} from '../inquiry/inquiry.constants';
 
 export function buildVerificationMail(
   purpose: VerificationPurpose,
@@ -18,35 +22,75 @@ export function buildVerificationMail(
   };
 }
 
+// 작성자가 메일만 보고 무엇에 대한 답변인지 알 수 있도록 원문을 함께 싣는다.
+export function buildInquiryAnswerMail(
+  type: InquiryType,
+  content: string,
+  answer: string,
+): { subject: string; body: string } {
+  return {
+    subject: '[dn.gg] 문의하신 내용에 답변드립니다',
+    body: [
+      '안녕하세요, dn.gg입니다.',
+      '보내주신 문의에 답변드립니다.',
+      '',
+      `■ 문의 유형: ${INQUIRY_TYPE_LABELS[type]}`,
+      '',
+      '■ 문의하신 내용',
+      content,
+      '',
+      '■ 답변',
+      answer,
+      '',
+      '추가로 궁금한 점이 있으면 앱의 [설정 → 문의·피드백]으로 다시 보내주세요.',
+    ].join('\n'),
+  };
+}
+
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name);
   private client: SESClient | null = null;
 
-  async sendVerificationCode(
-    email: string,
-    code: string,
-    purpose: VerificationPurpose,
-  ): Promise<void> {
+  // SES 클라이언트 생성과 MAIL_FROM 폴백을 여기 한 곳에 모은다.
+  // MAIL_FROM 미설정(dev)은 발송 실패가 아니라 정상 반환이다 — 기존 동작 유지.
+  private async send(to: string, subject: string, body: string): Promise<void> {
     const from = process.env.MAIL_FROM;
     if (!from) {
-      // dev 폴백 — SES 미설정 환경에서는 실발송 대신 코드를 로그로 출력
-      this.logger.warn(`[dev] ${email} ${purpose} 인증 코드: ${code}`);
+      this.logger.warn(`[dev] ${to} 메일 발송 생략 — ${subject}\n${body}`);
       return;
     }
     if (!this.client) {
       this.client = new SESClient({ region: process.env.AWS_REGION });
     }
-    const { subject, body } = buildVerificationMail(purpose, code);
     await this.client.send(
       new SendEmailCommand({
         Source: from,
-        Destination: { ToAddresses: [email] },
+        Destination: { ToAddresses: [to] },
         Message: {
           Subject: { Data: subject, Charset: 'UTF-8' },
           Body: { Text: { Data: body, Charset: 'UTF-8' } },
         },
       }),
     );
+  }
+
+  async sendVerificationCode(
+    email: string,
+    code: string,
+    purpose: VerificationPurpose,
+  ): Promise<void> {
+    const { subject, body } = buildVerificationMail(purpose, code);
+    await this.send(email, subject, body);
+  }
+
+  async sendInquiryAnswer(
+    to: string,
+    type: InquiryType,
+    content: string,
+    answer: string,
+  ): Promise<void> {
+    const { subject, body } = buildInquiryAnswerMail(type, content, answer);
+    await this.send(to, subject, body);
   }
 }
