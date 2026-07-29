@@ -3,8 +3,8 @@
 - 최종 갱신: 2026-07-29
 - 브랜치: `main` + **미머지 feature 브랜치 3개** (아래 "진행 중인 브랜치" 참고)
 - 다음 담당: 다른 기기에서 이어서 작업
-- 2026-07-29: 문의·피드백 후속 과제 1·2·3·4·5·7·8을 `main`에 머지·배포 (`3c7cd16`).
-  남은 것은 6번뿐이며, 문의 삭제 기능이 생길 때 함께 처리하면 된다.
+- 2026-07-29: 문의·피드백 후속 과제 **8건 전부 완료**. 1·2·3·4·5·7·8은 `main`에
+  머지·배포(`3c7cd16`), 6번은 브랜치 `fix/inquiry-answer-lock`에 있다.
 
 ## ⚠️ 진행 중인 브랜치 3개 — 먼저 읽을 것
 
@@ -163,7 +163,7 @@ DTO 필수화)와 프론트(`EmailCodeVerification` 게이트)를 한 커밋에 
 
 ## 문의·피드백 후속 과제 — 2026-07-29 배포 완료
 
-**6번을 제외한 전부(1·2·3·4·5·7·8)가 `main`에 머지되어 운영 배포됐다**
+**후속 과제 8건 전부 완료.** 1·2·3·4·5·7·8은 `main`에 머지되어 운영 배포됐다
 (`3c7cd16`, CI Deploy 성공). 아래 항목별 내용은 그때 알게 된 것들의 기록이다.
 
 1. ~~**`Logger.error`의 스택이 프로젝트 전체에서 유실된다**~~ — **완료**.
@@ -217,8 +217,15 @@ DTO 필수화)와 프론트(`EmailCodeVerification` 게이트)를 한 커밋에 
    CI frontend 잡은 Docker 이미지 빌드만 한다). 그래서 이 변경은 자동 테스트가 없고
    로컬 백엔드로 여섯 경로를 실제 유발해 검증했다. 프론트 로직이 더 늘어나면
    vitest 도입을 검토할 것.
-6. **`answer()`가 `manager.update`의 `affected`를 무시**하고 `findOne`이 락을 걸지 않는다.
-   현재 문의 삭제 경로가 없어 도달 불가. 삭제 기능이 생기면 `pessimistic_write` 필요.
+6. ~~**`answer()`가 `manager.update`의 `affected`를 무시**하고 `findOne`이 락을 걸지 않는다.~~
+   — **완료**. `findOne`에 `pessimistic_write`를 걸고 `affected === 0`이면 메일 발송 전에
+   `NotFoundException`으로 끊는다.
+
+   잠금 비용을 걱정할 필요는 없다 — 어차피 `UPDATE`가 커밋까지 행 잠금을 쥐므로
+   잠금 구간이 `SELECT` 지점까지 앞당겨질 뿐이다.
+
+   단위 테스트는 `manager`를 목킹하므로 TypeORM이 옵션을 받아들이는지는 검증되지 않는다.
+   로컬 DB로 실제 SQL을 찍어 트랜잭션 안에서 `... LIMIT 1 FOR UPDATE`가 나가는 것을 확인했다.
 7. ~~**`data-source.ts`의 엔티티 목록에 `Inquiry`가 없다**~~ — **완료**.
    14개 중 7개가 빠져 있었다(`AppSetting`·`EmailVerification`·`Inquiry`·`Payment`·
    `Subscription`·`Team`·`TeamPlayer`). 전부 등록하고 `data-source.spec.ts`가
