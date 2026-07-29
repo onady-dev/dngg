@@ -209,8 +209,17 @@ DTO 필수화)와 프론트(`EmailCodeVerification` 게이트)를 한 커밋에 
    vitest 도입을 검토할 것.
 6. **`answer()`가 `manager.update`의 `affected`를 무시**하고 `findOne`이 락을 걸지 않는다.
    현재 문의 삭제 경로가 없어 도달 불가. 삭제 기능이 생기면 `pessimistic_write` 필요.
-7. **`data-source.ts`의 엔티티 목록에 `Inquiry`가 없다**(`Subscription`·`Team` 등도 마찬가지).
-   `synchronize: false`로 전환할 때 `migration:generate`가 `DROP TABLE inquiry`를 뱉는다.
+7. ~~**`data-source.ts`의 엔티티 목록에 `Inquiry`가 없다**~~ — **완료**, 같은 브랜치.
+   14개 중 7개가 빠져 있었다(`AppSetting`·`EmailVerification`·`Inquiry`·`Payment`·
+   `Subscription`·`Team`·`TeamPlayer`). 전부 등록하고 `data-source.spec.ts`가
+   엔티티/마이그레이션 디렉토리와 등록 목록의 불일치를 잡도록 했다.
+
+   **여기 적혀 있던 `DROP TABLE` 예측은 틀렸다.** 로컬 DB로 실제 확인한 결과,
+   TypeORM은 등록되지 않은 테이블을 **그냥 무시할 뿐 지우지 않는다.** 실제 실패
+   양상은 침묵이다 — `Inquiry`에 컬럼을 추가하고 `migration:generate`를 돌리면
+   등록 후에는 `ALTER TABLE`이 나오지만 등록 전에는 `No changes`가 나온다.
+   `synchronize: false` 전환 후 이 엔티티들을 고치면 마이그레이션이 아예 생성되지
+   않아 DB와 코드가 조용히 어긋난다. DROP보다 나쁘다 — DROP은 리뷰에서 눈에 띈다.
 8. **admin 카드 4개가 조회 실패와 "데이터 없음"을 구분하지 않는다** — 기존 3개와 동일한
    패턴이라 하나만 고치면 오히려 불일치. 네 개를 함께 고칠 것.
 
