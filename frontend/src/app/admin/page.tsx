@@ -15,6 +15,7 @@ import { useToast } from "@/app/components/ui/Toast";
 import { useMounted } from "@/app/lib/useMounted";
 import * as S from "./styles";
 import { inquiryAnswerErrorMessage } from "./inquiryError";
+import { CardFallback } from "./CardFallback";
 
 interface Monetization {
   started: boolean;
@@ -85,30 +86,28 @@ const AdminPage = () => {
     }
   }, [mounted, isAdmin, router]);
 
-  const { data: monetization } = useQuery<Monetization>({
+  const monetizationQuery = useQuery<Monetization>({
     queryKey: ["admin", "monetization"],
     queryFn: async () => (await api.get("/admin/monetization")).data,
     enabled: mounted && isAdmin,
   });
+  const monetization = monetizationQuery.data;
 
-  const { data: groups } = useQuery<AdminGroupRow[]>({
+  const groupsQuery = useQuery<AdminGroupRow[]>({
     queryKey: ["admin", "groups"],
     queryFn: async () => (await api.get("/admin/groups")).data,
     enabled: mounted && isAdmin,
   });
+  const groups = groupsQuery.data;
 
-  const { data: overview } = useQuery<SubscriptionOverview>({
+  const overviewQuery = useQuery<SubscriptionOverview>({
     queryKey: ["admin", "subscriptions"],
     queryFn: async () => (await api.get("/admin/subscriptions")).data,
     enabled: mounted && isAdmin,
   });
+  const overview = overviewQuery.data;
 
-  const {
-    data: inquiryPages,
-    fetchNextPage: fetchMoreInquiries,
-    hasNextPage: hasMoreInquiries,
-    isFetchingNextPage: isFetchingMoreInquiries,
-  } = useInfiniteQuery<InquiryPage>({
+  const inquiryQuery = useInfiniteQuery<InquiryPage>({
     queryKey: ["admin", "inquiries", "list"],
     queryFn: async ({ pageParam }) =>
       (
@@ -125,12 +124,16 @@ const AdminPage = () => {
     enabled: mounted && isAdmin,
   });
 
-  const inquiries = inquiryPages?.pages.flatMap((page) => page.rows) ?? [];
-  const inquiryTotal = inquiryPages?.pages[0]?.total ?? 0;
+  const fetchMoreInquiries = inquiryQuery.fetchNextPage;
+  const hasMoreInquiries = inquiryQuery.hasNextPage;
+  const isFetchingMoreInquiries = inquiryQuery.isFetchingNextPage;
+  const inquiries =
+    inquiryQuery.data?.pages.flatMap((page) => page.rows) ?? [];
+  const inquiryTotal = inquiryQuery.data?.pages[0]?.total ?? 0;
 
   // 미답변 건수는 불러온 페이지가 아니라 전체 기준이어야 한다.
   // status 필터에 total이 실려 오므로 1건만 요청해 total만 읽는다.
-  const { data: pendingInquiryPage } = useQuery<InquiryPage>({
+  const pendingInquiryQuery = useQuery<InquiryPage>({
     queryKey: ["admin", "inquiries", "pending-count"],
     queryFn: async () =>
       (
@@ -140,7 +143,8 @@ const AdminPage = () => {
       ).data,
     enabled: mounted && isAdmin,
   });
-  const pendingInquiryTotal = pendingInquiryPage?.total ?? 0;
+  // 이 쿼리만 실패하면 0으로 표시하지 않는다 — "미답변 0건"은 거짓이 된다.
+  const pendingInquiryTotal = pendingInquiryQuery.data?.total ?? null;
 
   // 어느 행이 펼쳐져 있는지 + 행별 답변 초안(행마다 독립적으로 유지)
   const [openInquiryId, setOpenInquiryId] = useState<number | null>(null);
@@ -269,7 +273,14 @@ const AdminPage = () => {
 
       <S.Card>
         <S.CardTitle>유료화 서비스</S.CardTitle>
-        {monetization?.started ? (
+        {/* 조회 실패를 "아직 시작 전"으로 표시하면 되돌릴 수 없는 시작 버튼이
+            함께 뜬다 — 네 카드 중 여기가 가장 위험하다. */}
+        {monetizationQuery.isPending || monetizationQuery.isError ? (
+          <CardFallback
+            isPending={monetizationQuery.isPending}
+            onRetry={() => void monetizationQuery.refetch()}
+          />
+        ) : monetization?.started ? (
           <S.StatusLine>
             시작됨 ·{" "}
             {monetization.startedAt
@@ -295,6 +306,14 @@ const AdminPage = () => {
 
       <S.Card>
         <S.CardTitle>그룹 현황</S.CardTitle>
+        {groupsQuery.isPending || groupsQuery.isError ? (
+          <CardFallback
+            isPending={groupsQuery.isPending}
+            onRetry={() => void groupsQuery.refetch()}
+          />
+        ) : groups && groups.length === 0 ? (
+          <S.StatusLine>그룹 없음</S.StatusLine>
+        ) : (
         <S.TableWrap>
           <S.Table>
             <thead>
@@ -333,10 +352,18 @@ const AdminPage = () => {
             </tbody>
           </S.Table>
         </S.TableWrap>
+        )}
       </S.Card>
 
       <S.Card>
         <S.CardTitle>구독·결제 현황</S.CardTitle>
+        {overviewQuery.isPending || overviewQuery.isError ? (
+          <CardFallback
+            isPending={overviewQuery.isPending}
+            onRetry={() => void overviewQuery.refetch()}
+          />
+        ) : (
+        <>
         <S.StatusLine>
           {(overview?.statusCounts ?? [])
             .map((row) => `${row.status} ${row.count}건`)
@@ -376,14 +403,35 @@ const AdminPage = () => {
             </tbody>
           </S.Table>
         </S.TableWrap>
+        </>
+        )}
       </S.Card>
 
       <S.Card>
         <S.CardTitle>문의·피드백</S.CardTitle>
+        {inquiryQuery.isPending || inquiryQuery.isError ? (
+          <CardFallback
+            isPending={inquiryQuery.isPending}
+            // 미답변 집계는 별도 쿼리다 — 함께 되살리지 않으면 목록만 복구되고
+            // "미답변 N건"이 사라진 채로 남는다.
+            onRetry={() => {
+              void inquiryQuery.refetch();
+              void pendingInquiryQuery.refetch();
+            }}
+          />
+        ) : (
+        <>
         <S.StatusLine>
           {inquiryTotal === 0
             ? "접수된 문의 없음"
-            : `전체 ${inquiryTotal}건 · 미답변 ${pendingInquiryTotal}건` +
+            : `전체 ${inquiryTotal}건` +
+              // 미답변 집계만 따로 실패할 수 있다. 0으로 뭉뚱그리면 거짓이 되고,
+              // 조용히 빼면 집계가 사라진 것을 눈치채지 못한다.
+              (pendingInquiryQuery.isError
+                ? " · 미답변 집계 실패"
+                : pendingInquiryTotal === null
+                  ? ""
+                  : ` · 미답변 ${pendingInquiryTotal}건`) +
               (inquiries.length < inquiryTotal
                 ? ` · ${inquiries.length}건 표시 중`
                 : "")}
@@ -487,6 +535,8 @@ const AdminPage = () => {
           >
             {isFetchingMoreInquiries ? "불러오는 중..." : "더 보기"}
           </S.MoreButton>
+        )}
+        </>
         )}
       </S.Card>
     </S.Container>

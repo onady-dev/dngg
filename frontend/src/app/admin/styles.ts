@@ -168,3 +168,14 @@ export const MoreButton = styled.button`
     cursor: default;
   }
 `;
+
+// 조회 실패 표시 — "데이터 없음"(회색 StatusLine)과 시각적으로 구분한다.
+export const ErrorLine = styled.p`
+  font-size: 0.9rem;
+  color: #b91c1c;
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+`;
