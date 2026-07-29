@@ -1,8 +1,10 @@
 # 작업 인수인계 (handoff)
 
-- 최종 갱신: 2026-07-28
+- 최종 갱신: 2026-07-29
 - 브랜치: `main` + **미머지 feature 브랜치 3개** (아래 "진행 중인 브랜치" 참고)
 - 다음 담당: 다른 기기에서 이어서 작업
+- 2026-07-29: 문의·피드백 후속 과제 1·2·3·4·5·7·8을 `main`에 머지·배포 (`3c7cd16`).
+  남은 것은 6번뿐이며, 문의 삭제 기능이 생길 때 함께 처리하면 된다.
 
 ## ⚠️ 진행 중인 브랜치 3개 — 먼저 읽을 것
 
@@ -159,12 +161,13 @@ DTO 필수화)와 프론트(`EmailCodeVerification` 게이트)를 한 커밋에 
 - **Dockerfile Node 버전 스큐** — 운영 컨테이너는 `node:20`, CI `setup-node`는 22다.
   (`PROJECT_CONTEXT.md` 3.3)
 
-## 문의·피드백 후속 과제 (머지 비차단 — 최종 리뷰에서 이월)
+## 문의·피드백 후속 과제 — 2026-07-29 배포 완료
 
-우선순위 순. 전부 이번 배포를 막지 않는다고 판단된 것들이다.
+**6번을 제외한 전부(1·2·3·4·5·7·8)가 `main`에 머지되어 운영 배포됐다**
+(`3c7cd16`, CI Deploy 성공). 아래 항목별 내용은 그때 알게 된 것들의 기록이다.
 
-1. ~~**`Logger.error`의 스택이 프로젝트 전체에서 유실된다**~~ — **완료**,
-   브랜치 `fix/logger-error-stack` (미푸시). printf 본문을 `backend/src/common/log-format.ts`의
+1. ~~**`Logger.error`의 스택이 프로젝트 전체에서 유실된다**~~ — **완료**.
+   printf 본문을 `backend/src/common/log-format.ts`의
    `formatLogLine`으로 추출하고 `stack`을 읽도록 고쳤다.
 
    **한 줄 수정이 아니었다.** 두 가지가 걸려 있었다:
@@ -179,14 +182,14 @@ DTO 필수화)와 프론트(`EmailCodeVerification` 게이트)를 한 커밋에 
      넘기지 말 것.**
 
    부수 효과로 4xx 로그의 `[[object Object]]` 컨텍스트도 사라진다.
-2. ~~**`bootstrap()`에 `.catch` 없음**~~ — **완료**, 같은 브랜치.
+2. ~~**`bootstrap()`에 `.catch` 없음**~~ — **완료**.
    `backend/src/common/bootstrap-failure.ts`의 `reportBootstrapFailure`를
    `bootstrap().catch(...)`로 연결했다. 핸들러를 별도 모듈로 뺀 이유는 `main.ts`가
    import 즉시 앱을 띄워 테스트에서 불러올 수 없기 때문이다.
    제안된 `console.error(e.message)`와 달리 **스택도 메시지 뒤에 함께 출력한다** —
    가드가 아닌 부팅 실패(DB 연결 거부, 포트 점유)는 스택이 있어야 진단된다.
 3. ~~**`main.ts`가 `assertMailConfigured`를 호출한다는 것 자체는 테스트가 없다**~~ —
-   **완료**, 같은 브랜치. `backend/src/main.spec.ts`가 프로세스를 직접 띄워 검증한다.
+   **완료**. `backend/src/main.spec.ts`가 프로세스를 직접 띄워 검증한다.
 
    **CI 빌드 스텝은 필요 없었다.** `dist/main.js` 대신 ts-node로 `src/main.ts`를 띄우면
    약 1초다(`ts-node/register/transpile-only` + `tsconfig-paths/register`, 둘 다 이미
@@ -196,15 +199,16 @@ DTO 필수화)와 프론트(`EmailCodeVerification` 게이트)를 한 커밋에 
    `JwtStrategy`가 `JWT_SECRET` 없이 뜨지 못해 종료 코드는 그대로 1이었다.
    그래서 stderr의 `MAIL_FROM` 메시지로 원인을 특정한다. 가드를 제거하면 실패하고
    되돌리면 통과하는 것까지 확인했다.
-4. ~~**`GET /admin/inquiries`에 페이지네이션·인덱스 없음**~~ — **완료**, 같은 브랜치.
+4. ~~**`GET /admin/inquiries`에 페이지네이션·인덱스 없음**~~ — **완료**.
    응답이 `{ rows, total, page, limit }` 봉투로 바뀌었다(기본 20건, 최대 100건).
    `(status, createdAt)` 복합 인덱스 + `createdAt` 인덱스를 엔티티에 추가했고
    `synchronize: true`라 백엔드 재시작 시 자동 생성된다(로컬에서 생성·EXPLAIN 확인).
 
-   **⚠️ 파괴적 변경이다 — 프론트·백엔드가 반드시 함께 배포돼야 한다.** 관리자 화면이
-   배열을 기대하다 봉투를 받으면 문의 카드가 깨진다. CI 경로 필터상 두 잡이 독립이므로
-   `workflow_dispatch`로 동시 배포할 것 (2026-07-18 혼합 배포 장애와 같은 구조).
-5. ~~**관리자 답변 실패 토스트가 원인을 구분하지 않는다**~~ — **완료**, 같은 브랜치.
+   응답 형태가 바뀌는 파괴적 변경이라 프론트·백엔드가 함께 가야 했다. 한 커밋에
+   양쪽이 모두 들어 있어 두 잡이 다 돌았고, **`workflow_dispatch`는 필요 없었다** —
+   `deploy` 잡이 `needs.*.result != 'failure'` 조건이라 한쪽이라도 빌드에 실패하면
+   배포 자체가 스킵된다. 앞으로도 양쪽을 한 커밋에 담으면 일반 푸시로 안전하다.
+5. ~~**관리자 답변 실패 토스트가 원인을 구분하지 않는다**~~ — **완료**.
    매핑을 순수 함수 `frontend/src/app/admin/inquiryError.ts`로 분리했다.
    **401은 토스트를 띄우지 않는다** — axios 인터셉터가 로그아웃 + `/settings`
    리다이렉트와 자체 토스트를 이미 처리하므로 중복이다(`lib/axios.ts` 참고).
@@ -215,7 +219,7 @@ DTO 필수화)와 프론트(`EmailCodeVerification` 게이트)를 한 커밋에 
    vitest 도입을 검토할 것.
 6. **`answer()`가 `manager.update`의 `affected`를 무시**하고 `findOne`이 락을 걸지 않는다.
    현재 문의 삭제 경로가 없어 도달 불가. 삭제 기능이 생기면 `pessimistic_write` 필요.
-7. ~~**`data-source.ts`의 엔티티 목록에 `Inquiry`가 없다**~~ — **완료**, 같은 브랜치.
+7. ~~**`data-source.ts`의 엔티티 목록에 `Inquiry`가 없다**~~ — **완료**.
    14개 중 7개가 빠져 있었다(`AppSetting`·`EmailVerification`·`Inquiry`·`Payment`·
    `Subscription`·`Team`·`TeamPlayer`). 전부 등록하고 `data-source.spec.ts`가
    엔티티/마이그레이션 디렉토리와 등록 목록의 불일치를 잡도록 했다.
@@ -226,7 +230,7 @@ DTO 필수화)와 프론트(`EmailCodeVerification` 게이트)를 한 커밋에 
    등록 후에는 `ALTER TABLE`이 나오지만 등록 전에는 `No changes`가 나온다.
    `synchronize: false` 전환 후 이 엔티티들을 고치면 마이그레이션이 아예 생성되지
    않아 DB와 코드가 조용히 어긋난다. DROP보다 나쁘다 — DROP은 리뷰에서 눈에 띈다.
-8. ~~**admin 카드 4개가 조회 실패와 "데이터 없음"을 구분하지 않는다**~~ — **완료**, 같은 브랜치.
+8. ~~**admin 카드 4개가 조회 실패와 "데이터 없음"을 구분하지 않는다**~~ — **완료**.
    `CardFallback` 컴포넌트로 로딩·실패를 구분하고 네 카드에 함께 적용했다.
 
    **가장 위험했던 것은 유료화 카드다** — 조회 실패가 "아직 시작 전입니다"로 표시되면서
