@@ -185,11 +185,17 @@ DTO 필수화)와 프론트(`EmailCodeVerification` 게이트)를 한 커밋에 
    import 즉시 앱을 띄워 테스트에서 불러올 수 없기 때문이다.
    제안된 `console.error(e.message)`와 달리 **스택도 메시지 뒤에 함께 출력한다** —
    가드가 아닌 부팅 실패(DB 연결 거부, 포트 점유)는 스택이 있어야 진단된다.
-3. **`main.ts`가 `assertMailConfigured`를 호출한다는 것 자체는 테스트가 없다** — 그 줄이
-   지워지면 가드가 조용히 무력화되는데 테스트는 초록이다. 2번 작업 중 `NODE_ENV=prod` +
-   `MAIL_FROM` 미설정으로 `dist/main.js`를 직접 돌려 배선을 확인했지만 **수동 스모크였다.**
-   자동화하려면 빌드된 `dist/main.js`를 spawn해 종료 코드·stderr를 검증해야 하는데,
-   CI는 `pnpm test` 전에 빌드하지 않으므로(`deploy.yml`) 그대로 넣으면 CI에서 깨진다.
+3. ~~**`main.ts`가 `assertMailConfigured`를 호출한다는 것 자체는 테스트가 없다**~~ —
+   **완료**, 같은 브랜치. `backend/src/main.spec.ts`가 프로세스를 직접 띄워 검증한다.
+
+   **CI 빌드 스텝은 필요 없었다.** `dist/main.js` 대신 ts-node로 `src/main.ts`를 띄우면
+   약 1초다(`ts-node/register/transpile-only` + `tsconfig-paths/register`, 둘 다 이미
+   devDependency).
+
+   **종료 코드만 검사하면 공허하게 통과한다** — 가드를 실제로 지우고 돌려보니
+   `JwtStrategy`가 `JWT_SECRET` 없이 뜨지 못해 종료 코드는 그대로 1이었다.
+   그래서 stderr의 `MAIL_FROM` 메시지로 원인을 특정한다. 가드를 제거하면 실패하고
+   되돌리면 통과하는 것까지 확인했다.
 4. ~~**`GET /admin/inquiries`에 페이지네이션·인덱스 없음**~~ — **완료**, 같은 브랜치.
    응답이 `{ rows, total, page, limit }` 봉투로 바뀌었다(기본 20건, 최대 100건).
    `(status, createdAt)` 복합 인덱스 + `createdAt` 인덱스를 엔티티에 추가했고
