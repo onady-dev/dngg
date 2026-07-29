@@ -248,7 +248,37 @@ describe('InquiryService.answer', () => {
     // 걸러지지 않으므로 여기서 findOne 호출 인자 자체를 검증한다.
     expect(manager.findOne).toHaveBeenCalledWith(Inquiry, {
       where: { id: 5 },
+      lock: { mode: 'pessimistic_write' },
     });
+  });
+
+  // 조회와 UPDATE 사이에 행이 사라질 수 있다(문의 삭제 기능이 생기는 순간).
+  // 잠그지 않으면 두 문장 사이가 벌어져 삭제된 문의에 회신 메일이 나간다.
+  test('행을 pessimistic_write로 잠그고 읽는다', async () => {
+    const { service, manager } = makeService({ inquiry: pendingInquiry });
+
+    await service.answer(5, { answer: '답변' }, NOW);
+
+    expect(manager.findOne).toHaveBeenCalledWith(Inquiry, {
+      where: { id: 5 },
+      lock: { mode: 'pessimistic_write' },
+    });
+  });
+
+  // affected를 무시하면 갱신된 행이 없어도 메일을 보내고 성공을 반환한다 —
+  // 존재하지 않는 문의에 대한 회신 메일이 나가고, 관리자는 답변됐다고 믿는다.
+  test('UPDATE가 아무 행도 바꾸지 못하면 메일을 보내지 않고 실패한다', async () => {
+    const { service, manager, mailService, committed } = makeService({
+      inquiry: pendingInquiry,
+    });
+    manager.update.mockResolvedValueOnce({ affected: 0 } as any);
+
+    await expect(
+      service.answer(5, { answer: '답변' }, NOW),
+    ).rejects.toThrow(NotFoundException);
+
+    expect(mailService.sendInquiryAnswer).not.toHaveBeenCalled();
+    expect(committed.value).toBe(false);
   });
 
   test('이미 answered인 문의에 재답변하면 덮어쓰고 메일을 다시 보낸다', async () => {
