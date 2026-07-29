@@ -14,6 +14,7 @@ import { useGroupStore } from "@/app/stores/groupStore";
 import { useToast } from "@/app/components/ui/Toast";
 import { useMounted } from "@/app/lib/useMounted";
 import * as S from "./styles";
+import { inquiryAnswerErrorMessage } from "./inquiryError";
 
 interface Monetization {
   started: boolean;
@@ -175,9 +176,12 @@ const AdminPage = () => {
       });
       queryClient.invalidateQueries({ queryKey: ["admin", "inquiries"] });
     },
-    onError: () => {
+    onError: (error: unknown) => {
       // 백엔드가 롤백했으므로 이 문의는 여전히 pending이다. 성공한 척하지 않는다.
-      showToast("답변 메일 발송에 실패했습니다. 다시 시도해주세요.", "error");
+      const message = inquiryAnswerErrorMessage(error);
+      if (message) {
+        showToast(message, "error");
+      }
       queryClient.invalidateQueries({ queryKey: ["admin", "inquiries"] });
     },
     onSettled: (_data, _error, variables) => {
