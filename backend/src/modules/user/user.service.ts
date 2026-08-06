@@ -1,6 +1,7 @@
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, Repository } from 'typeorm';
+import { isEmail } from 'class-validator';
 import { User } from '../../entities/User.entity';
 import { CreateUserDto, UpdateUserDto } from './user.request.dto';
 import { Group } from 'src/entities/Group.entity';
@@ -149,10 +150,7 @@ export class UserService {
     identifier: string,
     password: string,
   ): Promise<{ user: Omit<User, 'password'>; accessToken: string }> {
-    const trimmed = identifier.trim();
-    const user = await this.userRepository.findOne({
-      where: { email: trimmed },
-    });
+    const user = await this.findUserByIdentifier(identifier.trim());
     if (!user) {
       throw new HttpException(
         INVALID_CREDENTIALS_MESSAGE,
@@ -174,6 +172,41 @@ export class UserService {
     };
     const accessToken = this.jwtService.sign(payload);
     return { user: this.omitPassword(user), accessToken };
+  }
+
+  // 아이디는 이메일 또는 그룹명이다. 이메일 형식이어도 그룹명일 수 있으므로
+  // (Group.name에 문자 제한이 없어 '@'가 들어갈 수 있다) 못 찾으면 그룹명으로 폴백한다.
+  private async findUserByIdentifier(identifier: string): Promise<User | null> {
+    if (isEmail(identifier)) {
+      const byEmail = await this.userRepository.findOne({
+        where: { email: identifier },
+      });
+      if (byEmail) return byEmail;
+    }
+    return this.findUserByGroupName(identifier);
+  }
+
+  // findByName이 isDeleted: false를 걸러주므로 탈퇴한 그룹명으로는 로그인되지 않는다
+  // (해당 계정의 이메일 로그인은 계속 동작한다).
+  private async findUserByGroupName(name: string): Promise<User | null> {
+    const group = await this.groupRepository.findByName(name);
+    if (!group) return null;
+    // 가입이 그룹을 만드는 유일한 경로라 그룹당 계정은 1개다. 그 전제가 깨졌을 때
+    // 엉뚱한 계정으로 조용히 로그인되지 않도록, 2건 이상이면 거부한다.
+    const users = await this.userRepository.find({
+      where: { groupId: group.id },
+      order: { id: 'ASC' },
+      take: 2,
+    });
+    if (users.length !== 1) {
+      if (users.length > 1) {
+        this.logger.error(
+          `그룹 ${group.id}(${group.name})에 계정이 2개 이상이라 그룹명 로그인을 거부했습니다.`,
+        );
+      }
+      return null;
+    }
+    return users[0];
   }
 
   async resetPassword(

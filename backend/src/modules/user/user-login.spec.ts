@@ -3,6 +3,7 @@ import { DataSource, Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { INVALID_CREDENTIALS_MESSAGE, UserService } from './user.service';
 import { User } from '../../entities/User.entity';
+import { Group } from '../../entities/Group.entity';
 import { GroupRepository } from '../../repository/group.repository';
 import { EmailVerificationService } from './email-verification.service';
 
@@ -106,5 +107,107 @@ describe('loginUser — 실패 응답', () => {
       status: 401,
       message: INVALID_CREDENTIALS_MESSAGE,
     });
+  });
+});
+
+const makeGroup = (overrides: Partial<Group> = {}): Group =>
+  ({
+    id: 10,
+    name: '월요농구',
+    isDeleted: false,
+    freeGamesUsed: 0,
+    customerKey: null,
+    ...overrides,
+  }) as unknown as Group;
+
+describe('loginUser — 그룹명 로그인', () => {
+  test('그룹명으로 그 그룹의 계정에 로그인한다', async () => {
+    const user = makeUser();
+    const findByName = jest.fn().mockResolvedValue(makeGroup());
+    const userFind = jest.fn().mockResolvedValue([user]);
+    const { service } = buildService({ findByName, userFind });
+
+    const result = await service.loginUser('월요농구', PASSWORD);
+
+    expect(findByName).toHaveBeenCalledWith('월요농구');
+    expect(userFind).toHaveBeenCalledWith({
+      where: { groupId: 10 },
+      order: { id: 'ASC' },
+      take: 2,
+    });
+    expect(result.accessToken).toBe('signed-token');
+  });
+
+  test('그룹명이면 이메일 조회를 시도하지 않는다', async () => {
+    const userFindOne = jest.fn().mockResolvedValue(null);
+    const findByName = jest.fn().mockResolvedValue(makeGroup());
+    const userFind = jest.fn().mockResolvedValue([makeUser()]);
+    const { service } = buildService({ userFindOne, findByName, userFind });
+
+    await service.loginUser('월요농구', PASSWORD);
+
+    expect(userFindOne).not.toHaveBeenCalled();
+  });
+
+  test('@가 들어간 그룹명은 이메일 조회 실패 후 그룹명으로 폴백한다', async () => {
+    const userFindOne = jest.fn().mockResolvedValue(null);
+    const findByName = jest
+      .fn()
+      .mockResolvedValue(makeGroup({ name: 'a@b.co' }));
+    const userFind = jest.fn().mockResolvedValue([makeUser()]);
+    const { service } = buildService({ userFindOne, findByName, userFind });
+
+    const result = await service.loginUser('a@b.co', PASSWORD);
+
+    expect(userFindOne).toHaveBeenCalledWith({ where: { email: 'a@b.co' } });
+    expect(findByName).toHaveBeenCalledWith('a@b.co');
+    expect(result.accessToken).toBe('signed-token');
+  });
+
+  // findByName은 isDeleted: false를 조건에 포함한다 — 삭제된 그룹은 null로 돌아온다.
+  test('삭제됐거나 없는 그룹명은 401', async () => {
+    const findByName = jest.fn().mockResolvedValue(null);
+    const { service } = buildService({ findByName });
+
+    await expect(service.loginUser('없는그룹', PASSWORD)).rejects.toMatchObject(
+      {
+        status: 401,
+        message: INVALID_CREDENTIALS_MESSAGE,
+      },
+    );
+  });
+
+  test('그룹은 있는데 계정이 없으면 401', async () => {
+    const findByName = jest.fn().mockResolvedValue(makeGroup());
+    const userFind = jest.fn().mockResolvedValue([]);
+    const { service } = buildService({ findByName, userFind });
+
+    await expect(service.loginUser('월요농구', PASSWORD)).rejects.toMatchObject(
+      {
+        status: 401,
+      },
+    );
+  });
+
+  test('한 그룹에 계정이 2개 이상이면 로그인을 거부하고 에러 로그를 남긴다', async () => {
+    const findByName = jest.fn().mockResolvedValue(makeGroup());
+    const userFind = jest
+      .fn()
+      .mockResolvedValue([makeUser(), makeUser({ id: 2 })]);
+    const { service } = buildService({ findByName, userFind });
+    const errorLog = jest
+      .spyOn(
+        (service as unknown as { logger: { error: (m: string) => void } })
+          .logger,
+        'error',
+      )
+      .mockImplementation(() => undefined);
+
+    await expect(service.loginUser('월요농구', PASSWORD)).rejects.toMatchObject(
+      {
+        status: 401,
+      },
+    );
+    expect(errorLog).toHaveBeenCalled();
   });
 });
