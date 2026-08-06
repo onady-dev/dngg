@@ -15,7 +15,13 @@ import { seedLogitemsForGroup } from '../logitem/logitem-seed';
 // 타입을 명시해 unsafe-* 린트를 피한다. 기존 호출부는 out-of-scope로 남겨둔다.
 const typedBcrypt = bcrypt as unknown as {
   hash: (data: string, saltOrRounds: number) => Promise<string>;
+  compare: (data: string, encrypted: string) => Promise<boolean>;
 };
+
+// 아이디 미존재와 비밀번호 불일치를 구분해서 알려주면 계정 열거가 가능해진다.
+// 그룹명은 GET /group/all로 공개되어 있어 특히 위험하므로 응답을 하나로 통일한다.
+export const INVALID_CREDENTIALS_MESSAGE =
+  '아이디 또는 비밀번호가 올바르지 않습니다.';
 
 @Injectable()
 export class UserService {
@@ -140,16 +146,25 @@ export class UserService {
   }
 
   async loginUser(
-    email: string,
+    identifier: string,
     password: string,
   ): Promise<{ user: Omit<User, 'password'>; accessToken: string }> {
-    const user = await this.userRepository.findOne({ where: { email } });
+    const trimmed = identifier.trim();
+    const user = await this.userRepository.findOne({
+      where: { email: trimmed },
+    });
     if (!user) {
-      throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+      throw new HttpException(
+        INVALID_CREDENTIALS_MESSAGE,
+        HttpStatus.UNAUTHORIZED,
+      );
     }
-    const isMatch = await bcrypt.compare(password, user.password);
+    const isMatch = await typedBcrypt.compare(password, user.password);
     if (!isMatch) {
-      throw new HttpException('Invalid password', HttpStatus.UNAUTHORIZED);
+      throw new HttpException(
+        INVALID_CREDENTIALS_MESSAGE,
+        HttpStatus.UNAUTHORIZED,
+      );
     }
     const payload = {
       userId: user.id,

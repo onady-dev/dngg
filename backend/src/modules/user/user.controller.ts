@@ -77,10 +77,10 @@ export class UserController {
 
   @Post('login')
   async loginUser(
-    @Body('email') email: string,
+    @Body('email') identifier: string,
     @Body('password') password: string,
   ) {
-    return this.userService.loginUser(email, password);
+    return this.userService.loginUser(identifier, password);
   }
 
   @Post('password-reset')
