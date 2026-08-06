@@ -70,15 +70,19 @@ export class ResetPasswordDto {
 }
 
 export class LoginUserDto {
-  // 이메일 또는 그룹명. 둘 다 비면 양쪽 검증이 모두 실패해 400이 된다.
-  @ValidateIf((o: LoginUserDto) => !o.email)
+  // identifier가 오면 항상 타입을 검증한다. 둘 다 없을 때만 존재를 강제해 400을 낸다.
+  // (양쪽에 서로를 참조하는 ValidateIf를 걸면 두 키가 동시에 오는 요청에서
+  //  서로가 서로의 검증을 꺼버려 타입 검사가 통째로 사라진다.)
+  @ValidateIf(
+    (o: LoginUserDto) => o.identifier !== undefined || o.email === undefined,
+  )
   @IsString()
   @IsNotEmpty()
   identifier?: string;
 
   // 캐시된 구버전 프론트 번들 호환용 — 새 클라이언트는 identifier를 보낸다.
   // 전역 ValidationPipe가 forbidNonWhitelisted라 여기 선언해 두지 않으면 400이 난다.
-  @ValidateIf((o: LoginUserDto) => !o.identifier)
+  @ValidateIf((o: LoginUserDto) => o.email !== undefined)
   @IsString()
   @IsNotEmpty()
   email?: string;

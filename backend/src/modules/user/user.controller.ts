@@ -78,7 +78,7 @@ export class UserController {
 
   @Post('login')
   async loginUser(@Body(ValidationPipe) dto: LoginUserDto) {
-    // DTO 검증에서 identifier/email 둘 다 없으면 이미 400으로 걸러지므로
+    // DTO 검증이 identifier/email 중 최소 하나가 비어있지 않은 문자열임을 보장하므로
     // '?? ""'는 타입상 optional을 만족시키기 위한 것일 뿐 실제로는 도달하지 않는다.
     return this.userService.loginUser(
       dto.identifier ?? dto.email ?? '',
