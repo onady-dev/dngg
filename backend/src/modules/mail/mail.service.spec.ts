@@ -118,6 +118,65 @@ describe('MailService', () => {
     });
   });
 
+  // no-reply@dngg.one은 발송 전용이라 수신함이 없다. Reply-To가 없으면 사용자의
+  // 답장이 아무 데도 도착하지 않는다 — 인증 코드 메일은 그래도 됐지만, 사람이
+  // 직접 보내는 성격의 메일에서는 대화가 끊긴다.
+  describe('Reply-To', () => {
+    const originalMailFrom = process.env.MAIL_FROM;
+    const originalReplyTo = process.env.MAIL_REPLY_TO;
+    afterEach(() => {
+      process.env.MAIL_FROM = originalMailFrom;
+      if (originalReplyTo === undefined) delete process.env.MAIL_REPLY_TO;
+      else process.env.MAIL_REPLY_TO = originalReplyTo;
+    });
+
+    const makeService = () => {
+      const service = new MailService();
+      const send = jest.fn((command: SendEmailCommand) => {
+        void command;
+        return Promise.resolve({});
+      });
+      internals(service).client = { send };
+      return { service, send };
+    };
+
+    test('MAIL_REPLY_TO 설정 시 ReplyToAddresses에 실린다', async () => {
+      process.env.MAIL_FROM = 'no-reply@dngg.one';
+      process.env.MAIL_REPLY_TO = 'reply@example.com';
+      const { service, send } = makeService();
+
+      await service.sendInquiryAnswer('who@example.com', 'bug', '원문', '답변');
+
+      expect(send.mock.calls[0][0].input.ReplyToAddresses).toEqual([
+        'reply@example.com',
+      ]);
+      // 발신 주소는 그대로여야 한다 — SES는 Source만 인증을 요구한다
+      expect(send.mock.calls[0][0].input.Source).toBe('no-reply@dngg.one');
+    });
+
+    test('인증 코드 메일에도 동일하게 적용된다', async () => {
+      process.env.MAIL_FROM = 'no-reply@dngg.one';
+      process.env.MAIL_REPLY_TO = 'reply@example.com';
+      const { service, send } = makeService();
+
+      await service.sendVerificationCode('a@b.c', '123456', 'signup');
+
+      expect(send.mock.calls[0][0].input.ReplyToAddresses).toEqual([
+        'reply@example.com',
+      ]);
+    });
+
+    test('MAIL_REPLY_TO 미설정이면 ReplyToAddresses를 넣지 않는다', async () => {
+      process.env.MAIL_FROM = 'no-reply@dngg.one';
+      delete process.env.MAIL_REPLY_TO;
+      const { service, send } = makeService();
+
+      await service.sendInquiryAnswer('who@example.com', 'bug', '원문', '답변');
+
+      expect(send.mock.calls[0][0].input.ReplyToAddresses).toBeUndefined();
+    });
+  });
+
   describe('buildInquiryAnswerMail', () => {
     test('제목이 고정 문구이고 본문에 유형 라벨·원문·답변이 모두 들어간다', () => {
       const { subject, body } = buildInquiryAnswerMail(

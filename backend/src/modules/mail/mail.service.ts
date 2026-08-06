@@ -85,10 +85,16 @@ export class MailService {
     if (!this.client) {
       this.client = new SESClient({ region: process.env.AWS_REGION });
     }
+    // MAIL_FROM(no-reply@dngg.one)은 발송 전용이라 수신함이 없다 — Reply-To가
+    // 없으면 사용자의 답장이 아무 데도 도착하지 않고 사라진다. SES는 Source만
+    // 인증을 요구하므로 Reply-To는 아무 주소나 쓸 수 있다.
+    // 미설정이면 헤더를 아예 넣지 않는다(기존 동작 유지).
+    const replyTo = process.env.MAIL_REPLY_TO;
     await this.client.send(
       new SendEmailCommand({
         Source: from,
         Destination: { ToAddresses: [to] },
+        ...(replyTo ? { ReplyToAddresses: [replyTo] } : {}),
         Message: {
           Subject: { Data: subject, Charset: 'UTF-8' },
           Body: { Text: { Data: body, Charset: 'UTF-8' } },
