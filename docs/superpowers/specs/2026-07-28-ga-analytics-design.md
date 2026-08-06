@@ -106,6 +106,10 @@ React effect가 `afterInteractive` 스크립트보다 먼저 돌 수 있어서, 
 | `page_view` | `AnalyticsProvider` pathname 변경 | `page_path` |
 | `sign_up` | `Signup.tsx` — `POST /user` 성공 직후 | `method: "email"` |
 | `share_click` | `ShareButton` (기존 3곳) | `player_id`, `method` |
+| `landing_cta_click` | `LandingHero.tsx` — 랜딩 가입 CTA 클릭 | 없음 |
+
+`landing_cta_click`은 이 설계 이후 `feature/landing-intro`에서 추가됐다(2026-08-06,
+두 브랜치 모두 `main` 배포 완료). 랜딩 노출 → CTA 클릭 → `sign_up` 깔때기를 만든다.
 
 ### 의도적으로 넣지 않는 것
 

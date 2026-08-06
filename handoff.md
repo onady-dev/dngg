@@ -1,48 +1,18 @@
 # 작업 인수인계 (handoff)
 
 - 최종 갱신: 2026-08-06
-- `main` 최신 배포: GA4 계측(`feature/ga-analytics`) 머지 — 측정 ID `G-VVC37NHFYB`
-- **미머지 feature 브랜치 2개는 전부 origin에 푸시돼 있다** — 다른 기기에서 `git fetch`로 바로 이어받을 수 있다.
+- `main` 최신 배포: GA4 계측 + 소개(랜딩) 화면 — 측정 ID `G-VVC37NHFYB`
+- **미머지 feature 브랜치 1개는 origin에 푸시돼 있다** — 다른 기기에서 `git fetch`로 바로 이어받을 수 있다.
 
-## ⚠️ 진행 중인 브랜치 2개 — 먼저 읽을 것
+## ⚠️ 진행 중인 브랜치 1개 — 먼저 읽을 것
 
-두 갈래 작업이 각자 다른 이유로 멈춰 있다. 하나는 **사람이 값을 넣어야** 움직인다.
 feature 브랜치를 푸시해도 배포는 일어나지 않는다 — `deploy.yml`은 `push: branches: [main]`만 트리거한다.
 
 | 브랜치 | 상태 | 막고 있는 것 |
 |---|---|---|
-| `feature/landing-intro` | 구현·리뷰·최종리뷰 완료 | 머지만 남음 (GA 배포 완료) |
 | `feature/privacy-page` | 설계만 완료 | **사업자 정보 6개 값** (사람) |
 
-**머지 순서가 고정돼 있다: `landing-intro` → `privacy-page`.**
-`privacy-page`가 `landing-intro`에서 갈라져 나왔기 때문이다(랜딩 하단에 방침 링크를 걸어야
-하는데 `LandingHero.tsx`가 그 브랜치에만 있다). 코드 충돌은 없지만 `handoff.md`와
-`docs/featurelist.md`는 두 브랜치가 모두 고치므로 **나중에 머지하는 쪽이 텍스트 충돌을
-해결해야 한다**(`git merge-tree`로 확인함).
-
-### 1. `feature/landing-intro` — 소개(랜딩) 화면
-
-로그아웃 방문자가 `/`에 오면 "그룹을 선택해주세요" 대신 제품 소개와 가입 CTA를 본다.
-
-- 설계 `docs/superpowers/specs/2026-07-28-landing-intro-design.md`
-- 계획 `docs/superpowers/plans/2026-07-28-landing-intro.md`
-
-**알아둘 것:**
-
-- **분기는 `page.tsx`의 `if (!selectedGroup)` 블록 *안에서* 갈라진다.** `!user`를 바깥에서
-  먼저 검사하면 안 된다 — `/group/all`이 공개 API라 비로그인 사용자도 헤더에서 그룹을 골라
-  기록을 볼 수 있는데, 그 경로가 막힌다.
-- **랜딩 이미지는 가명화한 로컬 DB에서 새로 캡처했다.** 매뉴얼 스크린샷에는 실제 사용자
-  이름이 있었고, 능력치 레이더 구현 이전 화면이라 캡션과도 어긋났다. 세 번째 이미지는
-  `/player/[id]/opengraph-image`가 만드는 실제 공유 카드다. 재캡처 절차는 계획서 Task 1에 있다.
-- **`<img>`에 `width`/`height` 속성을 주면서 CSS `aspect-ratio`로 박스를 잡을 때는
-  CSS에 `height: auto`를 반드시 넣을 것.** 안 넣으면 height 속성이 CSS height로 잡혀
-  aspect-ratio가 무시되고 `object-fit: cover`가 가로를 잘라낸다. 빌드·타입·리뷰를 전부
-  통과했는데도 이미지 절반이 날아가 있었다.
-- **`landing_cta_click`은 GA가 배포된 뒤에야 수집된다.** GA는 2026-08-06에 먼저 올렸으므로
-  전제는 충족됐다. 랜딩 전환율을 묻기 전에 이 이벤트가 실제로 들어오는지부터 확인할 것.
-
-### 2. `feature/privacy-page` — 개인정보처리방침 (설계만)
+### `feature/privacy-page` — 개인정보처리방침 (설계만)
 
 - 설계 `docs/superpowers/specs/2026-07-28-privacy-policy-design.md`
 - 계획서 없음 — 아래 값을 받아야 쓸 수 있다.
@@ -57,12 +27,8 @@ feature 브랜치를 푸시해도 배포는 일어나지 않는다 — `deploy.y
 
 ## 남은 TODO (`docs/featurelist.md`)
 
-`메뉴얼 페이지를 소개 페이지로 변경`은 **코드가 이미 다 됐고 머지만 남았다** —
-위 "진행 중인 브랜치" 참고. 각 브랜치가 머지되면 자기 줄을 지운다.
-
 - [ ] 메인 페이지가 스크롤 안되게(특히 기록화면) 그리고 기록화면 가려지는 버튼 없게
 - [ ] 공유 카드에 들어가는 워딩들 개선
-- [ ] 메뉴얼 페이지를 소개 페이지로 변경
 - [ ] 마케팅 이어서 진행
 - [ ] 배포중 접속 시 nginx 에러 페이지 나오는데 서버점검중 페이지로 변경
 
@@ -76,17 +42,57 @@ feature 브랜치를 푸시해도 배포는 일어나지 않는다 — `deploy.y
   개인정보보호법상 고지 대상이다. 방침·약관 페이지가 아예 없는 상태로 계측을
   시작했다(인지된 선택). 위 `feature/privacy-page`가 이걸 해소한다 — **사업자 정보
   6개 값만 받으면 바로 쓸 수 있으므로 미해결 이슈 중 가장 먼저 닫을 것.**
+- **루트 도메인 OG 카드가 없다** — `layout.tsx`의 metadata에 `openGraph` 블록이 없어
+  `dngg.one`을 카톡·밴드에 붙여넣으면 미리보기가 비어 있다. 공유 루프의 진입 링크인데
+  카드가 없는 상태다. `src/app/opengraph-image.tsx`를 `player/[id]`와 같은 `next/og`
+  패턴으로 추가하면 된다. (랜딩 작업에서 `layout.tsx` 충돌을 피하려고 범위 밖으로 뺐던
+  것인데, GA·랜딩이 모두 머지된 지금은 막는 게 없다.)
 - **프론트엔드 `pnpm lint`가 동작하지 않는다** — `eslint.config.mjs` flat config만 있고
   Next 14.1의 `next lint`는 `.eslintrc*`를 찾아 설정 마법사가 뜬다. 테스트 러너도 없어
   (아래 "반복해서 걸린 것" 참고) 계측 회귀는 자동으로 잡히지 않는다.
 - **이메일 인증 단계 이탈이 계측되지 않는다** — SES 복구 직후라 인증 요청→인증
   완료→가입 완료 깔때기의 이탈 지점이 궁금해질 수 있다. 이번 범위에서 제외했다.
+- **네이버 SEO가 필요해지면** — `/`의 정적 HTML은 비어 있다(`page.tsx`의 `!mounted` 게이트).
+  Googlebot은 JS를 실행하지만 네이버 크롤러는 약하다. 랜딩을 게이트 앞에서 정적으로 렌더하는
+  방식으로 올릴 수 있고, 대가는 로그인 사용자가 홈 방문마다 랜딩을 한 프레임 보는 것이다.
 
 ## 배포된 기능 — 건드리기 전에 알아야 할 것
 
+### 소개(랜딩) 화면 (2026-08-06 배포)
+
+로그아웃 방문자가 `/`에 오면 "그룹을 선택해주세요" 대신 제품 소개와 가입 CTA를 본다.
+마케팅 Phase 0의 랜딩페이지 항목(`docs/superpowers/plans/2026-07-19-marketing-phase0.md` D절).
+
+- 설계 `docs/superpowers/specs/2026-07-28-landing-intro-design.md`
+- 계획 `docs/superpowers/plans/2026-07-28-landing-intro.md`
+
+알아야 할 것 네 가지:
+
+1. **분기는 `page.tsx`의 `if (!selectedGroup)` 블록 *안에서* 갈라진다.** `!user`를 바깥에서
+   먼저 검사하면 안 된다 — `/group/all`이 공개 API라 비로그인 사용자도 헤더에서 그룹을 골라
+   기록을 볼 수 있는데, 그 경로가 막힌다.
+2. **메뉴얼(`/manual/index.html`)은 그대로 남아 있다.** 헤더 nav의 `manual` 아이콘과
+   로그인 사용자의 "그룹을 선택해주세요" 화면에서 여전히 연결된다. 랜딩에는 일부러 안 넣었다
+   (단일 CTA).
+3. **이미지는 `next/image`를 쓰지 않는다.** 이 프로젝트에 `sharp`가 없어 운영 `next start`의
+   이미지 최적화가 깨진다. `public/landing/`의 미리 리사이즈한 PNG를 평범한 `<img>`로 쓴다.
+   스크린샷을 갈아끼울 때 `sips --resampleWidth 800`으로 폭을 맞출 것(`-Z`는 긴 변을 맞춰서
+   세로로 긴 이미지의 폭이 어긋난다). 그리고 `<img>`에 `width`/`height` 속성을 주면서
+   CSS `aspect-ratio`로 박스를 잡을 때는 **CSS에 `height: auto`를 반드시 넣어야 한다** —
+   안 넣으면 height 속성이 CSS height로 잡혀 aspect-ratio가 무시되고 `object-fit: cover`가
+   가로를 잘라낸다(실제로 겪었다).
+4. **랜딩 이미지는 가명화한 로컬 DB에서 새로 캡처한 것이다.** 매뉴얼 스크린샷에는 실제
+   사용자 이름이 들어 있었다. 갈아끼울 때 실데이터가 찍히지 않도록 주의할 것. 세 번째
+   이미지는 `/player/[id]/opengraph-image`가 만드는 실제 공유 카드다. 재캡처 절차는
+   계획서 Task 1에 있다.
+
+`landing_cta_click`은 GA가 먼저 배포된 뒤에 올라갔으므로 처음부터 수집된다.
+랜딩 전환율을 묻기 전에 이 이벤트가 실제로 들어오는지부터 확인할 것.
+
 ### GA4 계측 (2026-08-06 배포)
 
-`page_view`·`sign_up`·`share_click` 세 이벤트와 로그인 사용자 `user_id`를 수집한다.
+`page_view`·`sign_up`·`share_click`·`landing_cta_click` 네 이벤트와 로그인 사용자
+`user_id`를 수집한다.
 마케팅 Phase 0의 계측 항목(`docs/superpowers/plans/2026-07-19-marketing-phase0.md` E절).
 측정 ID `G-VVC37NHFYB` (데이터 보관 14개월).
 
