@@ -175,6 +175,7 @@ describe('loginUser — 그룹명 로그인', () => {
         message: INVALID_CREDENTIALS_MESSAGE,
       },
     );
+    expect(findByName).toHaveBeenCalledWith('없는그룹');
   });
 
   test('그룹은 있는데 계정이 없으면 401', async () => {
@@ -187,6 +188,12 @@ describe('loginUser — 그룹명 로그인', () => {
         status: 401,
       },
     );
+    expect(findByName).toHaveBeenCalledWith('월요농구');
+    expect(userFind).toHaveBeenCalledWith({
+      where: { groupId: 10 },
+      order: { id: 'ASC' },
+      take: 2,
+    });
   });
 
   test('한 그룹에 계정이 2개 이상이면 로그인을 거부하고 에러 로그를 남긴다', async () => {
