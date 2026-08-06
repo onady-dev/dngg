@@ -7,26 +7,14 @@ import { Logitem } from 'src/entities/Logitem.entity';
 import { assertSameGroup } from 'src/common/group-access';
 import { SubscriptionService } from '../subscription/subscription.service';
 import { LogitemRepository } from 'src/repository/config.repository';
-
-// 새 그룹 생성 시 로그 항목(득점/파울 등)을 복제해올 템플릿 그룹.
-// 실제 그룹이 아닌 예약 id로, 부팅 시 아래 기본 항목이 시드된다.
-const TEMPLATE_GROUP_ID = 0;
+import {
+  DEFAULT_LOGITEMS,
+  TEMPLATE_GROUP_ID,
+  seedLogitemsForGroup,
+} from '../logitem/logitem-seed';
 
 // 시드 직렬화용 Postgres advisory lock 키 (임의 고정값)
 const LOGITEM_SEED_LOCK_KEY = 727172;
-
-const DEFAULT_LOGITEMS: Pick<Logitem, 'name' | 'value'>[] = [
-  { name: '어시', value: 0 },
-  { name: '리바', value: 0 },
-  { name: '스틸', value: 0 },
-  { name: '블록', value: 0 },
-  { name: '턴오버', value: 0 },
-  { name: '파울', value: 0 },
-  { name: '3점', value: 3 },
-  { name: '2점', value: 2 },
-  { name: '자유투1점', value: 1 },
-  { name: '자유투2점', value: 2 },
-];
 
 @Injectable()
 export class GroupService implements OnModuleInit {
@@ -73,19 +61,8 @@ export class GroupService implements OnModuleInit {
   async createGroup(group: PostGroupRequestDto) {
     const groupInstance = plainToInstance(Group, group);
     const created = await this.groupRepository.createGroup(groupInstance);
-    await this.copyTemplateLogitems(created.id);
+    await seedLogitemsForGroup(this.logitemRepository.manager, created.id);
     return created;
-  }
-
-  // 템플릿 그룹의 로그 항목들을 새 그룹 소속으로 복제한다
-  private async copyTemplateLogitems(groupId: number) {
-    const templates =
-      await this.logitemRepository.findByGroupId(TEMPLATE_GROUP_ID);
-    if (!templates?.length) return;
-    const copies = templates.map(({ name, value }) =>
-      plainToInstance(Logitem, { groupId, name, value }),
-    );
-    await this.logitemRepository.save(copies);
   }
 
   async getAllGroups() {

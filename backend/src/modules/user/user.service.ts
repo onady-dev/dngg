@@ -9,6 +9,7 @@ import { JwtService } from '@nestjs/jwt';
 import { UserRepository } from '../../repository/user.repository';
 import { GroupRepository } from 'src/repository/group.repository';
 import { EmailVerificationService } from './email-verification.service';
+import { seedLogitemsForGroup } from '../logitem/logitem-seed';
 
 // bcrypt 패키지에 타입 선언이 없어 호출부가 `any`로 추론된다 — 신규 코드에서는
 // 타입을 명시해 unsafe-* 린트를 피한다. 기존 호출부는 out-of-scope로 남겨둔다.
@@ -55,6 +56,10 @@ export class UserService {
           password: hashedPassword,
         });
         const savedUser = await manager.save(User, user);
+        // 가입이 그룹을 만드는 유일한 실사용 경로다 — 프론트는 POST /group을 호출하지
+        // 않는다. 여기서 시드하지 않으면 기록 화면에 버튼이 하나도 없는 그룹이 된다.
+        // 같은 manager를 넘겨 그룹 생성과 원자적으로 묶는다.
+        await seedLogitemsForGroup(manager, savedGroup.id);
         await this.emailVerificationService.markConsumed(
           verificationId,
           manager,

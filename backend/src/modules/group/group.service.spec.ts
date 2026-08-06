@@ -1,5 +1,6 @@
 import { ForbiddenException } from '@nestjs/common';
 import { GroupService } from './group.service';
+import { Logitem } from '../../entities/Logitem.entity';
 
 const OWN_GROUP = 1;
 const OTHER_GROUP = 2;
@@ -19,10 +20,11 @@ const makeService = () => {
     save: jest.fn().mockResolvedValue(undefined),
   };
   const logitemRepository = {
-    findByGroupId: jest.fn().mockResolvedValue([]),
-    save: jest.fn().mockResolvedValue(undefined),
     manager: {
       transaction: jest.fn(async (fn: any) => fn(txManager)),
+      // createGroup의 로그 항목 시드가 쓰는 경로
+      find: jest.fn().mockResolvedValue([]),
+      save: jest.fn().mockResolvedValue(undefined),
     },
   };
   const service = new GroupService(
@@ -90,6 +92,8 @@ describe('GroupService.onModuleInit', () => {
   });
 });
 
+// 복제 규칙 자체(id 미복사·기본 항목 폴백)는 logitem-seed.spec.ts가 검증한다.
+// 여기서는 createGroup이 새 그룹 id로 시드를 부르는지만 본다.
 describe('GroupService.createGroup', () => {
   test('그룹 생성 시 템플릿 그룹(0)의 로그 항목을 새 그룹으로 복제한다', async () => {
     const { service, groupRepository, logitemRepository } = makeService();
@@ -104,13 +108,12 @@ describe('GroupService.createGroup', () => {
       name: `항목${i + 1}`,
       value: i,
     }));
-    logitemRepository.findByGroupId.mockResolvedValue(templates);
+    logitemRepository.manager.find.mockResolvedValue(templates);
 
     const created = await service.createGroup({ name: '새그룹' } as any);
 
     expect(created.id).toBe(NEW_GROUP_ID);
-    expect(logitemRepository.findByGroupId).toHaveBeenCalledWith(0);
-    const saved = logitemRepository.save.mock.calls[0][0];
+    const saved = logitemRepository.manager.save.mock.calls[0][1] as Logitem[];
     expect(saved).toHaveLength(10);
     saved.forEach((item, i) => {
       expect(item.groupId).toBe(NEW_GROUP_ID);
@@ -121,14 +124,17 @@ describe('GroupService.createGroup', () => {
     });
   });
 
-  test('템플릿 그룹에 로그 항목이 없으면 복제를 건너뛴다', async () => {
+  // 부팅 시드 실패로 템플릿이 비어 있어도 새 그룹이 빈 채로 남지 않아야 한다.
+  test('템플릿 그룹이 비어 있으면 기본 항목으로 시드한다', async () => {
     const { service, groupRepository, logitemRepository } = makeService();
     groupRepository.createGroup.mockResolvedValue({ id: 8, name: '새그룹' });
-    logitemRepository.findByGroupId.mockResolvedValue([]);
+    logitemRepository.manager.find.mockResolvedValue([]);
 
     await service.createGroup({ name: '새그룹' } as any);
 
-    expect(logitemRepository.save).not.toHaveBeenCalled();
+    const saved = logitemRepository.manager.save.mock.calls[0][1] as Logitem[];
+    expect(saved).toHaveLength(10);
+    saved.forEach((item) => expect(item.groupId).toBe(8));
   });
 });
 
