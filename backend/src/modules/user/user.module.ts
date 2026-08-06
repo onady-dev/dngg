@@ -12,6 +12,12 @@ import { Group } from 'src/entities/Group.entity';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MailModule } from '../mail/mail.module';
 import { EmailVerificationService } from './email-verification.service';
+import { ThrottlerModule } from '@nestjs/throttler';
+import {
+  LOGIN_THROTTLE_LIMIT,
+  LOGIN_THROTTLE_TTL_MS,
+  LoginThrottlerGuard,
+} from './login-throttler.guard';
 
 @Module({
   imports: [
@@ -25,6 +31,10 @@ import { EmailVerificationService } from './email-verification.service';
     }),
     TypeOrmModule.forFeature([User, Group, EmailVerification]),
     MailModule,
+    // 전역 가드로 걸지 않는다 — /user/login에만 @UseGuards로 붙인다.
+    ThrottlerModule.forRoot([
+      { ttl: LOGIN_THROTTLE_TTL_MS, limit: LOGIN_THROTTLE_LIMIT },
+    ]),
   ],
   controllers: [UserController],
   providers: [
@@ -33,6 +43,7 @@ import { EmailVerificationService } from './email-verification.service';
     JwtStrategy,
     UserRepository,
     GroupRepository,
+    LoginThrottlerGuard,
   ],
 })
 export class UserModule {}

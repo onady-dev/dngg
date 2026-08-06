@@ -21,6 +21,7 @@ import {
 } from './user.request.dto';
 import { EmailVerificationService } from './email-verification.service';
 import { AuthGuard } from '@nestjs/passport';
+import { LoginThrottlerGuard } from './login-throttler.guard';
 
 // AuthGuard('jwt') 통과 후 req.user는 jwt.strategy.ts validate()의 반환값
 interface RequestWithUser {
@@ -77,6 +78,7 @@ export class UserController {
   }
 
   @Post('login')
+  @UseGuards(LoginThrottlerGuard)
   async loginUser(@Body(ValidationPipe) dto: LoginUserDto) {
     // DTO 검증이 identifier/email 중 최소 하나가 비어있지 않은 문자열임을 보장하므로
     // '?? ""'는 타입상 optional을 만족시키기 위한 것일 뿐 실제로는 도달하지 않는다.
