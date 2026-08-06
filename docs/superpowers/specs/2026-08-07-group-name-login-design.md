@@ -117,7 +117,11 @@
 - 비밀번호 불일치 → 401
 - `isDeleted: true` 그룹의 그룹명 → 401
 - 한 그룹에 계정 2개 → 401 + error 로그
-- `identifier`/`email` 둘 다 없으면 400
+
+**DTO** (`src/modules/user/user-login-dto.spec.ts` 신규)
+- `identifier` + `password` 통과 / 레거시 `email` + `password` 통과
+- `identifier`·`email` 둘 다 없으면 검증 실패(400)
+- `password` 없으면 검증 실패
 
 **가드** (`src/modules/user/login-throttler.guard.spec.ts` 신규)
 - `getTracker()`가 바디의 `identifier`를 반환
