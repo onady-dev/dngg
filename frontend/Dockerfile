@@ -23,6 +23,10 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 # 토스 클라이언트 키도 빌드 시점에 번들에 박힌다 — 값 변경 시 프론트 이미지 재빌드 필요.
 ARG NEXT_PUBLIC_TOSS_CLIENT_KEY
 ENV NEXT_PUBLIC_TOSS_CLIENT_KEY=$NEXT_PUBLIC_TOSS_CLIENT_KEY
+# GA4 측정 ID도 빌드 시점에 박힌다. 값이 비면 계측 스크립트가 아예 주입되지 않으므로
+# 운영 계측이 조용히 꺼진다 — repo variable 등록을 먼저 하고 프론트를 재빌드할 것.
+ARG NEXT_PUBLIC_GA_ID
+ENV NEXT_PUBLIC_GA_ID=$NEXT_PUBLIC_GA_ID
 
 # 빌드
 RUN pnpm run build

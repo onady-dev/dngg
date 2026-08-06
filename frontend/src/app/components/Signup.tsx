@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { api } from "@/lib/axios";
+import { track } from "@/lib/analytics";
 import { useToast } from "./ui/Toast";
 import EmailCodeVerification from "./EmailCodeVerification";
 import {
@@ -45,6 +46,10 @@ const Signup = ({ setView }: { setView: (view: AuthView) => void }) => {
         groupName,
         verificationToken,
       });
+      // 이 요청이 트랜잭션 안에서 그룹도 하나 만든다(user.service.ts) —
+      // sign_up 수 = 신규 그룹 수라서 group_created를 따로 두지 않는다.
+      // ⚠️ groupName·name·email은 PII라 파라미터에 넣지 않는다.
+      track("sign_up", { method: "email" });
       showToast("회원가입이 완료되었습니다. 로그인해주세요.", "success");
       setView("login");
     } catch (error: any) {

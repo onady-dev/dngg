@@ -53,8 +53,9 @@ export 5개:
 - `GA_MEASUREMENT_ID` — `process.env.NEXT_PUBLIC_GA_ID ?? ""`
 - `isAnalyticsEnabled()` — 측정 ID가 있고 브라우저 환경일 때만 `true`
 - `track(event, props)` — **시그니처 불변**. 내부만 `gtag('event', ...)`로 교체
-- `pageview(path)` — `gtag('event', 'page_view', { page_path: path })`.
-  `page_location`(UTM 포함)은 gtag가 발화 시점의 `document.location`에서 자동으로 붙인다
+- `pageview(path)` — `gtag('event', 'page_view', { page_path, page_location })`.
+  `page_location`은 발화 시점의 `document.location`에서 읽되 민감 쿼리 파라미터를
+  제거해 **명시적으로** 보낸다(4절 파라미터 규칙). UTM은 제거 목록에 없어 그대로 남는다
 - `setAnalyticsUser(id | null)` — `gtag('set', { user_id })`
 
 이 모듈이 `window.dataLayer`와 `gtag` 스텁을 **직접 보장한다**:
@@ -122,6 +123,13 @@ React effect가 `afterInteractive` 스크립트보다 먼저 돌 수 있어서, 
 - **PII 금지.** 이메일·이름·**그룹명**은 파라미터에 절대 넣지 않는다. 그룹명은 사용자가
   입력한 실제 팀 이름이라 식별 정보에 해당하고, GA4는 PII 전송을 계정 정지 사유로 본다.
   `user_id`는 숫자 ID만 보낸다. 이 규칙을 `analytics.ts` 주석에 명시한다.
+- **`page_location`은 민감 쿼리 파라미터를 제거한 뒤 명시적으로 보낸다.** 토스 결제
+  리다이렉트 복귀 URL(`/subscription?...&customerKey=…&authKey=…`, 실패 시
+  `?fail=1&code=…&message=…`)이 자동 수집되면 `customerKey`(Group에 영속되는 계정별
+  식별자)와 `authKey`(결제 인증 자격증명)가 그대로 GA4로 나간다. `pageview()`가
+  `SENSITIVE_QUERY_KEYS`(`authKey`·`customerKey`·`token`·`code`)를 제거한 URL을
+  `page_location`으로 명시 전달해 gtag의 자동값을 덮어쓴다. UTM 파라미터는 이 목록에
+  없으므로 의도적으로 그대로 남는다 — 채널 분석에 필요하기 때문이다.
 
 ### 알려진 정상 동작
 
@@ -155,7 +163,11 @@ Secret으로 넣으면 로그 마스킹만 지저분해진다.
 - 광고 차단기가 `gtag.js`를 막아도 스텁은 `dataLayer.push`만 하므로 예외가 나지 않는다.
   큐가 쌓이지만 세션당 수십 건이라 무시할 수준이다.
 - `track()`은 `void`이고 throw하지 않는다. `ShareButton`의 공유 로직은 계측 성공 여부와
-  무관하게 진행된다.
+  무관하게 진행된다. **이 불변식은 `track()`·`setAnalyticsUser()` 내부의 `try/catch`로
+  경계에서 강제한다** — `gtag.js`가 로드된 뒤에는 `window.gtag`와 `dataLayer.push`가
+  전부 구글 코드라 우리 제어 밖에서 던질 수 있다. 호출부에서 감싸지 않는다.
+  (`Signup.tsx`의 `sign_up`은 이미 성공한 `POST /user` 뒤에 있어서, 여기서 throw하면
+  가입에 성공한 사용자에게 "회원가입에 실패했습니다"가 뜨고 재시도는 중복 이메일로 막힌다.)
 
 ## 7. 검증
 

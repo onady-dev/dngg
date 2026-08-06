@@ -22,19 +22,19 @@ export default function ShareButton({ playerId }: ShareButtonProps) {
 
       if (navigator.share) {
         await navigator.share({ url });
-        track("share_click", { playerId, method: "web_share_link" });
+        track("share_click", { player_id: playerId, method: "web_share_link" });
         return;
       }
 
       // 폴백: 링크를 클립보드에 복사
       await navigator.clipboard.writeText(url);
       showGlobalToast("링크를 복사했어요. 붙여넣으면 카드 미리보기가 떠요.", "success");
-      track("share_click", { playerId, method: "copy_link" });
+      track("share_click", { player_id: playerId, method: "copy_link" });
     } catch (e) {
       // 사용자가 공유 시트를 취소하면 AbortError → 조용히 무시
       if ((e as { name?: string })?.name !== "AbortError") {
         showGlobalToast("공유에 실패했어요. 잠시 후 다시 시도해주세요.", "error");
-        track("share_click", { playerId, method: "error" });
+        track("share_click", { player_id: playerId, method: "error" });
       }
     } finally {
       setBusy(false);

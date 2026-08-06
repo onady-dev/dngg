@@ -8,6 +8,7 @@ import InstallPrompt from "./components/InstallPrompt";
 import { ToastProvider } from "./components/ui/Toast";
 import { ConfirmProvider } from "./components/ui/ConfirmDialog";
 import { Providers } from "./providers";
+import AnalyticsProvider from "./components/AnalyticsProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -56,6 +57,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </ToastProvider>
           </StyledComponentsRegistry>
         </Providers>
+        <AnalyticsProvider />
       </body>
     </html>
   );

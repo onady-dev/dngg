@@ -1,58 +1,26 @@
 # 작업 인수인계 (handoff)
 
-- 최종 갱신: 2026-07-30
-- `main` 최신 배포: `34636e7` (CI Deploy 성공)
-- **미머지 feature 브랜치 3개는 전부 origin에 푸시돼 있다** — 다른 기기에서 `git fetch`로 바로 이어받을 수 있다.
+- 최종 갱신: 2026-08-06
+- `main` 최신 배포: GA4 계측(`feature/ga-analytics`) 머지 — 측정 ID `G-VVC37NHFYB`
+- **미머지 feature 브랜치 2개는 전부 origin에 푸시돼 있다** — 다른 기기에서 `git fetch`로 바로 이어받을 수 있다.
 
-## ⚠️ 진행 중인 브랜치 3개 — 먼저 읽을 것
+## ⚠️ 진행 중인 브랜치 2개 — 먼저 읽을 것
 
-세 갈래 작업이 각자 다른 이유로 멈춰 있다. 둘은 **사람이 값을 넣어야** 움직인다.
+두 갈래 작업이 각자 다른 이유로 멈춰 있다. 하나는 **사람이 값을 넣어야** 움직인다.
 feature 브랜치를 푸시해도 배포는 일어나지 않는다 — `deploy.yml`은 `push: branches: [main]`만 트리거한다.
 
 | 브랜치 | 상태 | 막고 있는 것 |
 |---|---|---|
-| `feature/ga-analytics` | 구현·리뷰·최종리뷰 완료 | **GA4 속성 생성 + repo Variable 등록** (사람) |
-| `feature/landing-intro` | 구현·리뷰·최종리뷰 완료 | GA 배포 순서 대기 |
+| `feature/landing-intro` | 구현·리뷰·최종리뷰 완료 | 머지만 남음 (GA 배포 완료) |
 | `feature/privacy-page` | 설계만 완료 | **사업자 정보 6개 값** (사람) |
 
-**머지 순서가 고정돼 있다: `ga-analytics` → `landing-intro` → `privacy-page`.**
+**머지 순서가 고정돼 있다: `landing-intro` → `privacy-page`.**
 `privacy-page`가 `landing-intro`에서 갈라져 나왔기 때문이다(랜딩 하단에 방침 링크를 걸어야
 하는데 `LandingHero.tsx`가 그 브랜치에만 있다). 코드 충돌은 없지만 `handoff.md`와
-`docs/featurelist.md`는 세 브랜치가 모두 고치므로 **나중에 머지하는 쪽이 텍스트 충돌을
+`docs/featurelist.md`는 두 브랜치가 모두 고치므로 **나중에 머지하는 쪽이 텍스트 충돌을
 해결해야 한다**(`git merge-tree`로 확인함).
 
-### 1. `feature/ga-analytics` — GA4 계측
-
-`page_view`·`sign_up`·`share_click` 세 이벤트와 로그인 사용자 `user_id`를 수집한다.
-
-- 설계 `docs/superpowers/specs/2026-07-28-ga-analytics-design.md`
-- 계획 `docs/superpowers/plans/2026-07-28-ga-analytics.md`
-
-**머지 전에 사람이 해야 할 것 (순서 중요):**
-
-1. GA4 속성 + 웹 데이터 스트림 생성 → 측정 ID `G-XXXXXXXXXX`.
-   이때 **데이터 보관을 2개월 → 14개월로** 바꿀 것. **소급 적용되지 않는다.**
-2. GitHub repo Settings → Secrets and variables → Actions → **Variables 탭**(Secrets 아님)에
-   `NEXT_PUBLIC_GA_ID` 등록.
-
-**등록이 코드 머지보다 먼저다.** 값이 빌드 시점에 번들에 박히는데, 나중에 등록하면
-CI 경로 필터상 `frontend/**`가 안 바뀌는 한 프론트 잡이 돌지 않아 아무 일도 일어나지 않는다.
-그때는 `workflow_dispatch`를 써야 하는데 그건 백엔드까지 재배포한다.
-
-배포 후: `player_id`·`method`를 GA4 맞춤 측정기준으로 등록해야 리포트에 보인다.
-
-**최종 리뷰가 배포 전에 잡은 두 가지 (수정 완료, 알아둘 것):**
-
-- **토스 결제 자격증명이 GA4로 새어나갈 뻔했다.** gtag가 `page_location`으로 전체 URL을
-  자동 수집하는데, 토스 빌링 인증이 `/subscription?...&customerKey=<uuid>&authKey=<자격증명>`
-  으로 리다이렉트한다. `customerKey`는 Group 행에 영속되는 계정별 식별자다.
-  → `pageview()`가 `SENSITIVE_QUERY_KEYS`를 제거한 URL을 명시 전달한다.
-  **쿼리스트링에 자격증명·식별자를 담는 새 라우트를 만들면 이 목록에 추가할 것.**
-- **`track()`이 가입 성공을 실패로 뒤집을 수 있었다.** `Signup.tsx`의 `track("sign_up")`이
-  성공한 `POST /user` 뒤 try 블록 안에 있어서, throw하면 "회원가입에 실패했습니다"가 뜨는데
-  계정은 이미 생성된 상태였다. → `track()`·`setAnalyticsUser()` 내부 try/catch로 경계에서 강제.
-
-### 2. `feature/landing-intro` — 소개(랜딩) 화면
+### 1. `feature/landing-intro` — 소개(랜딩) 화면
 
 로그아웃 방문자가 `/`에 오면 "그룹을 선택해주세요" 대신 제품 소개와 가입 CTA를 본다.
 
@@ -71,10 +39,10 @@ CI 경로 필터상 `frontend/**`가 안 바뀌는 한 프론트 잡이 돌지 �
   CSS에 `height: auto`를 반드시 넣을 것.** 안 넣으면 height 속성이 CSS height로 잡혀
   aspect-ratio가 무시되고 `object-fit: cover`가 가로를 잘라낸다. 빌드·타입·리뷰를 전부
   통과했는데도 이미지 절반이 날아가 있었다.
-- **`landing_cta_click`은 GA가 배포되기 전까지 아무것도 수집하지 않는다.** 그래서 GA를
-  먼저 올린다. 랜딩 전환율을 묻기 전에 이걸 확인할 것.
+- **`landing_cta_click`은 GA가 배포된 뒤에야 수집된다.** GA는 2026-08-06에 먼저 올렸으므로
+  전제는 충족됐다. 랜딩 전환율을 묻기 전에 이 이벤트가 실제로 들어오는지부터 확인할 것.
 
-### 3. `feature/privacy-page` — 개인정보처리방침 (설계만)
+### 2. `feature/privacy-page` — 개인정보처리방침 (설계만)
 
 - 설계 `docs/superpowers/specs/2026-07-28-privacy-policy-design.md`
 - 계획서 없음 — 아래 값을 받아야 쓸 수 있다.
@@ -89,13 +57,12 @@ CI 경로 필터상 `frontend/**`가 안 바뀌는 한 프론트 잡이 돌지 �
 
 ## 남은 TODO (`docs/featurelist.md`)
 
-`GA 적용`과 `메뉴얼 페이지를 소개 페이지로 변경`은 **코드가 이미 다 됐고 머지만 남았다** —
+`메뉴얼 페이지를 소개 페이지로 변경`은 **코드가 이미 다 됐고 머지만 남았다** —
 위 "진행 중인 브랜치" 참고. 각 브랜치가 머지되면 자기 줄을 지운다.
 
 - [ ] 메인 페이지가 스크롤 안되게(특히 기록화면) 그리고 기록화면 가려지는 버튼 없게
 - [ ] 공유 카드에 들어가는 워딩들 개선
 - [ ] 메뉴얼 페이지를 소개 페이지로 변경
-- [ ] GA 적용
 - [ ] 마케팅 이어서 진행
 - [ ] 배포중 접속 시 nginx 에러 페이지 나오는데 서버점검중 페이지로 변경
 
@@ -105,8 +72,53 @@ CI 경로 필터상 `frontend/**`가 안 바뀌는 한 프론트 잡이 돌지 �
   계정이 있을 수 있다. 가입일 기준으로 훑어볼 필요가 있다. (`PROJECT_CONTEXT.md` 9절)
 - **Dockerfile Node 버전 스큐** — 운영 컨테이너는 `node:20`, CI `setup-node`는 22다.
   (`PROJECT_CONTEXT.md` 3.3)
+- **개인정보처리방침 페이지가 없다** — GA4가 쿠키/식별자를 심으므로 국내
+  개인정보보호법상 고지 대상이다. 방침·약관 페이지가 아예 없는 상태로 계측을
+  시작했다(인지된 선택). 위 `feature/privacy-page`가 이걸 해소한다 — **사업자 정보
+  6개 값만 받으면 바로 쓸 수 있으므로 미해결 이슈 중 가장 먼저 닫을 것.**
+- **프론트엔드 `pnpm lint`가 동작하지 않는다** — `eslint.config.mjs` flat config만 있고
+  Next 14.1의 `next lint`는 `.eslintrc*`를 찾아 설정 마법사가 뜬다. 테스트 러너도 없어
+  (아래 "반복해서 걸린 것" 참고) 계측 회귀는 자동으로 잡히지 않는다.
+- **이메일 인증 단계 이탈이 계측되지 않는다** — SES 복구 직후라 인증 요청→인증
+  완료→가입 완료 깔때기의 이탈 지점이 궁금해질 수 있다. 이번 범위에서 제외했다.
 
 ## 배포된 기능 — 건드리기 전에 알아야 할 것
+
+### GA4 계측 (2026-08-06 배포)
+
+`page_view`·`sign_up`·`share_click` 세 이벤트와 로그인 사용자 `user_id`를 수집한다.
+마케팅 Phase 0의 계측 항목(`docs/superpowers/plans/2026-07-19-marketing-phase0.md` E절).
+측정 ID `G-VVC37NHFYB` (데이터 보관 14개월).
+
+- 설계 `docs/superpowers/specs/2026-07-28-ga-analytics-design.md`
+- 계획 `docs/superpowers/plans/2026-07-28-ga-analytics.md`
+
+**배포 후 남은 사람 작업**: `player_id`·`method`를 GA4 맞춤 측정기준으로 등록해야
+리포트에서 이 파라미터로 나눠 볼 수 있다. 보관 기간과 마찬가지로 **소급 적용되지 않으니**
+빨리 등록할 것 — 등록 전에 들어온 이벤트는 파라미터 값 없이 집계된다.
+
+알아야 할 것:
+
+1. **측정 ID는 빌드 시점에 박힌다.** GitHub repo **Variables**(Secret 아님)의
+   `NEXT_PUBLIC_GA_ID` → CI build-arg → Dockerfile ARG. 값을 바꾸면 프론트
+   이미지를 재빌드해야 하고, `frontend/**` 변경 없이 variable만 고치면 아무 일도
+   일어나지 않는다.
+2. **측정 ID가 비면 계측이 통째로 꺼진다** — 스크립트를 아예 붙이지 않는다.
+   로컬 오염 방지 장치지만, 운영에서 variable이 빠지면 조용히 무계측이 된다.
+3. **`group_created` 이벤트는 일부러 없다.** `POST /user`가 트랜잭션 안에서 그룹을
+   무조건 하나 만들어서(`user.service.ts:48`) `sign_up` 수 = 신규 그룹 수다.
+4. **`page_location`은 민감 쿼리 파라미터를 제거하고 명시적으로 보낸다.** 토스 결제
+   복귀 URL의 `authKey`·`customerKey`가 자동 수집을 통해 GA4로 새 나가는 것을 막으려고
+   `analytics.ts`의 `SENSITIVE_QUERY_KEYS`로 걸러낸다. 새 라우트가 쿼리스트링에 자격증명·
+   식별자를 담아 리다이렉트를 받는다면 이 목록에 추가해야 한다.
+   `customerKey`는 Group 행에 영속되는 계정별 식별자라 한 번 나가면 회수할 수 없다.
+5. **`track()`·`setAnalyticsUser()`는 throw하지 않는다 (설계 §6 불변식).** 내부 try/catch로
+   경계에서 강제한다. `Signup.tsx`의 `track("sign_up")`이 성공한 `POST /user` 뒤 try 블록
+   안에 있어서, 던지면 계정은 생성됐는데 "회원가입에 실패했습니다"가 뜬다. 계측 호출을
+   성공 경로 뒤에 새로 넣을 때 이 불변식에 기대도 된다.
+
+`useSearchParams`를 쓰지 않은 것도 의도적이다 — 쓰면 Suspense 경계가 강제되고
+정적 라우트(현재 10개)가 동적으로 바뀐다. UTM은 gtag가 `document.location`에서 읽는다.
 
 ### 문의·피드백 (2026-07-28 ~ 29 배포)
 

@@ -104,6 +104,7 @@ jobs:
           build-args: |
             NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL || 'https://dngg.one/api' }}
             NEXT_PUBLIC_TOSS_CLIENT_KEY=${{ vars.NEXT_PUBLIC_TOSS_CLIENT_KEY }}
+            NEXT_PUBLIC_GA_ID=${{ vars.NEXT_PUBLIC_GA_ID }}
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/dngg-frontend:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/dngg-frontend:sha-${{ github.sha }}
