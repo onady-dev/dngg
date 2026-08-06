@@ -3,19 +3,20 @@ import { UserController } from './user.controller';
 import { UserService } from './user.service';
 import { EmailVerificationService } from './email-verification.service';
 
-describe('UserController 소유권 검증', () => {
-  const buildController = () => {
-    const userService = {
-      updateUser: jest.fn().mockResolvedValue({ id: 1 }),
-      deleteUser: jest.fn().mockResolvedValue(undefined),
-    };
-    const controller = new UserController(
-      userService as unknown as UserService,
-      {} as unknown as EmailVerificationService,
-    );
-    return { controller, userService };
+const buildController = () => {
+  const userService = {
+    updateUser: jest.fn().mockResolvedValue({ id: 1 }),
+    deleteUser: jest.fn().mockResolvedValue(undefined),
+    loginUser: jest.fn().mockResolvedValue({ accessToken: 't' }),
   };
+  const controller = new UserController(
+    userService as unknown as UserService,
+    {} as unknown as EmailVerificationService,
+  );
+  return { controller, userService };
+};
 
+describe('UserController 소유권 검증', () => {
   describe('updateUser', () => {
     test('본인 id면 수정을 허용한다', async () => {
       const { controller, userService } = buildController();
@@ -58,5 +59,30 @@ describe('UserController 소유권 검증', () => {
       );
       expect(userService.deleteUser).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('loginUser', () => {
+  test('identifier를 서비스에 그대로 넘긴다', async () => {
+    const { controller, userService } = buildController();
+
+    await controller.loginUser({
+      identifier: '월요농구',
+      password: 'pw12345678',
+    });
+
+    expect(userService.loginUser).toHaveBeenCalledWith(
+      '월요농구',
+      'pw12345678',
+    );
+  });
+
+  // 캐시된 구버전 프론트 번들은 여전히 email 키로 보낸다.
+  test('identifier가 없으면 레거시 email 키를 쓴다', async () => {
+    const { controller, userService } = buildController();
+
+    await controller.loginUser({ email: 'a@b.co', password: 'pw12345678' });
+
+    expect(userService.loginUser).toHaveBeenCalledWith('a@b.co', 'pw12345678');
   });
 });

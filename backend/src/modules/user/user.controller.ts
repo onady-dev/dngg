@@ -14,6 +14,7 @@ import { UserService } from './user.service';
 import {
   ConfirmEmailVerificationDto,
   CreateUserDto,
+  LoginUserDto,
   RequestEmailVerificationDto,
   ResetPasswordDto,
   UpdateUserDto,
@@ -76,11 +77,13 @@ export class UserController {
   }
 
   @Post('login')
-  async loginUser(
-    @Body('email') identifier: string,
-    @Body('password') password: string,
-  ) {
-    return this.userService.loginUser(identifier, password);
+  async loginUser(@Body(ValidationPipe) dto: LoginUserDto) {
+    // DTO 검증에서 identifier/email 둘 다 없으면 이미 400으로 걸러지므로
+    // '?? ""'는 타입상 optional을 만족시키기 위한 것일 뿐 실제로는 도달하지 않는다.
+    return this.userService.loginUser(
+      dto.identifier ?? dto.email ?? '',
+      dto.password,
+    );
   }
 
   @Post('password-reset')

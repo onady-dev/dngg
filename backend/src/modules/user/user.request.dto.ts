@@ -6,6 +6,7 @@ import {
   IsString,
   Length,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
 import {
   VERIFICATION_PURPOSES,
@@ -66,4 +67,23 @@ export class ResetPasswordDto {
   @IsString()
   @MinLength(8)
   newPassword: string;
+}
+
+export class LoginUserDto {
+  // 이메일 또는 그룹명. 둘 다 비면 양쪽 검증이 모두 실패해 400이 된다.
+  @ValidateIf((o: LoginUserDto) => !o.email)
+  @IsString()
+  @IsNotEmpty()
+  identifier?: string;
+
+  // 캐시된 구버전 프론트 번들 호환용 — 새 클라이언트는 identifier를 보낸다.
+  // 전역 ValidationPipe가 forbidNonWhitelisted라 여기 선언해 두지 않으면 400이 난다.
+  @ValidateIf((o: LoginUserDto) => !o.identifier)
+  @IsString()
+  @IsNotEmpty()
+  email?: string;
+
+  @IsString()
+  @IsNotEmpty()
+  password: string;
 }
