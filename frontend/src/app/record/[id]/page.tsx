@@ -1039,11 +1039,6 @@ export default function RecordPage() {
       return;
     }
 
-    // 토스트 안내용으로 마지막 로그 정보를 미리 확보
-    const lastLog = game.logs[game.logs.length - 1];
-    const lastPlayer = [...game.homePlayers, ...game.awayPlayers].find(p => p.id === lastLog.playerId);
-    const lastLogItem = logItems.find(item => item.id === lastLog.logitemId);
-
     try {
       // 백엔드 API 호출하여 마지막 로그 삭제
       await api.delete(`/log/game/${game.id}/undo`, {
@@ -1055,11 +1050,9 @@ export default function RecordPage() {
       // 게임 데이터 새로고침 (다른 기록자와의 동시 사용을 고려해 서버 기준으로 갱신)
       const response = await api.get<Game>(`/game/${game.id}`);
       setGame(response.data);
-
-      showToast(
-        `기록 취소: ${lastPlayer?.name ?? "알 수 없음"} ${lastLogItem?.name ?? ""}`.trim(),
-        "info"
-      );
+      // 성공 토스트를 띄우지 않는다 — 취소된 항목이 로그에서 곧바로 사라지는 것이
+      // 이미 피드백이고, 토스트는 화면 하단 정중앙(=가로 모드의 로그 패널 자리)을
+      // 3초간 가려 정작 그 확인을 방해했다. 실패했을 때만 알린다.
     } catch (error) {
       console.error("로그 삭제에 실패했습니다:", error);
       showToast("기록 취소에 실패했습니다. 다시 시도해주세요.", "error");
