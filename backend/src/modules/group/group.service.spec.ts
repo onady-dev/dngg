@@ -9,6 +9,7 @@ const makeService = () => {
   const groupRepository = {
     createGroup: jest.fn(),
     softDeleteById: jest.fn().mockResolvedValue(undefined),
+    findAll: jest.fn().mockResolvedValue([]),
   };
   const subscriptionService = {
     cancelForGroup: jest.fn().mockResolvedValue(undefined),
@@ -152,5 +153,47 @@ describe('GroupService.deleteGroup', () => {
     await service.deleteGroup(OWN_GROUP, OWN_GROUP);
     expect(subscriptionService.cancelForGroup).toHaveBeenCalledWith(OWN_GROUP);
     expect(groupRepository.softDeleteById).toHaveBeenCalledWith(OWN_GROUP);
+  });
+});
+
+describe('GroupService.getAllGroups', () => {
+  // /group/all은 인증 없이 열려 있다(비로그인 사용자도 그룹을 골라 기록을 본다).
+  // 그룹명이 로그인 아이디가 된 뒤로는 이 응답이 사실상 아이디 목록이므로,
+  // 화면이 쓰는 id/name만 남기고 결제·과금 필드는 내보내지 않는다.
+  test('id와 name만 반환한다', async () => {
+    const { service, groupRepository } = makeService();
+    groupRepository.findAll.mockResolvedValue([
+      {
+        id: 1,
+        name: '월요농구',
+        isDeleted: false,
+        freeGamesUsed: 3,
+        customerKey: 'secret-customer-key',
+      },
+      {
+        id: 2,
+        name: '수요농구',
+        isDeleted: false,
+        freeGamesUsed: 0,
+        customerKey: null,
+      },
+    ]);
+
+    const groups = await service.getAllGroups();
+
+    expect(groups).toEqual([
+      { id: 1, name: '월요농구' },
+      { id: 2, name: '수요농구' },
+    ]);
+    groups.forEach((group) => {
+      expect(Object.keys(group).sort()).toEqual(['id', 'name']);
+    });
+  });
+
+  test('그룹이 없으면 빈 배열을 반환한다', async () => {
+    const { service, groupRepository } = makeService();
+    groupRepository.findAll.mockResolvedValue([]);
+
+    await expect(service.getAllGroups()).resolves.toEqual([]);
   });
 });

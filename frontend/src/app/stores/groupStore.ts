@@ -2,10 +2,10 @@ import { create } from "zustand";
 import { api } from "@/lib/axios";
 import { useAuthStore } from "./useAuthStore";
 
+// GET /group/all의 응답 형태 — 공개 API라 id/name만 내려온다.
 interface Group {
   id: number;
   name: string;
-  description: string;
 }
 
 interface GroupState {

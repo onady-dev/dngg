@@ -30,6 +30,10 @@ export class CreateUserDto {
   @Length(1, 30)
   name: string;
   // Group.name 컬럼이 varchar(20)이므로 DTO에서 먼저 길이를 검증한다.
+  // 그룹명은 로그인 아이디이기도 하다 — 로그인은 입력을 trim하므로, 앞뒤 공백이
+  // 섞인 채로 저장되면 화면에 보이는 이름으로는 영영 로그인되지 않는다.
+  // 길이 검증보다 먼저 trim되도록 @Transform이 붙어 있다(변환은 검증 전에 일어난다).
+  @Transform(trimIfString)
   @IsNotEmpty()
   @IsString()
   @Length(1, 20)
