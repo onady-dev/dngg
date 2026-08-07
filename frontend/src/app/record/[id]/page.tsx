@@ -40,11 +40,17 @@ const Container = styled.div`
 const BackButton = styled.button`
   position: fixed;
   top: 1rem;
-  right: 1rem;
-  padding: 0.5rem 1rem;
+  left: 1rem;
+  /* 아이콘만 남았으므로 터치 타겟이 44px 아래로 내려가지 않도록 크기를 고정한다 */
+  width: 2.25rem;
+  height: 2.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background-color: #f3f4f6;
   border-radius: 0.375rem;
-  font-size: 0.875rem;
+  font-size: 1.125rem;
+  line-height: 1;
   color: #374151;
   transition: background-color 0.2s;
   z-index: 1000;
@@ -55,7 +61,7 @@ const BackButton = styled.button`
 
   @media (min-width: 768px) {
     top: 1.5rem;
-    right: 1.5rem;
+    left: 1.5rem;
   }
 `;
 
@@ -64,6 +70,9 @@ const GameInfoHeader = styled.div`
   flex-direction: column;
   align-items: center;
   margin-bottom: 0.5rem;
+  /* 뒤로가기 버튼이 좌상단에 고정되어 있어, 가운데 정렬된 경기명이 그 아래로
+     밀려들어가지 않도록 양쪽에 같은 폭을 비워 둔다 */
+  padding: 0 2.75rem;
 `;
 
 const GameName = styled.h2`
@@ -514,30 +523,6 @@ const HistoryButton = styled.button`
   }
 `;
 
-const RotateBanner = styled.div`
-  display: none;
-
-  @media (orientation: portrait) and (max-width: 768px) {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    background-color: #1f2937;
-    color: white;
-    border-radius: 0.5rem;
-    padding: 0.5rem 0.75rem;
-    margin-bottom: 0.5rem;
-    font-size: 0.8125rem;
-
-    button {
-      color: #d1d5db;
-      font-size: 0.75rem;
-      text-decoration: underline;
-      white-space: nowrap;
-    }
-  }
-`;
-
 const CoachmarkOverlay = styled.div`
   position: fixed;
   inset: 0;
@@ -615,7 +600,6 @@ export default function RecordPage() {
   const [isRecording, setIsRecording] = useState(false);
   const [isChangingQuarter, setIsChangingQuarter] = useState(false);
   const [showCoachmark, setShowCoachmark] = useState(false);
-  const [showRotateBanner, setShowRotateBanner] = useState(true);
 
   // 기록 입력은 로그인 + 이 경기가 내 소속 그룹의 경기일 때만 허용한다.
   const canRecord = !!user && !!game && user.groupId === game.groupId;
@@ -960,13 +944,10 @@ export default function RecordPage() {
         </CoachmarkOverlay>
       )}
       <Container className="full-height">
-      <BackButton onClick={() => router.back()}>뒤로 가기</BackButton>
-      {showRotateBanner && (
-        <RotateBanner>
-          <span>📱 가로 모드에서 더 편하게 기록할 수 있습니다.</span>
-          <button onClick={() => setShowRotateBanner(false)}>세로로 계속하기</button>
-        </RotateBanner>
-      )}
+      {/* 아이콘만 남으므로 스크린리더용 이름을 aria-label로 따로 준다 */}
+      <BackButton onClick={() => router.back()} aria-label="뒤로 가기">
+        {'<'}
+      </BackButton>
       <GameInfoHeader>
         <GameName>{`${game.homeTeamName} vs ${game.awayTeamName}`}</GameName>
         {!canRecord && (
