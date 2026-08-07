@@ -30,10 +30,17 @@ const Container = styled.div`
     padding: 1rem;
   }
 
+  /* 모바일 가로: 페이지 자체는 스크롤하지 않는다. 화면을 뷰포트 높이에 맞추고
+     선수 목록·로그 피드만 각자 스크롤시켜, 점수·쿼터·되돌리기가 항상 보이게 한다.
+     (dvh를 쓰면 브라우저 주소창이 접히고 펴질 때 높이가 따라간다) */
   @media (orientation: landscape) and (max-height: 500px) {
-    height: auto;
-    min-height: calc(100vh + 60px);
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+    /* 하단에 PWA 설치 배너(InstallPrompt)가 position: fixed로 깔린다 —
+       그만큼 비워두지 않으면 선수 목록 마지막 줄이 배너에 가린다 */
     padding-bottom: 70px;
+    overflow: hidden;
   }
 `;
 
@@ -73,6 +80,17 @@ const GameInfoHeader = styled.div`
   /* 뒤로가기 버튼이 좌상단에 고정되어 있어, 가운데 정렬된 경기명이 그 아래로
      밀려들어가지 않도록 양쪽에 같은 폭을 비워 둔다 */
   padding: 0 2.75rem;
+
+  /* 모바일 가로: 세로 공간이 390px 남짓뿐이라 세로로 쌓으면 헤더만 193px를
+     먹는다. 경기명을 숨기고 나머지를 한 줄로 몰아 ~60px로 줄인 뒤 고정한다. */
+  @media (orientation: landscape) and (max-height: 500px) {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.5rem 0.75rem;
+    margin-bottom: 0.375rem;
+    flex-shrink: 0;
+  }
 `;
 
 const GameName = styled.h2`
@@ -80,6 +98,11 @@ const GameName = styled.h2`
   font-weight: 600;
   margin-bottom: 0.5rem;
   text-align: center;
+
+  /* 가로 모드에서는 헤더를 한 줄로 압축해야 해서 경기명을 숨긴다 */
+  @media (orientation: landscape) and (max-height: 500px) {
+    display: none;
+  }
 `;
 
 const ViewOnlyNotice = styled.div`
@@ -110,6 +133,11 @@ const ScoreDisplay = styled.div`
     font-size: 1rem;
     color: #6b7280;
     font-weight: 500;
+  }
+
+  @media (orientation: landscape) and (max-height: 500px) {
+    margin: 0;
+    font-size: 1.25rem;
   }
 `;
 
@@ -142,6 +170,12 @@ const SwapButton = styled.button`
     width: 1rem;
     height: 1rem;
   }
+
+  @media (orientation: landscape) and (max-height: 500px) {
+    margin-top: 0;
+    padding: 0.375rem 0.625rem;
+    font-size: 0.8125rem;
+  }
 `;
 
 const QuarterBar = styled.div`
@@ -149,6 +183,12 @@ const QuarterBar = styled.div`
   gap: 0.375rem;
   margin-top: 0.5rem;
   align-items: center;
+
+  @media (orientation: landscape) and (max-height: 500px) {
+    margin-top: 0;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
 `;
 
 const QuarterChip = styled.button<{ isActive: boolean }>`
@@ -175,9 +215,12 @@ const TeamsContainer = styled.div`
   height: auto;
   overflow: visible;
 
+  /* 가로 모드: 헤더가 쓰고 남은 높이를 전부 차지하고, 넘치는 부분은
+     각 열(선수 목록·로그 피드)이 스스로 스크롤한다 */
   @media (orientation: landscape) and (max-height: 500px) {
     height: auto;
-    min-height: 300px;
+    min-height: 0;
+    overflow: hidden;
   }
 
   /* 세로 모드: 팀을 좌우 2열로, 기록 피드는 아래 전체 폭으로 배치 */
@@ -238,6 +281,15 @@ const TeamSection = styled.div`
       order: 2;
     }
   }
+
+  /* 가로 모드: 팀 헤더는 고정하고 선수 목록만 스크롤시키기 위한 전제.
+     min-height: 0이 없으면 flex 자식이 콘텐츠 높이만큼 부풀어 스크롤이 안 생긴다. */
+  @media (orientation: landscape) and (max-height: 500px) {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    margin-top: 0;
+  }
 `;
 
 const PlayerList = styled.div`
@@ -251,6 +303,8 @@ const PlayerList = styled.div`
 
   @media (orientation: landscape) and (max-height: 500px) {
     max-height: none;
+    flex: 1;
+    min-height: 0;
   }
 
   @media (orientation: portrait) and (max-width: 768px) {
@@ -320,6 +374,8 @@ const LogItemsContainer = styled.div`
 
   @media (orientation: landscape) and (max-height: 500px) {
     max-height: none;
+    flex: 1;
+    min-height: 0;
   }
 
   @media (orientation: portrait) and (max-width: 768px) {
@@ -440,8 +496,12 @@ const LogHistoryContainer = styled.div`
   background: white;
   border-radius: 0.5rem;
   padding: 0.75rem;
-  height: 100%;
-  overflow-y: auto; /* 로그 영역만 스크롤 허용 */
+  /* 높이는 그리드 행이 stretch로 채워준다. height: 100%를 주면 세로 모드처럼
+     행 높이가 콘텐츠 기반일 때 계산이 어긋나 열이 찌그러진다. */
+  height: auto;
+  min-height: 0;
+  /* 스크롤은 안쪽 LogFeed가 맡는다 — 여기서 스크롤하면 되돌리기 버튼까지 같이 밀려 올라간다 */
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -452,6 +512,19 @@ const LogHistoryContainer = styled.div`
     max-height: 40vh;
     border: 1px solid var(--border-color);
   }
+`;
+
+/* 로그 목록만 스크롤시켜 되돌리기 버튼이 항상 보이게 한다.
+   flex-basis를 auto로 두는 이유: 부모 높이가 정해진 가로·데스크톱에서는 남은 공간을
+   채우고, 부모가 콘텐츠 기반인 세로 모드에서는 내용만큼 커진 뒤 부모의 max-height(40vh)
+   에서 스크롤로 넘어간다. basis 0(`flex: 1`)이면 후자에서 높이 기여가 0이 된다. */
+const LogFeed = styled.div`
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 `;
 
 const LogHistoryItem = styled.div`
@@ -490,6 +563,8 @@ const HistoryButtonContainer = styled.div`
   margin: 0.25rem 0;
   min-height: 20px;
   align-items: center;
+  /* 로그가 길어져도 되돌리기 버튼은 줄어들거나 밀려나지 않는다 */
+  flex-shrink: 0;
 `;
 
 const HistoryButton = styled.button`
@@ -1072,6 +1147,7 @@ export default function RecordPage() {
             되돌리기
           </HistoryButton>
           </HistoryButtonContainer>
+          <LogFeed>
             {getProcessedLogs().map((log, index) => (
               <LogHistoryItem key={log.id || index}>
                 <LogHistoryPlayerName style={{
@@ -1086,6 +1162,7 @@ export default function RecordPage() {
             {getProcessedLogs().length === 0 && (
               <LogHistoryItem>기록된 로그가 없습니다.</LogHistoryItem>
             )}
+          </LogFeed>
         </LogHistoryContainer>
 
         {/* 오른쪽 팀 영역 */}
