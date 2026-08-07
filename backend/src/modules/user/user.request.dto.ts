@@ -5,13 +5,20 @@ import {
   IsOptional,
   IsString,
   Length,
+  MaxLength,
   MinLength,
   ValidateIf,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 import {
   VERIFICATION_PURPOSES,
   VerificationPurpose,
 } from './email-verification.constants';
+
+// 문자열이면 앞뒤 공백을 제거하고, 문자열이 아니면 그대로 통과시켜 이후 @IsString이
+// 타입 에러로 잡게 한다(여기서 강제 변환하면 타입 검증이 무력화된다).
+const trimIfString = ({ value }: { value: unknown }) =>
+  typeof value === 'string' ? value.trim() : value;
 
 export class CreateUserDto {
   @IsEmail()
@@ -76,15 +83,19 @@ export class LoginUserDto {
   @ValidateIf(
     (o: LoginUserDto) => o.identifier !== undefined || o.email === undefined,
   )
+  @Transform(trimIfString)
   @IsString()
   @IsNotEmpty()
+  @MaxLength(254)
   identifier?: string;
 
   // 캐시된 구버전 프론트 번들 호환용 — 새 클라이언트는 identifier를 보낸다.
   // 전역 ValidationPipe가 forbidNonWhitelisted라 여기 선언해 두지 않으면 400이 난다.
   @ValidateIf((o: LoginUserDto) => o.email !== undefined)
+  @Transform(trimIfString)
   @IsString()
   @IsNotEmpty()
+  @MaxLength(254)
   email?: string;
 
   @IsString()

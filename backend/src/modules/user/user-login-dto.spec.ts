@@ -56,4 +56,31 @@ describe('LoginUserDto', () => {
     });
     expect(errors.map((e) => e.property)).toContain('email');
   });
+
+  // @IsNotEmpty는 trim하지 않으므로 @Transform으로 먼저 공백을 제거해야 걸린다.
+  test('공백만 있는 identifier는 trim 후 빈 문자열이 되어 실패한다', async () => {
+    const errors = await validateBody({
+      identifier: '   ',
+      password: 'pw12345678',
+    });
+    expect(errors.map((e) => e.property)).toContain('identifier');
+  });
+
+  test('255자 identifier는 MaxLength(254)에 걸려 실패한다', async () => {
+    const errors = await validateBody({
+      identifier: 'a'.repeat(255),
+      password: 'pw12345678',
+    });
+    expect(errors.map((e) => e.property)).toContain('identifier');
+  });
+
+  test('앞뒤 공백이 있는 identifier는 trim되어 통과한다', async () => {
+    const instance = plainToInstance(LoginUserDto, {
+      identifier: '  월요농구  ',
+      password: 'pw12345678',
+    });
+    const errors = await validate(instance);
+    expect(errors).toHaveLength(0);
+    expect(instance.identifier).toBe('월요농구');
+  });
 });

@@ -82,6 +82,18 @@ describe('loginUser — 이메일 로그인', () => {
       where: { email: 'captain@dngg.one' },
     });
   });
+
+  test('이메일 조회가 성공하면 그룹명 조회는 시도하지 않는다', async () => {
+    const findByName = jest.fn().mockResolvedValue(null);
+    const { service } = buildService({
+      userFindOne: jest.fn().mockResolvedValue(makeUser()),
+      findByName,
+    });
+
+    await service.loginUser('captain@dngg.one', PASSWORD);
+
+    expect(findByName).not.toHaveBeenCalled();
+  });
 });
 
 describe('loginUser — 실패 응답', () => {
@@ -121,6 +133,19 @@ const makeGroup = (overrides: Partial<Group> = {}): Group =>
   }) as unknown as Group;
 
 describe('loginUser — 그룹명 로그인', () => {
+  // trim은 현재 findUserByIdentifier 진입 전에 한 번만 이뤄진다 — 리팩터로 trim이
+  // 이메일 분기 안쪽으로 들어가면(이메일 경로만 trim) 이 케이스가 조용히 깨져야 한다.
+  test('앞뒤 공백이 있는 그룹명도 trim되어 조회한다', async () => {
+    const user = makeUser();
+    const findByName = jest.fn().mockResolvedValue(makeGroup());
+    const userFind = jest.fn().mockResolvedValue([user]);
+    const { service } = buildService({ findByName, userFind });
+
+    await service.loginUser('  월요농구  ', PASSWORD);
+
+    expect(findByName).toHaveBeenCalledWith('월요농구');
+  });
+
   test('그룹명으로 그 그룹의 계정에 로그인한다', async () => {
     const user = makeUser();
     const findByName = jest.fn().mockResolvedValue(makeGroup());
