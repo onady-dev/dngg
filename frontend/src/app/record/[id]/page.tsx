@@ -17,6 +17,10 @@ const formatQuarter = (q: number | null | undefined) => {
 };
 
 const Container = styled.div`
+  /* 가로 모드 헤더(한 줄로 압축된 상태)의 실측 높이 — 가운데 열 sticky 오프셋과 맞춘다.
+     헤더가 스크롤포트 맨 위(top: 0)에 붙으므로 이 값이 곧 그 아래 경계다. */
+  --record-header-h: 88px;
+
   padding: 0.5rem;
   position: relative;
   min-height: 100vh;
@@ -30,9 +34,16 @@ const Container = styled.div`
     padding: 1rem;
   }
 
+  /* 이 컨테이너가 스크롤 주체다 — 아래 useEffect가 주입하는 .full-height 규칙이
+     height: calc(100vh - 2rem)를 !important로 걸고 여기 overflow: auto가 붙어 있다.
+     그래서 안쪽 sticky는 문서가 아니라 이 스크롤포트를 기준으로 동작한다. */
   @media (orientation: landscape) and (max-height: 500px) {
     height: auto;
     min-height: calc(100vh + 60px);
+    /* sticky 헤더가 스크롤포트 맨 위에 붙도록 위 패딩은 헤더가 직접 갖는다.
+       여기 패딩이 남아 있으면 그 틈으로 선수 버튼이 헤더 위를 지나간다. */
+    padding-top: 0;
+    /* 하단에 PWA 설치 배너(InstallPrompt)가 position: fixed로 깔린다 */
     padding-bottom: 70px;
   }
 `;
@@ -73,6 +84,26 @@ const GameInfoHeader = styled.div`
   /* 뒤로가기 버튼이 좌상단에 고정되어 있어, 가운데 정렬된 경기명이 그 아래로
      밀려들어가지 않도록 양쪽에 같은 폭을 비워 둔다 */
   padding: 0 2.75rem;
+
+  /* 모바일 가로: 세로 공간이 390px 남짓뿐이라 세로로 쌓으면 헤더만 193px를
+     먹는다. 경기명을 숨기고 나머지를 한 줄로 몰아 ~60px로 줄인 뒤 고정한다. */
+  @media (orientation: landscape) and (max-height: 500px) {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.5rem 0.75rem;
+    margin-bottom: 0.375rem;
+    flex-shrink: 0;
+    /* 스크롤해도 점수·쿼터·위치바꾸기가 따라온다. 기준은 문서가 아니라
+       스크롤 주체인 Container(.full-height)의 스크롤포트다.
+       배경이 없으면 아래 선수 버튼이 글자 사이로 비친다. */
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background-color: var(--background-color);
+    padding-top: 0.5rem;
+    padding-bottom: 0.375rem;
+  }
 `;
 
 const GameName = styled.h2`
@@ -80,6 +111,11 @@ const GameName = styled.h2`
   font-weight: 600;
   margin-bottom: 0.5rem;
   text-align: center;
+
+  /* 가로 모드에서는 헤더를 한 줄로 압축해야 해서 경기명을 숨긴다 */
+  @media (orientation: landscape) and (max-height: 500px) {
+    display: none;
+  }
 `;
 
 const ViewOnlyNotice = styled.div`
@@ -110,6 +146,11 @@ const ScoreDisplay = styled.div`
     font-size: 1rem;
     color: #6b7280;
     font-weight: 500;
+  }
+
+  @media (orientation: landscape) and (max-height: 500px) {
+    margin: 0;
+    font-size: 1.25rem;
   }
 `;
 
@@ -142,6 +183,12 @@ const SwapButton = styled.button`
     width: 1rem;
     height: 1rem;
   }
+
+  @media (orientation: landscape) and (max-height: 500px) {
+    margin-top: 0;
+    padding: 0.375rem 0.625rem;
+    font-size: 0.8125rem;
+  }
 `;
 
 const QuarterBar = styled.div`
@@ -149,6 +196,12 @@ const QuarterBar = styled.div`
   gap: 0.375rem;
   margin-top: 0.5rem;
   align-items: center;
+
+  @media (orientation: landscape) and (max-height: 500px) {
+    margin-top: 0;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
 `;
 
 const QuarterChip = styled.button<{ isActive: boolean }>`
@@ -238,6 +291,7 @@ const TeamSection = styled.div`
       order: 2;
     }
   }
+
 `;
 
 const PlayerList = styled.div`
@@ -440,8 +494,12 @@ const LogHistoryContainer = styled.div`
   background: white;
   border-radius: 0.5rem;
   padding: 0.75rem;
-  height: 100%;
-  overflow-y: auto; /* 로그 영역만 스크롤 허용 */
+  /* 높이는 그리드 행이 stretch로 채워준다. height: 100%를 주면 세로 모드처럼
+     행 높이가 콘텐츠 기반일 때 계산이 어긋나 열이 찌그러진다. */
+  height: auto;
+  min-height: 0;
+  /* 스크롤은 안쪽 LogFeed가 맡는다 — 여기서 스크롤하면 되돌리기 버튼까지 같이 밀려 올라간다 */
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -452,6 +510,49 @@ const LogHistoryContainer = styled.div`
     max-height: 40vh;
     border: 1px solid var(--border-color);
   }
+
+  /* 가로 모드: 이 그리드 아이템은 행 전체 높이를 그대로 차지하고(=sticky가 움직일
+     공간을 만들고), 실제로 따라다니는 건 안쪽 LogSticky다. 그리드 아이템 자신에게
+     sticky를 걸면 컨테이닝 블록에 클램프돼 헤더 뒤로 밀려 들어간다. */
+  @media (orientation: landscape) and (max-height: 500px) {
+    background: transparent;
+    padding: 0;
+    overflow: visible;
+  }
+`;
+
+/* 가로 모드에서 되돌리기 버튼과 로그를 헤더 바로 아래에 붙여 따라다니게 하는 래퍼 */
+const LogSticky = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-height: 0;
+  height: 100%;
+
+  @media (orientation: landscape) and (max-height: 500px) {
+    position: sticky;
+    top: var(--record-header-h);
+    z-index: 10;
+    height: auto;
+    max-height: calc(100vh - var(--record-header-h) - 90px);
+    background: white;
+    border-radius: 0.5rem;
+    padding: 0.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  }
+`;
+
+/* 로그 목록만 스크롤시켜 되돌리기 버튼이 항상 보이게 한다.
+   flex-basis를 auto로 두는 이유: 부모 높이가 정해진 가로·데스크톱에서는 남은 공간을
+   채우고, 부모가 콘텐츠 기반인 세로 모드에서는 내용만큼 커진 뒤 부모의 max-height(40vh)
+   에서 스크롤로 넘어간다. basis 0(`flex: 1`)이면 후자에서 높이 기여가 0이 된다. */
+const LogFeed = styled.div`
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 `;
 
 const LogHistoryItem = styled.div`
@@ -490,6 +591,8 @@ const HistoryButtonContainer = styled.div`
   margin: 0.25rem 0;
   min-height: 20px;
   align-items: center;
+  /* 로그가 길어져도 되돌리기 버튼은 줄어들거나 밀려나지 않는다 */
+  flex-shrink: 0;
 `;
 
 const HistoryButton = styled.button`
@@ -1059,6 +1162,7 @@ export default function RecordPage() {
         {/* 로그 히스토리 컴포넌트 - 가운데 배치 */}
 
         <LogHistoryContainer>
+          <LogSticky>
           <HistoryButtonContainer>
           <HistoryButton
             onClick={handleUndo}
@@ -1072,6 +1176,7 @@ export default function RecordPage() {
             되돌리기
           </HistoryButton>
           </HistoryButtonContainer>
+          <LogFeed>
             {getProcessedLogs().map((log, index) => (
               <LogHistoryItem key={log.id || index}>
                 <LogHistoryPlayerName style={{
@@ -1086,6 +1191,8 @@ export default function RecordPage() {
             {getProcessedLogs().length === 0 && (
               <LogHistoryItem>기록된 로그가 없습니다.</LogHistoryItem>
             )}
+          </LogFeed>
+          </LogSticky>
         </LogHistoryContainer>
 
         {/* 오른쪽 팀 영역 */}
