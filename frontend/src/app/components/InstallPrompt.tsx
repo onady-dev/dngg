@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import styled from "styled-components";
 
 const InstallPrompt = () => {
@@ -8,6 +8,28 @@ const InstallPrompt = () => {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isIOS, setIsIOS] = useState(false);
   const [showIOSModal, setShowIOSModal] = useState(false);
+  const bannerRef = useRef<HTMLDivElement>(null);
+
+  // 이 배너는 position: fixed로 화면 하단을 덮는다. 그 위로 콘텐츠를 깔면 가려지므로
+  // 실제 높이를 --install-banner-h로 알려, 필요한 화면이 그만큼 비켜설 수 있게 한다.
+  // 배너가 없을 때는 0이라 아무도 자리를 낭비하지 않는다.
+  useEffect(() => {
+    const root = document.documentElement;
+    const el = bannerRef.current;
+    if (!showPrompt || !el) {
+      root.style.setProperty("--install-banner-h", "0px");
+      return;
+    }
+    const publish = () =>
+      root.style.setProperty("--install-banner-h", `${el.offsetHeight}px`);
+    publish();
+    const observer = new ResizeObserver(publish);
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+      root.style.setProperty("--install-banner-h", "0px");
+    };
+  }, [showPrompt]);
 
   useEffect(() => {
     const isStandalone = window.matchMedia("(display-mode: standalone)").matches ||
@@ -57,7 +79,7 @@ const InstallPrompt = () => {
 
   return (
     <>
-      <Banner>
+      <Banner ref={bannerRef}>
         <Content>
           <Icon>📱</Icon>
           <Text>홈 화면에 추가하고 앱처럼 사용하세요</Text>

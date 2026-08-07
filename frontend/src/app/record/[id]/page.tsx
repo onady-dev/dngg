@@ -22,9 +22,15 @@ const Container = styled.div`
   /* 헤더 실측 높이 — ResizeObserver가 런타임에 덮어쓴다(쿼터 칩 줄바꿈으로 변한다).
      기록 패널을 헤더 바로 아래에 붙이는 데 쓰인다. */
   --record-header-h: 144px;
-  /* 화면 위/아래 여백 — 위는 패널 시작점, 아래는 PWA 설치 배너 자리 */
+  /* 화면 위/아래 여백 — 위는 패널 시작점, 아래는 화면 끝까지 내리기 위한 최소 여백.
+     하단 PWA 설치 배너(InstallPrompt)는 자리를 비워두지 않는다: 7일간 닫힘이
+     기억되고 standalone 모드에서는 아예 뜨지 않아 없는 경우가 흔한데, 항상 74px를
+     비워두면 그만큼 로그가 늘 짧아진다. 로그는 최신순이라 배너가 겹치는 아래쪽은
+     오래된 항목이고, 피드가 스크롤되므로 가려도 볼 수 있다. */
   --record-gap-top: 0.5rem;
-  --record-gap-bottom: 74px;
+  /* 배너가 떠 있을 때만 그 높이만큼 물러난다 (InstallPrompt가 --install-banner-h를
+     publish한다). 배너가 없으면 0이라 화면 끝까지 내려간다. */
+  --record-gap-bottom: calc(0.5rem + var(--install-banner-h, 0px));
 
   padding: 0.5rem;
   position: relative;
@@ -204,10 +210,15 @@ const QuarterBar = styled.div`
   margin-top: 0.5rem;
   align-items: center;
 
+  /* 가로 모드: 쿼터가 늘수록(최대 10개) 칩이 줄바꿈되며 헤더가 무한정 커져,
+     높이가 정해진 고정 패널에서 로그 영역이 0까지 깎였다(740x360·10쿼터에서 실측 0px).
+     2줄까지만 보이게 상한을 걸어 헤더 높이를 고정하고, 넘치면 칩 영역만 스크롤한다. */
   @media (orientation: landscape) and (max-height: 500px) {
     margin-top: 0;
     flex-wrap: wrap;
     justify-content: center;
+    max-height: 4rem;
+    overflow-y: auto;
   }
 `;
 
