@@ -17,6 +17,10 @@ const formatQuarter = (q: number | null | undefined) => {
 };
 
 const Container = styled.div`
+  /* 가로 모드 헤더(한 줄로 압축된 상태)의 실측 높이 — 가운데 열 sticky 오프셋과 맞춘다.
+     헤더가 스크롤포트 맨 위(top: 0)에 붙으므로 이 값이 곧 그 아래 경계다. */
+  --record-header-h: 88px;
+
   padding: 0.5rem;
   position: relative;
   min-height: 100vh;
@@ -30,17 +34,17 @@ const Container = styled.div`
     padding: 1rem;
   }
 
-  /* 모바일 가로: 페이지 자체는 스크롤하지 않는다. 화면을 뷰포트 높이에 맞추고
-     선수 목록·로그 피드만 각자 스크롤시켜, 점수·쿼터·되돌리기가 항상 보이게 한다.
-     (dvh를 쓰면 브라우저 주소창이 접히고 펴질 때 높이가 따라간다) */
+  /* 이 컨테이너가 스크롤 주체다 — 아래 useEffect가 주입하는 .full-height 규칙이
+     height: calc(100vh - 2rem)를 !important로 걸고 여기 overflow: auto가 붙어 있다.
+     그래서 안쪽 sticky는 문서가 아니라 이 스크롤포트를 기준으로 동작한다. */
   @media (orientation: landscape) and (max-height: 500px) {
-    height: 100vh;
-    height: 100dvh;
-    min-height: 0;
-    /* 하단에 PWA 설치 배너(InstallPrompt)가 position: fixed로 깔린다 —
-       그만큼 비워두지 않으면 선수 목록 마지막 줄이 배너에 가린다 */
+    height: auto;
+    min-height: calc(100vh + 60px);
+    /* sticky 헤더가 스크롤포트 맨 위에 붙도록 위 패딩은 헤더가 직접 갖는다.
+       여기 패딩이 남아 있으면 그 틈으로 선수 버튼이 헤더 위를 지나간다. */
+    padding-top: 0;
+    /* 하단에 PWA 설치 배너(InstallPrompt)가 position: fixed로 깔린다 */
     padding-bottom: 70px;
-    overflow: hidden;
   }
 `;
 
@@ -90,6 +94,15 @@ const GameInfoHeader = styled.div`
     gap: 0.5rem 0.75rem;
     margin-bottom: 0.375rem;
     flex-shrink: 0;
+    /* 스크롤해도 점수·쿼터·위치바꾸기가 따라온다. 기준은 문서가 아니라
+       스크롤 주체인 Container(.full-height)의 스크롤포트다.
+       배경이 없으면 아래 선수 버튼이 글자 사이로 비친다. */
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background-color: var(--background-color);
+    padding-top: 0.5rem;
+    padding-bottom: 0.375rem;
   }
 `;
 
@@ -215,12 +228,9 @@ const TeamsContainer = styled.div`
   height: auto;
   overflow: visible;
 
-  /* 가로 모드: 헤더가 쓰고 남은 높이를 전부 차지하고, 넘치는 부분은
-     각 열(선수 목록·로그 피드)이 스스로 스크롤한다 */
   @media (orientation: landscape) and (max-height: 500px) {
     height: auto;
-    min-height: 0;
-    overflow: hidden;
+    min-height: 300px;
   }
 
   /* 세로 모드: 팀을 좌우 2열로, 기록 피드는 아래 전체 폭으로 배치 */
@@ -282,14 +292,6 @@ const TeamSection = styled.div`
     }
   }
 
-  /* 가로 모드: 팀 헤더는 고정하고 선수 목록만 스크롤시키기 위한 전제.
-     min-height: 0이 없으면 flex 자식이 콘텐츠 높이만큼 부풀어 스크롤이 안 생긴다. */
-  @media (orientation: landscape) and (max-height: 500px) {
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-    margin-top: 0;
-  }
 `;
 
 const PlayerList = styled.div`
@@ -303,8 +305,6 @@ const PlayerList = styled.div`
 
   @media (orientation: landscape) and (max-height: 500px) {
     max-height: none;
-    flex: 1;
-    min-height: 0;
   }
 
   @media (orientation: portrait) and (max-width: 768px) {
@@ -374,8 +374,6 @@ const LogItemsContainer = styled.div`
 
   @media (orientation: landscape) and (max-height: 500px) {
     max-height: none;
-    flex: 1;
-    min-height: 0;
   }
 
   @media (orientation: portrait) and (max-width: 768px) {
@@ -511,6 +509,36 @@ const LogHistoryContainer = styled.div`
     order: 3;
     max-height: 40vh;
     border: 1px solid var(--border-color);
+  }
+
+  /* 가로 모드: 이 그리드 아이템은 행 전체 높이를 그대로 차지하고(=sticky가 움직일
+     공간을 만들고), 실제로 따라다니는 건 안쪽 LogSticky다. 그리드 아이템 자신에게
+     sticky를 걸면 컨테이닝 블록에 클램프돼 헤더 뒤로 밀려 들어간다. */
+  @media (orientation: landscape) and (max-height: 500px) {
+    background: transparent;
+    padding: 0;
+    overflow: visible;
+  }
+`;
+
+/* 가로 모드에서 되돌리기 버튼과 로그를 헤더 바로 아래에 붙여 따라다니게 하는 래퍼 */
+const LogSticky = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-height: 0;
+  height: 100%;
+
+  @media (orientation: landscape) and (max-height: 500px) {
+    position: sticky;
+    top: var(--record-header-h);
+    z-index: 10;
+    height: auto;
+    max-height: calc(100vh - var(--record-header-h) - 90px);
+    background: white;
+    border-radius: 0.5rem;
+    padding: 0.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   }
 `;
 
@@ -1134,6 +1162,7 @@ export default function RecordPage() {
         {/* 로그 히스토리 컴포넌트 - 가운데 배치 */}
 
         <LogHistoryContainer>
+          <LogSticky>
           <HistoryButtonContainer>
           <HistoryButton
             onClick={handleUndo}
@@ -1163,6 +1192,7 @@ export default function RecordPage() {
               <LogHistoryItem>기록된 로그가 없습니다.</LogHistoryItem>
             )}
           </LogFeed>
+          </LogSticky>
         </LogHistoryContainer>
 
         {/* 오른쪽 팀 영역 */}
