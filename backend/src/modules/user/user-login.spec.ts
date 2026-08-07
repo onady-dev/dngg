@@ -1,11 +1,12 @@
 import * as bcrypt from 'bcrypt';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, Not, Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { INVALID_CREDENTIALS_MESSAGE, UserService } from './user.service';
 import { User } from '../../entities/User.entity';
 import { Group } from '../../entities/Group.entity';
 import { GroupRepository } from '../../repository/group.repository';
 import { EmailVerificationService } from './email-verification.service';
+import { ADMIN_ROLE } from '../admin/admin.constants';
 
 const PASSWORD = 'password123';
 let hashedPassword: string;
@@ -156,7 +157,7 @@ describe('loginUser — 그룹명 로그인', () => {
 
     expect(findByName).toHaveBeenCalledWith('월요농구');
     expect(userFind).toHaveBeenCalledWith({
-      where: { groupId: 10 },
+      where: { groupId: 10, role: Not(ADMIN_ROLE) },
       order: { id: 'ASC' },
       take: 2,
     });
@@ -219,7 +220,7 @@ describe('loginUser — 그룹명 로그인', () => {
     );
     expect(findByName).toHaveBeenCalledWith('월요농구');
     expect(userFind).toHaveBeenCalledWith({
-      where: { groupId: 10 },
+      where: { groupId: 10, role: Not(ADMIN_ROLE) },
       order: { id: 'ASC' },
       take: 2,
     });
@@ -270,10 +271,15 @@ describe('loginUser — 이메일 형식이 아닌 레거시 아이디', () => {
   test('아이디가 그룹명과 같아도 계정 조회가 먼저다', async () => {
     const user = makeUser({ email: '스내치', groupId: 1 });
     const userFindOne = jest.fn().mockResolvedValue(user);
-    const findByName = jest.fn().mockResolvedValue(makeGroup({ id: 1, name: '스내치' }));
+    const findByName = jest
+      .fn()
+      .mockResolvedValue(makeGroup({ id: 1, name: '스내치' }));
     const userFind = jest
       .fn()
-      .mockResolvedValue([user, makeUser({ id: 12, email: 'onady', groupId: 1 })]);
+      .mockResolvedValue([
+        user,
+        makeUser({ id: 12, email: 'onady', groupId: 1 }),
+      ]);
     const { service } = buildService({ userFindOne, findByName, userFind });
 
     const result = await service.loginUser('스내치', PASSWORD);
@@ -293,5 +299,60 @@ describe('loginUser — 이메일 형식이 아닌 레거시 아이디', () => {
     expect(userFindOne).toHaveBeenCalledWith({ where: { email: '월요농구' } });
     expect(findByName).toHaveBeenCalledWith('월요농구');
     expect(result.accessToken).toBe('signed-token');
+  });
+});
+
+// admin은 플랫폼 전체 관리 계정이라 어느 그룹엔가 소속되어 있을 뿐,
+// 그 그룹의 계정이 아니다. 운영의 그룹 1(스내치)이 이 경우다 —
+// 주인 계정(id=1)과 admin 계정(onady)이 같은 그룹에 있어 "계정 2개" 가드에
+// 걸려 그룹명 로그인이 막혀 있었다.
+describe('loginUser — 그룹명 조회는 admin 계정을 세지 않는다', () => {
+  test('그룹에 admin이 같이 있어도 주인 계정으로 로그인된다', async () => {
+    const findByName = jest
+      .fn()
+      .mockResolvedValue(makeGroup({ id: 1, name: '스내치' }));
+    const userFind = jest
+      .fn()
+      .mockResolvedValue([makeUser({ id: 1, groupId: 1 })]);
+    const { service } = buildService({ findByName, userFind });
+
+    const result = await service.loginUser('스내치', PASSWORD);
+
+    // admin 제외가 조회 조건에 실려야 한다 — 조회 후 필터링이면
+    // take: 2에 admin이 먼저 잡혀 주인 계정이 밀려날 수 있다.
+    expect(userFind).toHaveBeenCalledWith({
+      where: { groupId: 1, role: Not(ADMIN_ROLE) },
+      order: { id: 'ASC' },
+      take: 2,
+    });
+    expect(result.accessToken).toBe('signed-token');
+  });
+
+  test('admin이 아닌 계정이 2개면 여전히 거부한다', async () => {
+    const findByName = jest.fn().mockResolvedValue(makeGroup());
+    const userFind = jest
+      .fn()
+      .mockResolvedValue([makeUser(), makeUser({ id: 2 })]);
+    const { service } = buildService({ findByName, userFind });
+
+    await expect(service.loginUser('월요농구', PASSWORD)).rejects.toMatchObject(
+      {
+        status: 401,
+      },
+    );
+  });
+
+  // admin만 있는 그룹은 그룹명으로 로그인되지 않는다(닫히는 쪽으로 실패).
+  // 해당 admin은 자기 아이디로 로그인하면 된다.
+  test('admin만 있는 그룹은 그룹명으로 로그인되지 않는다', async () => {
+    const findByName = jest.fn().mockResolvedValue(makeGroup());
+    const userFind = jest.fn().mockResolvedValue([]);
+    const { service } = buildService({ findByName, userFind });
+
+    await expect(service.loginUser('월요농구', PASSWORD)).rejects.toMatchObject(
+      {
+        status: 401,
+      },
+    );
   });
 });
