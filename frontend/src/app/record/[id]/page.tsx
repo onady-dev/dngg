@@ -286,9 +286,17 @@ const TeamsContainer = styled.div`
     padding-top: 3.5rem;
   }
 
-  /* 세로 모드: 팀을 좌우 2열로, 기록 피드는 아래 전체 폭으로 배치 */
+  /* 세로 모드: 팀을 좌우 2열로, 기록 피드는 아래 전체 폭으로 배치.
+
+     flex-shrink를 0으로 두는 게 핵심이다. 기본값 flex: 1은 basis 0 + shrink 1이라
+     이 그리드가 화면 높이에 맞춰 눌리고, 두 행(선수/로그)이 콘텐츠 크기대로 남은
+     공간을 나눠 갖는다. 선수 행은 인원수만큼 계속 커지므로 로그 행이 최소 몫도
+     못 받고 밀려났다 — 팀당 18명이면 로그 행 66px(되돌리기 버튼만), 20명이면 26px.
+     축소를 막으면 두 행이 각자 자연 높이를 갖고, 넘치는 만큼 Container가 스크롤한다. */
   @media (orientation: portrait) and (max-width: 768px) {
     grid-template-columns: 1fr 1fr;
+    flex: 1 0 auto;
+    min-height: auto;
   }
 `;
 
@@ -1039,11 +1047,6 @@ export default function RecordPage() {
       return;
     }
 
-    // 토스트 안내용으로 마지막 로그 정보를 미리 확보
-    const lastLog = game.logs[game.logs.length - 1];
-    const lastPlayer = [...game.homePlayers, ...game.awayPlayers].find(p => p.id === lastLog.playerId);
-    const lastLogItem = logItems.find(item => item.id === lastLog.logitemId);
-
     try {
       // 백엔드 API 호출하여 마지막 로그 삭제
       await api.delete(`/log/game/${game.id}/undo`, {
@@ -1055,11 +1058,9 @@ export default function RecordPage() {
       // 게임 데이터 새로고침 (다른 기록자와의 동시 사용을 고려해 서버 기준으로 갱신)
       const response = await api.get<Game>(`/game/${game.id}`);
       setGame(response.data);
-
-      showToast(
-        `기록 취소: ${lastPlayer?.name ?? "알 수 없음"} ${lastLogItem?.name ?? ""}`.trim(),
-        "info"
-      );
+      // 성공 토스트를 띄우지 않는다 — 취소된 항목이 로그에서 곧바로 사라지는 것이
+      // 이미 피드백이고, 토스트는 화면 하단 정중앙(=가로 모드의 로그 패널 자리)을
+      // 3초간 가려 정작 그 확인을 방해했다. 실패했을 때만 알린다.
     } catch (error) {
       console.error("로그 삭제에 실패했습니다:", error);
       showToast("기록 취소에 실패했습니다. 다시 시도해주세요.", "error");
