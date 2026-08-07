@@ -65,8 +65,13 @@ export class GroupService implements OnModuleInit {
     return created;
   }
 
-  async getAllGroups() {
-    return this.groupRepository.findAll();
+  // /group/all은 인증 없이 열려 있다 — 비로그인 사용자도 헤더에서 그룹을 골라
+  // 기록을 볼 수 있어야 하므로 공개를 유지한다. 다만 그룹명이 로그인 아이디가 된
+  // 뒤로 이 응답은 사실상 아이디 목록이므로, 화면이 쓰는 id/name만 남기고
+  // 결제·과금 필드(customerKey, freeGamesUsed)는 내보내지 않는다.
+  async getAllGroups(): Promise<{ id: number; name: string }[]> {
+    const groups = await this.groupRepository.findAll();
+    return groups.map(({ id, name }) => ({ id, name }));
   }
 
   async deleteGroup(id: number, userGroupId: number) {

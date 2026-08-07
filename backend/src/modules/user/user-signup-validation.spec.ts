@@ -41,4 +41,42 @@ describe('CreateUserDto groupName 검증', () => {
 
     expect(errors.find((e) => e.property === 'groupName')).toBeDefined();
   });
+
+  // 그룹명은 로그인 아이디이기도 하다. 앞뒤 공백이 섞인 채로 저장되면 화면에는
+  // 공백 없이 보이는데 그 이름으로는 영영 로그인되지 않는다(로그인은 입력을 trim한다).
+  test('앞뒤 공백은 제거되어 저장된다', async () => {
+    const dto = plainToInstance(CreateUserDto, {
+      ...baseDto,
+      groupName: '  월요농구  ',
+    });
+
+    const errors = await validate(dto);
+
+    expect(errors.find((e) => e.property === 'groupName')).toBeUndefined();
+    expect(dto.groupName).toBe('월요농구');
+  });
+
+  test('공백뿐인 groupName은 검증에 실패한다', async () => {
+    const dto = plainToInstance(CreateUserDto, {
+      ...baseDto,
+      groupName: '   ',
+    });
+
+    const errors = await validate(dto);
+
+    expect(errors.find((e) => e.property === 'groupName')).toBeDefined();
+  });
+
+  // trim 후 20자를 넘지 않으면 통과해야 한다 — 공백까지 세면 길이 검증이 어긋난다.
+  test('공백을 포함해 20자를 넘어도 trim 후 20자면 통과한다', async () => {
+    const dto = plainToInstance(CreateUserDto, {
+      ...baseDto,
+      groupName: `  ${'a'.repeat(20)}  `,
+    });
+
+    const errors = await validate(dto);
+
+    expect(errors.find((e) => e.property === 'groupName')).toBeUndefined();
+    expect(dto.groupName).toBe('a'.repeat(20));
+  });
 });
