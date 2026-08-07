@@ -1,6 +1,6 @@
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, Repository } from 'typeorm';
+import { DataSource, EntityManager, Not, Repository } from 'typeorm';
 import { User } from '../../entities/User.entity';
 import { CreateUserDto, UpdateUserDto } from './user.request.dto';
 import { Group } from 'src/entities/Group.entity';
@@ -10,6 +10,7 @@ import { UserRepository } from '../../repository/user.repository';
 import { GroupRepository } from 'src/repository/group.repository';
 import { EmailVerificationService } from './email-verification.service';
 import { seedLogitemsForGroup } from '../logitem/logitem-seed';
+import { ADMIN_ROLE } from '../admin/admin.constants';
 
 // bcrypt 패키지에 타입 선언이 없어 호출부가 `any`로 추론된다 — 신규 코드에서는
 // 타입을 명시해 unsafe-* 린트를 피한다. 기존 호출부는 out-of-scope로 남겨둔다.
@@ -193,11 +194,14 @@ export class UserService {
   private async findUserByGroupName(name: string): Promise<User | null> {
     const group = await this.groupRepository.findByName(name);
     if (!group) return null;
-    // 그룹당 계정이 1개라는 전제는 실제로는 깨져 있다 — 운영의 그룹 1(스내치)에는
-    // 계정이 2개다. 어느 쪽을 고를지 정할 근거가 없으므로 그룹명으로는 거부한다.
-    // 해당 계정들은 각자의 User.email 값(아이디)으로 로그인하면 된다.
+    // admin은 플랫폼 전체 관리 계정이라 어느 그룹엔가 소속되어 있을 뿐 그 그룹의
+    // 계정이 아니다 — 운영의 그룹 1(스내치)이 주인 계정 + admin 계정 조합이라
+    // 이걸 세면 "계정 2개"로 잡혀 그룹명 로그인이 막힌다. 조회 조건에서 제외한다
+    // (조회 후 필터링하면 take: 2에 admin이 먼저 잡혀 주인 계정이 밀려날 수 있다).
+    // admin만 있는 그룹은 그룹명으로 로그인되지 않는다 — 닫히는 쪽으로 실패하며,
+    // 해당 admin은 자기 아이디로 로그인하면 된다.
     const users = await this.userRepository.find({
-      where: { groupId: group.id },
+      where: { groupId: group.id, role: Not(ADMIN_ROLE) },
       order: { id: 'ASC' },
       take: 2,
     });
