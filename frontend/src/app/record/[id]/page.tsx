@@ -16,6 +16,29 @@ const formatQuarter = (q: number | null | undefined) => {
   return quarter <= 4 ? `${quarter}Q` : `연장${quarter - 4}`;
 };
 
+// 가로 모드 고정 패널은 폭이 190px뿐이라 '연장1'이 자리를 많이 먹는다.
+// 칩에서만 쓰는 축약형 — 로그 항목은 읽기 쉬운 formatQuarter를 그대로 쓴다.
+const formatQuarterShort = (q: number) => (q <= 4 ? `${q}Q` : `OT${q - 4}`);
+
+// 현재 쿼터 기준 앞뒤로 이만큼만 펼쳐 보여준다 (나머지는 접는다).
+const QUARTER_WINDOW = 1;
+
+// 좁은 가로 화면(고정 패널이 뜨는 조건)인지. CSS 미디어쿼리로는 글자를 바꿀 수
+// 없어서 같은 조건을 JS로도 본다.
+const useCompactLandscape = () => {
+  const [matches, setMatches] = useState(false);
+  useEffect(() => {
+    const query = window.matchMedia(
+      "(orientation: landscape) and (max-height: 500px)",
+    );
+    const update = () => setMatches(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+  return matches;
+};
+
 const Container = styled.div`
   /* 가로 모드 고정 패널의 폭. 그리드 가운데 열도 같은 값을 써서 폭을 맞춘다. */
   --record-center-w: 190px;
@@ -227,6 +250,12 @@ const QuarterChip = styled.button<{ isActive: boolean }>`
   border-radius: 999px;
   font-size: 0.8125rem;
   font-weight: 600;
+
+  /* 좁은 가로 패널에서는 한 줄에 더 들어가도록 줄인다 */
+  @media (orientation: landscape) and (max-height: 500px) {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+  }
   background-color: ${props => (props.isActive ? 'var(--primary-color)' : '#e5e7eb')};
   color: ${props => (props.isActive ? 'white' : '#374151')};
   transition: all 0.2s;
@@ -735,6 +764,8 @@ export default function RecordPage() {
   const [isChangingQuarter, setIsChangingQuarter] = useState(false);
   const [showCoachmark, setShowCoachmark] = useState(false);
   const headerRef = useRef<HTMLDivElement>(null);
+  const isCompactLandscape = useCompactLandscape();
+  const [quarterExpanded, setQuarterExpanded] = useState(false);
 
   // 가로 모드에서 헤더와 기록 패널은 둘 다 position: fixed로 화면에 고정되는데,
   // 기록 패널을 헤더 바로 아래에 놓으려면 헤더의 실제 높이가 필요하다.
@@ -1126,25 +1157,43 @@ export default function RecordPage() {
             (_, i) => i + 1,
           );
           const quarterLocked = !canRecord || game.status !== 'IN_PROGRESS' || isChangingQuarter;
+          // 좁은 가로 화면에서는 현재 쿼터 주변만 펼치고 나머지는 접는다.
+          // 접힌 칩이 있으면 '···'로 펼칠 수 있게 한다(펼친 뒤에는 다시 접기).
+          const collapsing = isCompactLandscape && !quarterExpanded;
+          const visibleChips = collapsing
+            ? chips.filter(q => Math.abs(q - currentQuarter) <= QUARTER_WINDOW)
+            : chips;
+          const hiddenCount = chips.length - visibleChips.length;
+          const label = isCompactLandscape ? formatQuarterShort : formatQuarter;
           return (
             <QuarterBar>
-              {chips.map(q => (
+              {visibleChips.map(q => (
                 <QuarterChip
                   key={q}
                   isActive={q === currentQuarter}
                   disabled={quarterLocked}
                   onClick={() => handleQuarterChange(q)}
                 >
-                  {formatQuarter(q)}
+                  {label(q)}
                 </QuarterChip>
               ))}
+              {isCompactLandscape && (hiddenCount > 0 || quarterExpanded) && (
+                <QuarterChip
+                  isActive={false}
+                  onClick={() => setQuarterExpanded(prev => !prev)}
+                  aria-label={quarterExpanded ? '쿼터 목록 접기' : `쿼터 ${hiddenCount}개 더 보기`}
+                  title={quarterExpanded ? '접기' : '전체 쿼터 보기'}
+                >
+                  {quarterExpanded ? '접기' : '···'}
+                </QuarterChip>
+              )}
               {currentQuarter >= 4 && currentQuarter < 10 && (
                 <QuarterChip
                   isActive={false}
                   disabled={quarterLocked}
                   onClick={() => handleQuarterChange(currentQuarter + 1)}
                 >
-                  +연장
+                  {isCompactLandscape ? '+OT' : '+연장'}
                 </QuarterChip>
               )}
             </QuarterBar>
