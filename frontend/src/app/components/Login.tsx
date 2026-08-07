@@ -78,8 +78,14 @@ export const AuthSwitchButton = styled.button`
   font-size: 0.875rem;
 `;
 
+const AuthHint = styled.p`
+  margin-top: -0.5rem;
+  font-size: 0.8125rem;
+  color: #6b7280;
+`;
+
 const Login = ({ setView }: { setView: (view: AuthView) => void }) => {
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const setUser = useAuthStore((state) => state.setUser);
   const setSelectedGroup = useGroupStore((state) => state.setSelectedGroup);
@@ -88,7 +94,7 @@ const Login = ({ setView }: { setView: (view: AuthView) => void }) => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const response = await api.post(`/user/login`, { email, password });
+      const response = await api.post(`/user/login`, { identifier, password });
       // axios 인터셉터가 localStorage.token을 읽어 Authorization을 붙이므로 로그인 시 저장한다.
       localStorage.setItem("token", response.data.accessToken);
       setUser({
@@ -104,10 +110,11 @@ const Login = ({ setView }: { setView: (view: AuthView) => void }) => {
       showToast("로그인되었습니다.", "success");
     } catch (error: any) {
       const status = error?.response?.status;
-      if (status === 401) {
+      if (status === 429) {
+        showToast("시도가 너무 많아요. 잠시 후 다시 시도해주세요.", "error");
+      } else if (status === 401) {
+        // 백엔드가 아이디 미존재와 비밀번호 오류를 401 하나로 통일해 응답한다.
         showToast("아이디 또는 비밀번호가 올바르지 않습니다.", "error");
-      } else if (status === 404) {
-        showToast("존재하지 않는 사용자입니다.", "error");
       } else {
         showToast("로그인에 실패했습니다. 잠시 후 다시 시도해주세요.", "error");
       }
@@ -121,12 +128,13 @@ const Login = ({ setView }: { setView: (view: AuthView) => void }) => {
         <AuthForm onSubmit={handleLogin}>
           <AuthInput
             type="text"
-            placeholder="아이디"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            placeholder="이메일 또는 그룹명"
+            value={identifier}
+            onChange={(e) => setIdentifier(e.target.value)}
             required
             autoComplete="username"
           />
+          <AuthHint>그룹명으로도 로그인할 수 있어요.</AuthHint>
           <AuthInput
             type="password"
             placeholder="비밀번호"

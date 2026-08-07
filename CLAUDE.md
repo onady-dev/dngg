@@ -110,6 +110,7 @@ docker compose -f docker-compose.dev.yml up
 
 - App Router 페이지: `/` (경기 요약), `/games`, `/teams`, `/record/[id]` (실시간 기록), `/daily`, `/rankings`, `/player/[id]`, `/settings` (로그인/회원가입).
 - **API 클라이언트**: `frontend/src/lib/axios.ts` (`@/lib/axios`)를 사용할 것 — `localStorage.token`의 JWT를 붙이고, 401을 처리한다(Authorization 헤더를 싣고 나간 요청의 401만 해당) — 로그아웃 후 토스트와 함께 `/settings`로 리다이렉트. `src/app/lib/axios.ts`는 아무 곳에서도 import하지 않는 레거시 중복 파일이다 — 여기에 import를 추가하지 말 것.
+- **로그인 아이디**는 이메일 또는 그룹명이다 (`POST /user/login`의 `identifier`). 백엔드는 캐시된 구버전 번들 호환을 위해 레거시 `email` 키도 계속 받는다. 로그인 실패는 아이디 미존재·비밀번호 오류 구분 없이 401 하나로 응답하며, `/user/login`에는 아이디 기준 rate limit(5분 10회, 초과 시 429)과 스프레이 공격을 막는 사이트 전역 rate limit(5분 300회)이 함께 걸려 있다. 백엔드 CI 잡이 실패하고 프론트 잡만 성공한 채 배포되면 새 프론트가 `{identifier, password}`를 보내도 구버전 백엔드가 `@Body('email')`만 읽어 사이트 전체 로그인이 401로 막히는데 `/group/all`만 확인하는 CI 헬스체크는 green을 유지하므로, 이런 스큐가 나지 않게 백엔드를 먼저 배포하거나 `workflow_dispatch`로 동시 배포할 것.
 - **인증 상태**는 이원화되어 있다: Zustand persist 스토어(`src/app/stores/useAuthStore.ts`)와 axios 인터셉터가 읽는 raw `localStorage.token`. 로그인/로그아웃 플로우를 수정할 때 둘을 동기화 상태로 유지할 것.
 - 그룹 선택은 `src/app/stores/groupStore.ts`에 있고, 서버 데이터는 TanStack Query로 관리한다.
 - styled-components에 SSR registry(`src/app/registry.tsx`) 사용; 스타일 파일은 같은 위치의 `styles/*.ts` 모듈에 있다. hydration에 민감한 컴포넌트는 `useMounted` 훅을 사용한다.

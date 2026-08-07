@@ -604,6 +604,8 @@ Expected: FAIL — `LoginUserDto`가 없어 컴파일 에러
 
 `backend/src/modules/user/user.request.dto.ts` 상단 import에 `ValidateIf`를 추가하고, 파일 끝에 DTO를 추가한다:
 
+> ⚠️ **주의: 아래 스니펫은 결함이 있다.** `identifier`와 `email`의 `@ValidateIf`가 서로를 참조한다(`!o.email` / `!o.identifier`) — 두 키가 동시에 오는 요청에서는 각자 상대가 존재한다는 이유로 서로의 검증을 꺼버려, 타입 검사(`@IsString`)가 통째로 우회된다(예: `identifier`가 객체여도 통과). 실행 중 발견되어 수정됐다. 실제 구현은 `backend/src/modules/user/user.request.dto.ts`의 `LoginUserDto`를 참고할 것 — `identifier`의 조건은 `o.identifier !== undefined || o.email === undefined`로, 둘 다 없을 때만 존재를 강제하고 `identifier`가 오면 항상 타입을 검증하도록 고쳐져 있다. 이후 Finding 4 후속 수정으로 `@Transform`(trim)과 `@MaxLength(254)`도 추가됐으므로 최신 파일이 이 스니펫보다 우선한다.
+
 ```ts
 export class LoginUserDto {
   // 이메일 또는 그룹명. 둘 다 비면 양쪽 검증이 모두 실패해 400이 된다.
