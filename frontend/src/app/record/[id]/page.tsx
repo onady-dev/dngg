@@ -204,10 +204,15 @@ const QuarterBar = styled.div`
   margin-top: 0.5rem;
   align-items: center;
 
+  /* 가로 모드: 쿼터가 늘수록(최대 10개) 칩이 줄바꿈되며 헤더가 무한정 커져,
+     높이가 정해진 고정 패널에서 로그 영역이 0까지 깎였다(740x360·10쿼터에서 실측 0px).
+     2줄까지만 보이게 상한을 걸어 헤더 높이를 고정하고, 넘치면 칩 영역만 스크롤한다. */
   @media (orientation: landscape) and (max-height: 500px) {
     margin-top: 0;
     flex-wrap: wrap;
     justify-content: center;
+    max-height: 4rem;
+    overflow-y: auto;
   }
 `;
 
