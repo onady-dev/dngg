@@ -286,9 +286,17 @@ const TeamsContainer = styled.div`
     padding-top: 3.5rem;
   }
 
-  /* 세로 모드: 팀을 좌우 2열로, 기록 피드는 아래 전체 폭으로 배치 */
+  /* 세로 모드: 팀을 좌우 2열로, 기록 피드는 아래 전체 폭으로 배치.
+
+     flex-shrink를 0으로 두는 게 핵심이다. 기본값 flex: 1은 basis 0 + shrink 1이라
+     이 그리드가 화면 높이에 맞춰 눌리고, 두 행(선수/로그)이 콘텐츠 크기대로 남은
+     공간을 나눠 갖는다. 선수 행은 인원수만큼 계속 커지므로 로그 행이 최소 몫도
+     못 받고 밀려났다 — 팀당 18명이면 로그 행 66px(되돌리기 버튼만), 20명이면 26px.
+     축소를 막으면 두 행이 각자 자연 높이를 갖고, 넘치는 만큼 Container가 스크롤한다. */
   @media (orientation: portrait) and (max-width: 768px) {
     grid-template-columns: 1fr 1fr;
+    flex: 1 0 auto;
+    min-height: auto;
   }
 `;
 
