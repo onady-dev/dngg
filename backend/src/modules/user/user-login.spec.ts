@@ -163,7 +163,10 @@ describe('loginUser — 그룹명 로그인', () => {
     expect(result.accessToken).toBe('signed-token');
   });
 
-  test('그룹명이면 이메일 조회를 시도하지 않는다', async () => {
+  // 이 테스트는 원래 "그룹명이면 이메일 조회를 시도하지 않는다"였다. 그 동작이
+  // 2026-08-07 운영 장애의 원인이었다 — 비이메일 아이디를 쓰는 레거시 계정이
+  // 조회조차 되지 않았다. 계정 조회를 항상 먼저 하는 것이 올바른 계약이다.
+  test('그룹명이어도 계정 조회를 먼저 하고, 없을 때 그룹으로 넘어간다', async () => {
     const userFindOne = jest.fn().mockResolvedValue(null);
     const findByName = jest.fn().mockResolvedValue(makeGroup());
     const userFind = jest.fn().mockResolvedValue([makeUser()]);
@@ -171,7 +174,8 @@ describe('loginUser — 그룹명 로그인', () => {
 
     await service.loginUser('월요농구', PASSWORD);
 
-    expect(userFindOne).not.toHaveBeenCalled();
+    expect(userFindOne).toHaveBeenCalledWith({ where: { email: '월요농구' } });
+    expect(findByName).toHaveBeenCalledWith('월요농구');
   });
 
   test('@가 들어간 그룹명은 이메일 조회 실패 후 그룹명으로 폴백한다', async () => {
@@ -241,5 +245,53 @@ describe('loginUser — 그룹명 로그인', () => {
       },
     );
     expect(errorLog).toHaveBeenCalled();
+  });
+});
+
+// 운영 회귀(2026-08-07): User.email 컬럼에 이메일이 아니라 아이디가 들어 있는
+// 레거시 계정이 다수 있다(11개 중 8개). 이메일 형식일 때만 email 컬럼을 조회하면
+// 그 계정들은 조회조차 되지 않고 그룹명 경로로 빠져 전부 로그인 불가가 된다.
+describe('loginUser — 이메일 형식이 아닌 레거시 아이디', () => {
+  test('이메일 형식이 아니어도 email 컬럼을 조회해 로그인된다', async () => {
+    const user = makeUser({ email: 'onady' });
+    const userFindOne = jest.fn().mockResolvedValue(user);
+    const findByName = jest.fn().mockResolvedValue(null);
+    const { service } = buildService({ userFindOne, findByName });
+
+    const result = await service.loginUser('onady', PASSWORD);
+
+    expect(userFindOne).toHaveBeenCalledWith({ where: { email: 'onady' } });
+    expect(result.accessToken).toBe('signed-token');
+    expect(findByName).not.toHaveBeenCalled();
+  });
+
+  // 스내치 계정이 잠긴 실제 경로: 아이디가 그룹명과 같고 그 그룹에 계정이 2개라
+  // 그룹명 가드에 걸려 거부됐다. 계정 조회가 먼저이므로 가드까지 가면 안 된다.
+  test('아이디가 그룹명과 같아도 계정 조회가 먼저다', async () => {
+    const user = makeUser({ email: '스내치', groupId: 1 });
+    const userFindOne = jest.fn().mockResolvedValue(user);
+    const findByName = jest.fn().mockResolvedValue(makeGroup({ id: 1, name: '스내치' }));
+    const userFind = jest
+      .fn()
+      .mockResolvedValue([user, makeUser({ id: 12, email: 'onady', groupId: 1 })]);
+    const { service } = buildService({ userFindOne, findByName, userFind });
+
+    const result = await service.loginUser('스내치', PASSWORD);
+
+    expect(result.accessToken).toBe('signed-token');
+    expect(findByName).not.toHaveBeenCalled();
+  });
+
+  test('일치하는 계정이 없을 때만 그룹명으로 넘어간다', async () => {
+    const userFindOne = jest.fn().mockResolvedValue(null);
+    const findByName = jest.fn().mockResolvedValue(makeGroup());
+    const userFind = jest.fn().mockResolvedValue([makeUser()]);
+    const { service } = buildService({ userFindOne, findByName, userFind });
+
+    const result = await service.loginUser('월요농구', PASSWORD);
+
+    expect(userFindOne).toHaveBeenCalledWith({ where: { email: '월요농구' } });
+    expect(findByName).toHaveBeenCalledWith('월요농구');
+    expect(result.accessToken).toBe('signed-token');
   });
 });

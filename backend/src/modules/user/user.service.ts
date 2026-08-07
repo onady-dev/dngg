@@ -1,7 +1,6 @@
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, Repository } from 'typeorm';
-import { isEmail } from 'class-validator';
 import { User } from '../../entities/User.entity';
 import { CreateUserDto, UpdateUserDto } from './user.request.dto';
 import { Group } from 'src/entities/Group.entity';
@@ -174,15 +173,18 @@ export class UserService {
     return { user: this.omitPassword(user), accessToken };
   }
 
-  // 아이디는 이메일 또는 그룹명이다. 이메일 형식이어도 그룹명일 수 있으므로
-  // (Group.name에 문자 제한이 없어 '@'가 들어갈 수 있다) 못 찾으면 그룹명으로 폴백한다.
+  // 아이디는 User.email 값(이메일 또는 레거시 아이디) 또는 그룹명이다.
+  // 계정 조회가 항상 먼저이고, 일치하는 계정이 없을 때만 그룹명으로 폴백한다.
   private async findUserByIdentifier(identifier: string): Promise<User | null> {
-    if (isEmail(identifier)) {
-      const byEmail = await this.userRepository.findOne({
-        where: { email: identifier },
-      });
-      if (byEmail) return byEmail;
-    }
+    // 형식과 무관하게 email 컬럼을 먼저 조회한다. 이메일 형식일 때만 조회하면
+    // 안 되는 이유(2026-08-07 운영 장애): 이메일 인증 도입 전에 만들어진 계정들은
+    // email 컬럼을 아이디로 쓰고 있어(운영 11개 중 8개가 'onady', '스내치' 같은
+    // 비이메일 값) 조회조차 되지 않고 그룹명 경로로 빠져 전부 로그인 불가가 됐다.
+    // 계정 조회를 먼저 두면 그룹명 로그인 도입 전과 동일한 결과가 보장된다.
+    const byEmail = await this.userRepository.findOne({
+      where: { email: identifier },
+    });
+    if (byEmail) return byEmail;
     return this.findUserByGroupName(identifier);
   }
 
@@ -191,8 +193,9 @@ export class UserService {
   private async findUserByGroupName(name: string): Promise<User | null> {
     const group = await this.groupRepository.findByName(name);
     if (!group) return null;
-    // 가입이 그룹을 만드는 유일한 경로라 그룹당 계정은 1개다. 그 전제가 깨졌을 때
-    // 엉뚱한 계정으로 조용히 로그인되지 않도록, 2건 이상이면 거부한다.
+    // 그룹당 계정이 1개라는 전제는 실제로는 깨져 있다 — 운영의 그룹 1(스내치)에는
+    // 계정이 2개다. 어느 쪽을 고를지 정할 근거가 없으므로 그룹명으로는 거부한다.
+    // 해당 계정들은 각자의 User.email 값(아이디)으로 로그인하면 된다.
     const users = await this.userRepository.find({
       where: { groupId: group.id },
       order: { id: 'ASC' },
