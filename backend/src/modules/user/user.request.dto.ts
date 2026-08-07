@@ -10,15 +10,11 @@ import {
   ValidateIf,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
+import { trimIfString } from '../../common/trim';
 import {
   VERIFICATION_PURPOSES,
   VerificationPurpose,
 } from './email-verification.constants';
-
-// 문자열이면 앞뒤 공백을 제거하고, 문자열이 아니면 그대로 통과시켜 이후 @IsString이
-// 타입 에러로 잡게 한다(여기서 강제 변환하면 타입 검증이 무력화된다).
-const trimIfString = ({ value }: { value: unknown }) =>
-  typeof value === 'string' ? value.trim() : value;
 
 export class CreateUserDto {
   @IsEmail()
