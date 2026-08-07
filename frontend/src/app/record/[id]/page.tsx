@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import styled from "styled-components";
 import { Game, LogItem, Log } from "@/types/game";
@@ -17,9 +17,14 @@ const formatQuarter = (q: number | null | undefined) => {
 };
 
 const Container = styled.div`
-  /* 가로 모드 헤더(한 줄로 압축된 상태)의 실측 높이 — 가운데 열 sticky 오프셋과 맞춘다.
-     헤더가 스크롤포트 맨 위(top: 0)에 붙으므로 이 값이 곧 그 아래 경계다. */
-  --record-header-h: 88px;
+  /* 가로 모드 고정 패널의 폭. 그리드 가운데 열도 같은 값을 써서 폭을 맞춘다. */
+  --record-center-w: 190px;
+  /* 헤더 실측 높이 — ResizeObserver가 런타임에 덮어쓴다(쿼터 칩 줄바꿈으로 변한다).
+     기록 패널을 헤더 바로 아래에 붙이는 데 쓰인다. */
+  --record-header-h: 144px;
+  /* 화면 위/아래 여백 — 위는 패널 시작점, 아래는 PWA 설치 배너 자리 */
+  --record-gap-top: 0.5rem;
+  --record-gap-bottom: 74px;
 
   padding: 0.5rem;
   position: relative;
@@ -40,9 +45,6 @@ const Container = styled.div`
   @media (orientation: landscape) and (max-height: 500px) {
     height: auto;
     min-height: calc(100vh + 60px);
-    /* sticky 헤더가 스크롤포트 맨 위에 붙도록 위 패딩은 헤더가 직접 갖는다.
-       여기 패딩이 남아 있으면 그 틈으로 선수 버튼이 헤더 위를 지나간다. */
-    padding-top: 0;
     /* 하단에 PWA 설치 배너(InstallPrompt)가 position: fixed로 깔린다 */
     padding-bottom: 70px;
   }
@@ -85,24 +87,23 @@ const GameInfoHeader = styled.div`
      밀려들어가지 않도록 양쪽에 같은 폭을 비워 둔다 */
   padding: 0 2.75rem;
 
-  /* 모바일 가로: 세로 공간이 390px 남짓뿐이라 세로로 쌓으면 헤더만 193px를
-     먹는다. 경기명을 숨기고 나머지를 한 줄로 몰아 ~60px로 줄인 뒤 고정한다. */
+  /* 모바일 가로: 뒤로가기 버튼과 같은 position: fixed로 화면에 붙여, 스크롤과
+     무관하게 항상 보이게 한다. sticky는 스크롤 주체(주소창 높이에 따라 문서가
+     되기도 하고 .full-height 컨테이너가 되기도 한다)를 잘못 잡으면 그냥 안 붙는다.
+     폭은 가운데 로그 열과 같은 --record-center-w로 맞추고 세로로 쌓는다. */
   @media (orientation: landscape) and (max-height: 500px) {
-    flex-direction: row;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 0.5rem 0.75rem;
-    margin-bottom: 0.375rem;
-    flex-shrink: 0;
-    /* 스크롤해도 점수·쿼터·위치바꾸기가 따라온다. 기준은 문서가 아니라
-       스크롤 주체인 Container(.full-height)의 스크롤포트다.
-       배경이 없으면 아래 선수 버튼이 글자 사이로 비친다. */
-    position: sticky;
-    top: 0;
-    z-index: 20;
-    background-color: var(--background-color);
-    padding-top: 0.5rem;
-    padding-bottom: 0.375rem;
+    position: fixed;
+    top: var(--record-gap-top);
+    left: 50%;
+    transform: translateX(-50%);
+    width: var(--record-center-w);
+    z-index: 30;
+    margin-bottom: 0;
+    padding: 0.5rem;
+    gap: 0.375rem;
+    background: white;
+    border-radius: 0.5rem 0.5rem 0 0;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   }
 `;
 
@@ -126,6 +127,12 @@ const ViewOnlyNotice = styled.div`
   font-size: 0.8125rem;
   font-weight: 500;
   margin-bottom: 0.5rem;
+
+  /* 고정 패널 폭(190px)에서는 여러 줄로 번져 선수 목록 자리를 먹는다.
+     조회 전용 사용자는 기록 버튼이 어차피 동작하지 않으므로 가로에서는 숨긴다. */
+  @media (orientation: landscape) and (max-height: 500px) {
+    display: none;
+  }
 `;
 
 const ScoreDisplay = styled.div`
@@ -228,9 +235,15 @@ const TeamsContainer = styled.div`
   height: auto;
   overflow: visible;
 
+  /* 가운데 열은 고정 패널이 덮는 자리다 — 폭을 패널과 같게 맞춰 선수 목록이
+     패널 밑으로 들어가지 않게 한다 */
   @media (orientation: landscape) and (max-height: 500px) {
     height: auto;
     min-height: 300px;
+    grid-template-columns: 1fr var(--record-center-w) 1fr;
+    /* 좌상단 뒤로가기 버튼(top 1rem + 높이 2.25rem)이 고정이라, 그만큼 비워두지
+       않으면 첫 줄 선수 버튼이 그 밑에 깔려 눌리지 않는다 */
+    padding-top: 3.5rem;
   }
 
   /* 세로 모드: 팀을 좌우 2열로, 기록 피드는 아래 전체 폭으로 배치 */
@@ -529,15 +542,22 @@ const LogSticky = styled.div`
   min-height: 0;
   height: 100%;
 
+  /* 헤더와 같은 폭으로 바로 아래에 이어 붙여 하나의 패널처럼 보이게 한다.
+     헤더 높이는 ResizeObserver가 --record-header-h로 넘겨준다. */
   @media (orientation: landscape) and (max-height: 500px) {
-    position: sticky;
-    top: var(--record-header-h);
-    z-index: 10;
+    position: fixed;
+    top: calc(var(--record-gap-top) + var(--record-header-h));
+    left: 50%;
+    transform: translateX(-50%);
+    width: var(--record-center-w);
+    z-index: 29;
     height: auto;
-    max-height: calc(100vh - var(--record-header-h) - 90px);
+    max-height: calc(
+      100vh - var(--record-gap-top) - var(--record-header-h) - var(--record-gap-bottom)
+    );
     background: white;
-    border-radius: 0.5rem;
-    padding: 0.5rem;
+    border-radius: 0 0 0.5rem 0.5rem;
+    padding: 0 0.5rem 0.5rem;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   }
 `;
@@ -703,6 +723,23 @@ export default function RecordPage() {
   const [isRecording, setIsRecording] = useState(false);
   const [isChangingQuarter, setIsChangingQuarter] = useState(false);
   const [showCoachmark, setShowCoachmark] = useState(false);
+  const headerRef = useRef<HTMLDivElement>(null);
+
+  // 가로 모드에서 헤더와 기록 패널은 둘 다 position: fixed로 화면에 고정되는데,
+  // 기록 패널을 헤더 바로 아래에 놓으려면 헤더의 실제 높이가 필요하다.
+  // 쿼터 칩이 좁은 폭에서 줄바꿈돼 높이가 변하므로 상수로 둘 수 없다 — 실측해서
+  // CSS 변수로 넘긴다.
+  useEffect(() => {
+    const el = headerRef.current;
+    const container = el?.parentElement;
+    if (!el || !container) return;
+    const publish = () =>
+      container.style.setProperty("--record-header-h", `${el.offsetHeight}px`);
+    publish();
+    const observer = new ResizeObserver(publish);
+    observer.observe(el);
+    return () => observer.disconnect();
+  });
 
   // 기록 입력은 로그인 + 이 경기가 내 소속 그룹의 경기일 때만 허용한다.
   const canRecord = !!user && !!game && user.groupId === game.groupId;
@@ -1051,7 +1088,7 @@ export default function RecordPage() {
       <BackButton onClick={() => router.back()} aria-label="뒤로 가기">
         {'<'}
       </BackButton>
-      <GameInfoHeader>
+      <GameInfoHeader ref={headerRef}>
         <GameName>{`${game.homeTeamName} vs ${game.awayTeamName}`}</GameName>
         {!canRecord && (
           <ViewOnlyNotice>
