@@ -1,10 +1,13 @@
 [Unit]
 Description=dngg 주간 마케팅 지표 리포트 (신규 그룹·막힌 그룹·기록 활동 → SNS)
 After=docker.service
+Requires=docker.service
 
 [Service]
 Type=oneshot
-# docker exec와 서버 .env 읽기에 root 권한이 필요하다.
+# root일 특별한 이유는 없다 — 같은 서버의 dngg-backup-db.service는 동일하게
+# docker exec ... postgres와 .env 읽기를 User=ec2-user로 수행하며 실제로 돌고 있다.
+# root로 남겨둔 건 기존 컨벤션 확정 전까지 굳이 바꿔 검증 비용을 들이지 않은 것뿐이다.
 User=root
 Group=root
 ExecStart=/usr/local/project/dngg/scripts/weekly-report.sh
