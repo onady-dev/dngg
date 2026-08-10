@@ -1,5 +1,6 @@
 import { ExecutionContext, Injectable } from '@nestjs/common';
 import { ThrottlerGuard } from '@nestjs/throttler';
+import { readPositiveInt } from '../../common/env';
 
 // 로그인 시도 제한 창(아이디 기준) — 5분에 10회
 export const LOGIN_THROTTLE_TTL_MS = 300_000;
@@ -11,7 +12,17 @@ export const LOGIN_THROTTLE_LIMIT = 10;
 // 긁어 각각 1회씩 시도)은 각 시도가 서로 다른 버킷에 떨어져 전혀 막지 못한다.
 // 이 굵은 버킷이 그 경우를 잡는다. 정상 트래픽에는 영향이 없도록 넉넉하게 잡았다.
 export const SITEWIDE_LOGIN_THROTTLE_TTL_MS = 300_000;
-export const SITEWIDE_LOGIN_THROTTLE_LIMIT = 300;
+export const DEFAULT_SITEWIDE_LOGIN_THROTTLE_LIMIT = 300;
+
+// 이 버킷은 전역 단일 키라, 스파이크로 정상 사용자가 한꺼번에 몰리면 서비스가
+// 스스로를 잠글 수 있다. 재배포 없이 .env + 컨테이너 재시작만으로 올릴 수 있게
+// 환경변수를 받는다.
+export function resolveSitewideLoginLimit(env: NodeJS.ProcessEnv): number {
+  return readPositiveInt(
+    env.SITEWIDE_LOGIN_THROTTLE_LIMIT,
+    DEFAULT_SITEWIDE_LOGIN_THROTTLE_LIMIT,
+  );
+}
 
 export const SITEWIDE_LOGIN_THROTTLER_NAME = 'login-sitewide';
 export const PER_IDENTIFIER_LOGIN_THROTTLER_NAME = 'login-per-identifier';
