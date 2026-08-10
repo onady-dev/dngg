@@ -1,0 +1,11 @@
+[Unit]
+Description=dngg 리소스 모니터링 (메모리·swap·디스크·컨테이너·5xx·p95·429)
+After=docker.service
+
+[Service]
+Type=oneshot
+# nginx access.log 읽기와 docker inspect에 root 권한이 필요하다.
+User=root
+Group=root
+ExecStart=/usr/local/project/dngg/scripts/monitor-resources.sh
+# 출력은 journal로 간다: journalctl -u dngg-monitor.service

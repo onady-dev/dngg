@@ -1,0 +1,11 @@
+[Unit]
+Description=dngg 리소스 모니터링을 5분 간격으로 실행
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=5min
+# 놓친 실행을 따라잡을 이유가 없는 감시용이라 Persistent는 쓰지 않는다.
+AccuracySec=30s
+
+[Install]
+WantedBy=timers.target
