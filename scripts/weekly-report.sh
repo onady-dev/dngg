@@ -21,23 +21,30 @@ q() {
 }
 
 # 1) 최근 7일 신규 그룹 (group에는 생성일이 없어 소유 user.createdAt을 대리값으로 쓴다)
+#    그룹당 계정이 여러 개인 사례가 실재한다(그룹 1 스내치는 2계정). group by 없이
+#    user.createdAt 아무 행이나 걸러내면 (a) 기존 그룹에 최근 멤버가 합류했을 때
+#    "신규 그룹"으로 오탐되고 (b) 같은 그룹이 여러 행으로 중복 출력된다. 그룹의
+#    가장 이른 user.createdAt(min)을 그룹 생성 시각의 대리값으로 쓴다.
 NEW_GROUPS="$(q "
-  select g.id, g.name, u.\"createdAt\"::date
+  select g.id, g.name, min(u.\"createdAt\")::date as created
     from \"group\" g join \"user\" u on u.\"groupId\" = g.id
-   where u.\"createdAt\" >= now() - interval '7 days'
-   order by u.\"createdAt\";")"
+   group by g.id, g.name
+  having min(u.\"createdAt\") >= now() - interval '7 days'
+   order by min(u.\"createdAt\");")"
 
 # 2) 막힌 그룹 — 최근 14일 내 생성 + 경기 있음 + 로그 0
 #    14일인 이유: 동호회 경기 주기가 주 1회 수준이라 7일 창은
 #    "아직 안 모인 팀"과 "막힌 팀"을 구분하지 못한다.
+#    NEW_GROUPS와 같은 이유로 min(user.createdAt)을 그룹 생성 시각의 대리값으로 쓴다 —
+#    where 절에 걸면 계정이 둘인 그룹은 아무 계정 하나만 최근이어도 걸리는 오탐이 생긴다.
 STUCK="$(q "
   select g.id, g.name, count(distinct ga.id) as games
     from \"group\" g
     join \"user\" u on u.\"groupId\" = g.id
     join game ga on ga.\"groupId\" = g.id
-   where u.\"createdAt\" >= now() - interval '14 days'
-     and not exists (select 1 from log l where l.\"groupId\" = g.id)
-   group by g.id, g.name;")"
+   where not exists (select 1 from log l where l.\"groupId\" = g.id)
+   group by g.id, g.name
+  having min(u.\"createdAt\") >= now() - interval '14 days';")"
 
 # 3) 주간 기록 활동 — 지난 7일 로그를 남긴 그룹
 ACTIVE="$(q "
