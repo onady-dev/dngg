@@ -7,6 +7,7 @@ import { Game, LogItem, Log } from "@/types/game";
 import { api } from "@/lib/axios";
 import { useAuthStore } from "@/app/stores/useAuthStore";
 import { useToast } from "@/app/components/ui/Toast";
+import { track } from "@/lib/analytics";
 
 const COACHMARK_STORAGE_KEY = "record_coachmark_seen";
 
@@ -973,6 +974,12 @@ export default function RecordPage() {
 
       // 전체 재조회 대신 응답으로 받은 로그를 로컬 상태에 즉시 반영해
       // 경기 중 기록 지연과 화면 깜빡임을 줄인다.
+      // 이 경기의 첫 로그 = 이 팀이 기록에 성공한 순간. 활성화 지표로 계측한다.
+      // (logitem 미시드로 기록 자체가 불가능했던 2026-08 사고를 조기에 잡기 위한 장치)
+      // PII 금지 규약에 따라 숫자 id만 보낸다 — 그룹명·선수명은 넣지 않는다.
+      if ((game.logs ?? []).length === 0) {
+        track("first_log_recorded", { game_id: game.id });
+      }
       const created = response.data;
       if (created && typeof created === "object" && "id" in created) {
         const newLog = {
