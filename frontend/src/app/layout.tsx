@@ -23,6 +23,17 @@ export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: "DN.GG",
   description: "농구 경기 기록·통계 서비스",
+  openGraph: {
+    type: "website",
+    siteName: "DN.GG",
+    title: "DN.GG — 동호회 농구 경기 기록·랭킹",
+    description: "터치 몇 번이면 랭킹·능력치가 자동으로. 무료 경기 기록 앱.",
+    locale: "ko_KR",
+    url: "/",
+  },
+  twitter: {
+    card: "summary_large_image",
+  },
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
