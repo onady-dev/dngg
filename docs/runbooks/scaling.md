@@ -395,6 +395,26 @@ aws ec2 authorize-security-group-ingress --group-id sg-035e49b91ab5412e2 --regio
 - 풀 40에서도 요청의 약 1.5%가 5초를 넘는다(`/api/group/all` 위주). 풀을 더 올려서
   해결되는지, 아니면 그 엔드포인트 자체가 무거운지 확인이 필요하다.
 
+- **오래된 docker 이미지가 계속 쌓인다.** 배포 워크플로의 `docker image prune -f`는
+  dangling 이미지만 지우고 `sha-<커밋>` 태그가 붙은 구버전은 남긴다. 2026-08-10에
+  26개(11GB)가 쌓여 디스크가 70%였고, 정리 후 34%가 됐다. 약 2주에 11GB 속도라
+  방치하면 두 달 안에 찬다.
+
+  당장의 정리:
+  ```bash
+  ssh dngg 'cd /usr/local/project/dngg
+    IN_USE=$(docker compose ps --format "{{.Image}}")
+    KEEP=$(for r in onady/dngg-backend onady/dngg-frontend; do
+      docker images "$r" --format "{{.CreatedAt}}\t{{.Repository}}:{{.Tag}}" | sort -r | head -2 | cut -f2
+    done)
+    docker images --format "{{.Repository}}:{{.Tag}}" | grep "^onady/dngg-" | sort -u > /tmp/all
+    printf "%s\n%s\n" "$KEEP" "$IN_USE" | grep -v "^$" | sort -u > /tmp/keep
+    comm -23 /tmp/all /tmp/keep | xargs -r docker rmi'
+  ```
+  (현재 배포본과 직전 버전을 남긴다. 더 이전으로 롤백해야 하면 Docker Hub에서 다시 받는다.)
+
+  근본 해결은 `deploy.yml`의 정리 단계를 태그된 구버전까지 회수하도록 고치는 것이다.
+
 ### 보안·설정 관련 (2026-08-10 작업 중 발견, 이번 범위 밖)
 
 - **운영 `.env`에 `TOSS_SECRET_KEY`·`TOSS_WEBHOOK_SECRET`이 없다.** compose가
