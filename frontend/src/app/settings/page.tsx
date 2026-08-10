@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import styled from "styled-components";
 import Signup from "../components/Signup";
 import type { AuthView } from "../components/Signup";
@@ -165,6 +166,15 @@ const SettingsPage = () => {
   const confirm = useConfirm();
   const mounted = useMounted();
 
+  // 구독 관리 버튼은 관리자가 유료화 서비스를 시작한 뒤에만 노출한다.
+  // 조회 중·조회 실패에는 undefined라 버튼이 숨겨진 상태로 유지된다(fail-closed).
+  // 아래 이른 return들보다 먼저 선언해야 훅 순서가 깨지지 않는다.
+  const { data: subStatus } = useQuery<{ monetizationStarted: boolean }>({
+    queryKey: ["subscription", "status"],
+    queryFn: async () => (await api.get("/subscription/status")).data,
+    enabled: mounted && !!user,
+  });
+
   // 랜딩 CTA(/settings#signup)로 들어오면 로그인이 아니라 가입 폼에서 시작한다.
   // useState 초기화 함수로는 안 된다 — 클라이언트 사이드 내비게이션에서는 Next가
   // 새 세그먼트를 렌더한 뒤에 History API로 URL을 갱신하므로, 초기화 시점의
@@ -265,9 +275,11 @@ const SettingsPage = () => {
           </LogoutButton>
           <ManualLink href="/manual/index.html">사용 가이드 보기</ManualLink>
         </ButtonRow>
-        <SubscriptionButton onClick={() => router.push("/subscription")}>
-          구독 관리
-        </SubscriptionButton>
+        {subStatus?.monetizationStarted && (
+          <SubscriptionButton onClick={() => router.push("/subscription")}>
+            구독 관리
+          </SubscriptionButton>
+        )}
         <SubscriptionButton onClick={() => router.push("/inquiry")}>
           문의·피드백
         </SubscriptionButton>
