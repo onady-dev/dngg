@@ -175,9 +175,77 @@ aws ec2 describe-instance-credit-specifications --instance-ids i-0bb00c849769dcb
 ```
 
 **되돌리기:** 같은 절차에서 `t3.small`을 `t2.micro`로 바꾼다.
-크레딧 모드가 `standard`로 돌아갔으면 다시 `unlimited`로 설정한다.
+크레딧 모드는 t3↔t2 왕복 후에도 `unlimited`가 유지되는 것을 확인했지만, 매번 확인한다.
 
-**실측 다운타임:** (Task 14 리허설에서 기록 예정)
+### ⚠️ 컨테이너를 `docker compose stop`으로 내렸다면 반드시 다시 올려야 한다
+
+`restart: always`는 **명시적으로 정지시킨 컨테이너에는 적용되지 않는다.** 위 절차의
+1단계에서 `docker compose stop`을 하므로, 기동 후에는 사람이 올려야 한다.
+
+```bash
+ssh dngg 'cd /usr/local/project/dngg && sudo docker compose up -d'
+```
+
+(단순 재부팅은 다르다 — 명시적 정지가 없었으므로 `restart: always`가 알아서 복구한다.)
+
+## L1 리허설 결과 (2026-08-10)
+
+t2.micro ↔ t3.small 왕복을 실제로 수행했다. **부팅 시 사이트가 스스로 복구되지 않는
+버그 2개를 찾아 고쳤다.**
+
+### 찾은 것 — 재부팅하면 사이트가 영영 안 올라왔다
+
+| 유닛 | 발견 당시 | 증상 |
+|---|---|---|
+| `nginx` | **`disabled`** | 부팅해도 nginx가 안 뜸 → 접속 자체 실패(연결 거부) |
+| `docker` | **`disabled`** | 부팅해도 컨테이너가 안 뜸 → nginx는 뜨지만 **502** |
+
+`docker`가 `disabled`인데도 평소 문제가 없어 보였던 이유는 **소켓 활성화** 때문이다.
+누군가 `docker ps` 같은 명령을 한 번 실행하면 그때 데몬이 뜨고, `restart: always`
+컨테이너가 따라 올라온다. 즉 **사람이 SSH로 들어가 docker를 건드리기 전까지는 사이트가
+죽어 있다.** `start-dngg.sh`로 인스턴스를 켜도 마찬가지다.
+
+조치:
+
+```bash
+sudo systemctl enable nginx docker containerd
+```
+
+검증: 위 조치 후 `systemctl reboot`으로 재부팅 → **수동 개입 없이 41초 만에 완전 복구**.
+docker·nginx·컨테이너 3개·타이머 3개 자동 기동, swap·swappiness·`DB_POOL_MAX`·
+크레딧 모드 전부 유지.
+
+### 실측 다운타임
+
+| 구간 | 소요 | 비고 |
+|---|---|---|
+| t2.micro → t3.small | 8분 43초 | 이 중 약 6분이 nginx 미기동 대기 |
+| t3.small → t2.micro | 6분 42초 | 이 중 상당 부분이 docker 미기동 대기 |
+| 재부팅만 (수정 후) | **41초** | 완전 자동 |
+
+**부팅 버그를 고친 지금, L1 전환의 예상 다운타임은 2~3분이다** (인스턴스 stop/start
+약 1분 30초 + 부팅 + 컨테이너 기동). 여기에 `docker compose up -d` 한 번이 더 필요하다.
+
+### 함께 확인한 것
+
+- **EIP가 유지된다** (`3.34.242.163`) — 타입 변경 왕복 후에도 그대로. DNS 갱신 불필요.
+- **`synchronize: true`가 스키마를 건드리지 않았다** — 재기동 로그에 `ALTER`/`CREATE`/`DROP` 0건.
+- swap(2GB, `fstab`), `swappiness=10`(`sysctl.d`), `DB_POOL_MAX`(서버 `.env`) 모두 영속.
+- t3.small의 크레딧 모드는 기본 `unlimited`이고, t2.micro로 되돌린 뒤에도 `unlimited`가 유지됐다.
+
+### t3.small 성능 실측 (풀 40)
+
+| 구성 | 동시 50 p95 | 동시 100 p95 | 실패율 | 처리량 |
+|---|---|---|---|---|
+| t2.micro + 풀 10 | 3.118초 | 7.229초 | 0.53% | 27.5 req/s |
+| t2.micro + 풀 40 | 37ms | (미측정) | 0.68% | 36.2 req/s |
+| **t3.small + 풀 40** | **6ms** | **10ms** | **0%** | **200.9 req/s** |
+
+t3.small은 동시 100명에서 60,477건 중 **실패 0건**, CPU 평균 31%. 두 조치가 서로 다른
+병목을 푼다 — 풀 확대가 큐 대기를 없애고, vCPU 2개가 남은 꼬리를 없앤다.
+
+**현재는 비용 제약에 따라 t2.micro로 되돌려 둔 상태다.** 마케팅 캠페인 직전에 미리
+t3.small로 올려두면 스파이크 당일 다운타임 없이 넘길 수 있다.
 
 ## L2·L3의 선행 조건
 

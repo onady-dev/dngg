@@ -27,16 +27,33 @@
 
 ## 2. 배포 구조
 
+```
+dngg.one ──DNS(Namecheap)──→ EIP 3.34.242.163 ──→ EC2 t2.micro (ap-northeast-2c)
+                                                    └─ nginx (호스트, 80/443, certbot)
+                                                         ├─ /      → :3000 frontend (docker)
+                                                         └─ /api/  → :3010 backend  (docker)
+                                                                       └─ postgres (docker, ./pg-data)
+```
+
+**로드밸런서는 없다.** 예전에 ALB(`dngg-1671377533...`)가 있었으나 삭제됐고, 이를 참조하던
+`full-stop-dngg.sh`·`optimize-lb.sh`는 2026-08-10에 제거했다.
+
+호스트 nginx가 유일한 진입점이며 `infra/nginx/nginx.conf`로 버전 관리한다.
+컨테이너 포트(3000/3010)는 공개 포트가 아니다 — 보안 그룹에서 3010은 닫혀 있고,
+프론트는 `NEXT_PUBLIC_API_URL=https://dngg.one/api`로 nginx를 경유한다.
+
 루트 compose 기준:
-- `frontend` 외부 포트 `3000`
-- `backend` 외부 포트 `3010`
-- `db` 외부 포트 `5432`
+- `frontend` 컨테이너 포트 `3000` (nginx가 `/`로 프록시)
+- `backend` 컨테이너 포트 `3010` (nginx가 `/api/`로 프록시)
+- `db` 포트 `5432`
 
 현재 compose는 아래를 마운트한다:
-- `./postgresql.conf:/etc/postgresql.conf`
 - `./pg-data:/var/lib/postgresql/data`
 
-현재 워크스페이스에는 `pg-data`와 `postgresql.conf`가 존재한다.
+> 예전에는 `./postgresql.conf:/etc/postgresql.conf`도 마운트했으나, 서버에 그 파일이 없어
+> **Docker가 빈 디렉토리를 만들어 놓은 상태**였고 postgres:15는 그 경로를 읽지도 않았다
+> (실효 `config_file`은 `/var/lib/postgresql/data/postgresql.conf`). 아무 효과 없이 튜닝이
+> 적용된다는 착각만 만들어 2026-08-10에 제거했다.
 
 루트 `.env` 예시 항목:
 - `FRONTEND_VERSION`

@@ -82,6 +82,24 @@ docker compose -f docker-compose.dev.yml up
 
 운영 배포는 루트 `docker-compose.yaml` 기준(frontend :3000, backend :3010, db :5432)이며 이미지는 `onady/dngg-frontend` / `onady/dngg-backend`를 사용한다. `start-dngg.sh` / `stop-dngg.sh`는 EC2 인스턴스를 시작/중지한다.
 
+### 운영 트래픽 경로 (컨테이너 포트 ≠ 공개 포트)
+
+```
+dngg.one ──DNS(Namecheap)──→ EIP 3.34.242.163 ──→ EC2 t2.micro (ap-northeast-2c)
+                                                    └─ nginx (호스트, 80/443, certbot)
+                                                         ├─ /      → :3000 frontend (docker)
+                                                         └─ /api/  → :3010 backend  (docker)
+                                                                       └─ postgres (docker, ./pg-data)
+```
+
+- **로드밸런서는 없다.** 과거 ALB가 있었으나 삭제됐다 — 스크립트나 문서에 남은 ALB 참조는 전부 무효다.
+- **호스트 nginx가 유일한 진입점**이다. 설정은 `infra/nginx/nginx.conf`로 버전 관리하며, 서버의 `/etc/nginx/nginx.conf`가 실제 사용본이다. 변경은 `nginx -t` 통과 후 `systemctl reload nginx`로 적용한다(restart 아님).
+- 프론트는 `NEXT_PUBLIC_API_URL=https://dngg.one/api`로 **nginx를 경유**한다. 보안 그룹에서 3010은 닫혀 있다.
+- **CI 배포는 SSH 인바운드(22번)에 의존한다.** GitHub Actions 러너 IP는 매번 달라지므로 22번을 특정 IP로 좁히면 배포가 통째로 막힌다 — 이미지는 빌드되지만 서버에 반영되지 않아 조용히 구버전이 계속 돈다.
+- `docker`·`nginx`는 부팅 자동 시작이 등록되어 있다. 이게 풀리면 재부팅 후 사이트가 스스로 복구되지 않는다.
+
+운영 확장·부하 대응은 `docs/runbooks/scaling.md`, 백업·복구는 `docs/runbooks/backup-restore.md`를 본다.
+
 ## 환경 변수
 
 - 백엔드는 `.env.${NODE_ENV}`를 로드한다 (`backend/`의 `.env.dev`, `.env.development`, `.env.prod`). 키: `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_DATABASE`, `PORT`, `JWT_SECRET`, `MAIL_FROM`, `AWS_REGION`. `MAIL_FROM`이 없으면 인증 메일은 실발송 대신 콘솔 로그로 대체된다(dev 폴백) — 운영에는 반드시 설정할 것. SES 자격증명은 EC2 IAM Role을 사용한다.
