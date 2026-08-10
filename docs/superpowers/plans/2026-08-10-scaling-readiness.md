@@ -22,6 +22,8 @@
 - 전역 `ValidationPipe`가 `whitelist` + `forbidNonWhitelisted`로 동작한다 — 새 엔드포인트 필드는 반드시 DTO에 선언해야 한다.
 - 백엔드 테스트는 `backend/` 안에서 `pnpm test` (jest, `rootDir: src`, `testRegex: .*\.spec\.ts$`). 단일 파일은 `pnpm test -- <경로>`.
 - **`pnpm lint`는 `eslint --fix`라 저장소 전체를 수정한다.** 태스크와 무관한 파일이 바뀌므로 커밋 전 `git add`는 반드시 **경로를 명시**해서 한다.
+- **서버에 cron이 없다** (Amazon Linux 2023, `cronie` 미설치 — `crontab` 명령도 `/etc/cron.d`도 없음). 예약 실행은 전부 **systemd 타이머**로 한다. 유닛 파일은 `infra/systemd/`에 버전 관리하고 `/etc/systemd/system/`에 설치한다. (Task 1 실행 중 확인 — 계획 초안의 `crontab` 지시는 이 규칙으로 대체됨)
+- **서버의 `/usr/local/project/dngg`는 root 소유다.** 파일 배포는 `/tmp`로 `scp` 후 `sudo mv`로 설치한다 (`scp`로 직접 쓰면 Permission denied). `ssh dngg`의 `ec2-user`는 비밀번호 없는 sudo와 docker 그룹 권한을 가진다.
 
 **고정 식별자 (모든 AWS 명령에서 사용):**
 
@@ -50,6 +52,9 @@
 | `scripts/restore-db.sh` | S3 덤프를 지정 DB로 복원 (리허설·실복구 공용) |
 | `scripts/backup-config.sh` | nginx.conf·.env·compose를 tar.gz로 S3 업로드 |
 | `scripts/monitor-resources.sh` | 5분마다 메모리/디스크/5xx/p95/429 확인 후 SNS 발행 |
+| `infra/systemd/dngg-backup-db.{service,timer}` | DB 백업 예약 실행 (매일 04:10 KST) |
+| `infra/systemd/dngg-backup-config.{service,timer}` | 설정 백업 예약 실행 (매주 일 04:30 KST) |
+| `infra/systemd/dngg-monitor.{service,timer}` | 리소스 모니터링 예약 실행 (5분 간격) |
 | `infra/nginx/nginx.conf` | 운영 nginx 설정의 **버전 관리본** (서버가 유일본이던 문제 해소) |
 | `backend/src/common/env.ts` | 환경변수 파싱 헬퍼 — TypeORM 풀 상한과 로그인 한도가 공유한다 |
 | `backend/src/common/env.spec.ts` | 위 테스트 |
@@ -259,17 +264,28 @@ Expected: 운영에서 뽑은 행 수와 **정확히 일치**. 정리:
 docker rm -f dngg-restore-test
 ```
 
-- [ ] **Step 7: cron 등록 (매일 04:10 KST)**
+- [ ] **Step 7: systemd 타이머 등록 (매일 04:10 KST)**
 
-`subscription-renewal.cron.ts`가 매일 04:00에 도는 것을 피해 10분 뒤로 둔다.
+`subscription-renewal.cron.ts`가 매일 04:00에 도는 것을 피해 10분 뒤로 둔다. `infra/systemd/dngg-backup-db.service`(`Type=oneshot`, `User=ec2-user`, `After=docker.service`)와 `dngg-backup-db.timer`(`OnCalendar=*-*-* 04:10:00`, `Persistent=true`, `RandomizedDelaySec=120`)를 만들어 설치한다.
 
 ```bash
-ssh dngg 'crontab -l 2>/dev/null | grep -v backup-db.sh > /tmp/ct; \
-  echo "10 4 * * * /usr/local/project/dngg/scripts/backup-db.sh >> /var/log/dngg-backup.log 2>&1" >> /tmp/ct; \
-  crontab /tmp/ct; crontab -l'
+scp infra/systemd/dngg-backup-db.service infra/systemd/dngg-backup-db.timer dngg:/tmp/
+ssh dngg 'sudo mv /tmp/dngg-backup-db.service /tmp/dngg-backup-db.timer /etc/systemd/system/ && \
+  sudo chown root:root /etc/systemd/system/dngg-backup-db.* && \
+  sudo systemctl daemon-reload && \
+  sudo systemctl enable --now dngg-backup-db.timer && \
+  systemctl list-timers dngg-backup-db.timer --no-pager'
 ```
 
-Expected: crontab에 해당 줄이 보인다.
+그 뒤 타이머가 아니라 **서비스가 실제로 도는지** 직접 확인한다 (systemd 환경은 대화형 셸과 다르다):
+
+```bash
+ssh dngg 'sudo systemctl start dngg-backup-db.service && sleep 8 && \
+  systemctl is-failed dngg-backup-db.service; \
+  sudo journalctl -u dngg-backup-db.service -n 15 --no-pager -o cat'
+```
+
+Expected: 다음 실행 시각이 잡히고, `is-failed`가 `inactive`(oneshot 정상 완료), 로그에 `백업 완료: s3://...`.
 
 - [ ] **Step 8: 런북 작성**
 
@@ -292,6 +308,7 @@ git commit -m "feat: DB 백업을 S3로 자동화하고 복구 절차를 검증
 
 **Files:**
 - Create: `scripts/backup-config.sh`
+- Create: `infra/systemd/dngg-backup-config.service`, `infra/systemd/dngg-backup-config.timer`
 - Modify: `docs/runbooks/backup-restore.md`
 
 **Interfaces:**
@@ -341,13 +358,32 @@ ssh dngg 'chmod +x /usr/local/project/dngg/scripts/backup-config.sh && /usr/loca
 
 Expected: `설정 백업 완료: s3://...` 출력.
 
-- [ ] **Step 3: cron 등록 (매주 일요일 04:30 KST)**
+- [ ] **Step 3: systemd 타이머 등록 (매주 일요일 04:30 KST)**
+
+Task 1에서 만든 `infra/systemd/dngg-backup-db.*`와 같은 형태로 `dngg-backup-config.service`/`.timer`를 만든다. 서비스는 `Type=oneshot`, `User=ec2-user`, `After=docker.service`, `ExecStart=/usr/local/project/dngg/scripts/backup-config.sh`. 타이머는 `OnCalendar=Sun *-*-* 04:30:00`, `Persistent=true`, `RandomizedDelaySec=120`, `WantedBy=timers.target`.
+
+> `backup-config.sh`는 `sudo cat /etc/nginx/nginx.conf`를 쓴다. `User=ec2-user`로 실행되므로 비밀번호 없는 sudo가 동작하는지 Step 4에서 반드시 확인한다 — 안 되면 `User=root`로 돌린다.
 
 ```bash
-ssh dngg 'crontab -l 2>/dev/null | grep -v backup-config.sh > /tmp/ct; \
-  echo "30 4 * * 0 /usr/local/project/dngg/scripts/backup-config.sh >> /var/log/dngg-backup.log 2>&1" >> /tmp/ct; \
-  crontab /tmp/ct; crontab -l'
+scp infra/systemd/dngg-backup-config.service infra/systemd/dngg-backup-config.timer dngg:/tmp/
+ssh dngg 'sudo mv /tmp/dngg-backup-config.service /tmp/dngg-backup-config.timer /etc/systemd/system/ && \
+  sudo chown root:root /etc/systemd/system/dngg-backup-config.* && \
+  sudo systemctl daemon-reload && \
+  sudo systemctl enable --now dngg-backup-config.timer && \
+  systemctl list-timers dngg-backup-config.timer --no-pager'
 ```
+
+- [ ] **Step 3b: 타이머가 아니라 서비스가 실제로 도는지 확인**
+
+systemd 환경은 대화형 셸과 PATH·환경변수가 다르다. 반드시 직접 기동해 확인한다.
+
+```bash
+ssh dngg 'sudo systemctl start dngg-backup-config.service && sleep 8 && \
+  systemctl is-failed dngg-backup-config.service; \
+  sudo journalctl -u dngg-backup-config.service -n 15 --no-pager -o cat'
+```
+
+Expected: `is-failed`가 `inactive`(oneshot 정상 완료), 로그에 `설정 백업 완료: s3://...`.
 
 - [ ] **Step 4: DLM 서비스 역할 생성**
 
@@ -1457,6 +1493,7 @@ Expected: 두 알람 모두 `OK`, `dngg-cpu-credit-low`의 임계치가 `50.0`.
 
 **Files:**
 - Create: `scripts/monitor-resources.sh`
+- Create: `infra/systemd/dngg-monitor.service`, `infra/systemd/dngg-monitor.timer`
 
 **Interfaces:**
 - Consumes: Task 10의 `rt=` 로그 포맷, Task 11의 SNS 토픽.
@@ -1595,23 +1632,28 @@ Expected: `경고 발송:` 출력, 몇 분 안에 `[dngg] 리소스 경고` 메�
 ssh dngg 'sudo rm -f /var/tmp/dngg-monitor/* && rm -f /tmp/mon-test.sh'
 ```
 
-- [ ] **Step 5: cron 등록 (5분마다)**
+- [ ] **Step 5: systemd 타이머 등록 (5분마다)**
 
-`access.log` 읽기에 root 권한이 필요하므로 root crontab에 넣는다.
+`access.log` 읽기에 root 권한이 필요하므로 `User=root`로 돌린다. `infra/systemd/dngg-monitor.service`(`Type=oneshot`, `User=root`, `ExecStart=/usr/local/project/dngg/scripts/monitor-resources.sh`)와 `dngg-monitor.timer`(`OnBootSec=5min`, `OnUnitActiveSec=5min`, `WantedBy=timers.target`)를 만든다.
 
-```bash
-ssh dngg 'sudo bash -c "crontab -l 2>/dev/null | grep -v monitor-resources.sh > /tmp/rct; \
-  echo \"*/5 * * * * /usr/local/project/dngg/scripts/monitor-resources.sh >> /var/log/dngg-monitor.log 2>&1\" >> /tmp/rct; \
-  crontab /tmp/rct; crontab -l"'
-```
-
-- [ ] **Step 6: 10분 뒤 로그 확인**
+> 5분 간격 반복은 `OnCalendar`가 아니라 `OnUnitActiveSec`을 쓴다. 이 타이머는 놓친 실행을 따라잡을 필요가 없으므로 `Persistent=true`를 넣지 않는다.
 
 ```bash
-ssh dngg 'sudo tail -5 /var/log/dngg-monitor.log'
+scp infra/systemd/dngg-monitor.service infra/systemd/dngg-monitor.timer dngg:/tmp/
+ssh dngg 'sudo mv /tmp/dngg-monitor.service /tmp/dngg-monitor.timer /etc/systemd/system/ && \
+  sudo chown root:root /etc/systemd/system/dngg-monitor.* && \
+  sudo systemctl daemon-reload && \
+  sudo systemctl enable --now dngg-monitor.timer && \
+  systemctl list-timers dngg-monitor.timer --no-pager'
 ```
 
-Expected: `이상 없음` 줄이 2회 이상 쌓여 있다.
+- [ ] **Step 6: 12분 뒤 journal 확인**
+
+```bash
+ssh dngg 'sudo journalctl -u dngg-monitor.service --since "-15min" --no-pager -o cat | tail -10'
+```
+
+Expected: `이상 없음 (mem=...MB disk=...%)` 줄이 2회 이상 쌓여 있다.
 
 - [ ] **Step 7: 커밋**
 

@@ -1,0 +1,13 @@
+[Unit]
+Description=dngg DB 백업을 매일 04:10(KST)에 실행
+
+[Timer]
+# subscription-renewal.cron.ts가 04:00에 도는 것을 피해 10분 뒤로 둔다.
+OnCalendar=*-*-* 04:10:00
+# 인스턴스가 꺼져 있어 놓친 실행은 다음 부팅 직후 따라잡는다.
+Persistent=true
+# 여러 타이머가 같은 순간에 몰리지 않게 흩뿌린다.
+RandomizedDelaySec=120
+
+[Install]
+WantedBy=timers.target
