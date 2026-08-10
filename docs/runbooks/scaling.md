@@ -394,6 +394,23 @@ aws ec2 authorize-security-group-ingress --group-id sg-035e49b91ab5412e2 --regio
 
 - 풀 40에서도 요청의 약 1.5%가 5초를 넘는다(`/api/group/all` 위주). 풀을 더 올려서
   해결되는지, 아니면 그 엔드포인트 자체가 무거운지 확인이 필요하다.
+
+### 보안·설정 관련 (2026-08-10 작업 중 발견, 이번 범위 밖)
+
+- **운영 `.env`에 `TOSS_SECRET_KEY`·`TOSS_WEBHOOK_SECRET`이 없다.** compose가
+  `${TOSS_SECRET_KEY}`를 참조하므로 빈 문자열이 주입되고, `docker compose` 실행 시
+  경고가 찍힌다. compose 주석대로면 **결제가 조용히 401로 실패하고 가격은 기본값으로
+  폴백**된다. 유료화 미시작 상태라 의도된 것으로 보이지만 **유료화 개시 전 반드시
+  채워야 한다.**
+- **서버 `/usr/local/project/dngg/.env`가 `644`(누구나 읽기 가능)이고
+  `JWT_SECRET`·`DB_PASSWORD`가 들어 있다.** 로그인 사용자가 `ec2-user` 하나뿐이라
+  실질 위험은 낮지만 `600`으로 좁히는 편이 낫다.
+- **보안 그룹의 기존 4개 IP가 모든 프로토콜/포트(-1) 허용이라 Postgres 5432도
+  열려 있다.** 좁히면 본인 접근 경로가 막힐 수 있어 손대지 않았다.
+- **SSH 22번이 전 세계에 열려 있다** — CI 배포가 SSH에 의존하기 때문이다(위 "하지 말 것"
+  참고). 키 전용 인증(`passwordauthentication no`)이라 브루트포스는 통하지 않지만,
+  7일간 실패 시도가 3,746건 관측됐다. 닫으려면 SSM 전환이나 러너 IP 자동 등록이
+  선행되어야 한다. `PermitRootLogin yes`도 `prohibit-password`로 좁힐 여지가 있다.
 - `worker_processes auto`가 1 vCPU에서 nginx 워커 1개를 만든다. L1으로 2 vCPU가 되면
   자동으로 2개가 되지만, 그전까지는 단일 워커가 상한이다.
 - 컨테이너 포트가 docker 유저랜드 프록시(`docker-proxy`)를 거친다. 이 오버헤드는
