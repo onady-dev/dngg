@@ -186,5 +186,5 @@ jobs:
           script: |
             set -e
             sleep 10
-            curl -sf http://127.0.0.1:3010/group/all > /dev/null && echo "backend OK"
+            curl -sf http://127.0.0.1:3010/health/ready > /dev/null && echo "backend OK"
             curl -sfI http://127.0.0.1:3000 > /dev/null && echo "frontend OK"

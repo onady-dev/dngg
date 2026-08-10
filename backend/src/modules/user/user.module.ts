@@ -18,7 +18,7 @@ import {
   LOGIN_THROTTLE_TTL_MS,
   LoginThrottlerGuard,
   PER_IDENTIFIER_LOGIN_THROTTLER_NAME,
-  SITEWIDE_LOGIN_THROTTLE_LIMIT,
+  resolveSitewideLoginLimit,
   SITEWIDE_LOGIN_THROTTLE_TTL_MS,
   SITEWIDE_LOGIN_THROTTLER_NAME,
 } from './login-throttler.guard';
@@ -44,7 +44,7 @@ import {
       {
         name: SITEWIDE_LOGIN_THROTTLER_NAME,
         ttl: SITEWIDE_LOGIN_THROTTLE_TTL_MS,
-        limit: SITEWIDE_LOGIN_THROTTLE_LIMIT,
+        limit: resolveSitewideLoginLimit(process.env),
       },
       {
         name: PER_IDENTIFIER_LOGIN_THROTTLER_NAME,

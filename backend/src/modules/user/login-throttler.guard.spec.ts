@@ -1,8 +1,10 @@
 import {
+  DEFAULT_SITEWIDE_LOGIN_THROTTLE_LIMIT,
   LOGIN_THROTTLE_LIMIT,
   LOGIN_THROTTLE_TTL_MS,
   LoginThrottlerGuard,
   resolveLoginTracker,
+  resolveSitewideLoginLimit,
 } from './login-throttler.guard';
 
 describe('resolveLoginTracker', () => {
@@ -66,5 +68,29 @@ describe('LoginThrottlerGuard.getTracker', () => {
 
     expect(tracker).toBe('id:월요농구');
     expect(tracker).not.toBe('9.9.9.9');
+  });
+});
+
+describe('resolveSitewideLoginLimit', () => {
+  test('미설정이면 기본값 300을 쓴다', () => {
+    expect(resolveSitewideLoginLimit({})).toBe(
+      DEFAULT_SITEWIDE_LOGIN_THROTTLE_LIMIT,
+    );
+    expect(DEFAULT_SITEWIDE_LOGIN_THROTTLE_LIMIT).toBe(300);
+  });
+
+  // 스파이크 때 재배포 없이 .env 수정 + 컨테이너 재시작만으로 올릴 수 있어야 한다.
+  test('환경변수로 한도를 올릴 수 있다', () => {
+    expect(
+      resolveSitewideLoginLimit({ SITEWIDE_LOGIN_THROTTLE_LIMIT: '1000' }),
+    ).toBe(1000);
+  });
+
+  test('무효한 값은 기본값으로 폴백해 부팅을 막지 않는다', () => {
+    for (const bad of ['abc', '0', '-5', '', '1.5']) {
+      expect(
+        resolveSitewideLoginLimit({ SITEWIDE_LOGIN_THROTTLE_LIMIT: bad }),
+      ).toBe(DEFAULT_SITEWIDE_LOGIN_THROTTLE_LIMIT);
+    }
   });
 });

@@ -1,0 +1,11 @@
+[Unit]
+Description=dngg 설정 백업 (nginx·env·compose·systemd 유닛 → S3)
+
+[Service]
+Type=oneshot
+# nginx.conf와 systemd 유닛을 읽어야 해서 sudo를 쓴다. ec2-user는 비밀번호 없는
+# sudo가 되지만, 스크립트가 sudo에 의존하는 대신 root로 도는 편이 단순하다.
+User=root
+Group=root
+ExecStart=/usr/local/project/dngg/scripts/backup-config.sh
+# 출력은 journal로 간다: journalctl -u dngg-backup-config.service

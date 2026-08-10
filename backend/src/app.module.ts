@@ -16,7 +16,9 @@ import { TeamModule } from './modules/team/team.module';
 import { SubscriptionModule } from './modules/subscription/subscription.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { InquiryModule } from './modules/inquiry/inquiry.module';
+import { HealthModule } from './modules/health/health.module';
 import { formatLogLine } from './common/log-format';
+import { buildTypeOrmOptions } from './config/typeorm.options';
 import * as winston from 'winston';
 
 const { combine, timestamp, printf, colorize } = winston.format;
@@ -27,18 +29,7 @@ const { combine, timestamp, printf, colorize } = winston.format;
       envFilePath: `.env.${process.env.NODE_ENV}`, // 접근 가능한 환경변수 목록
     }),
     ScheduleModule.forRoot(),
-    TypeOrmModule.forRoot({
-      type: 'postgres',
-      host: process.env.DB_HOST,
-      port: Number(process.env.DB_PORT),
-      username: process.env.DB_USERNAME,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_DATABASE,
-      entities: ['dist/entities/*.entity.js'],
-      autoLoadEntities: true,
-      synchronize: true,
-      logging: false,
-    }),
+    TypeOrmModule.forRoot(buildTypeOrmOptions(process.env)),
     WinstonModule.forRoot({
       transports: [
         new winston.transports.Console({
@@ -63,6 +54,7 @@ const { combine, timestamp, printf, colorize } = winston.format;
     SubscriptionModule,
     AdminModule,
     InquiryModule,
+    HealthModule,
   ],
   controllers: [],
   providers: [

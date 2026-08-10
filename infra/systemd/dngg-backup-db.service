@@ -1,0 +1,12 @@
+[Unit]
+Description=dngg DB 백업 (pg_dump → S3)
+# docker가 떠 있어야 pg_dump를 컨테이너에서 실행할 수 있다.
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=ec2-user
+Group=ec2-user
+ExecStart=/usr/local/project/dngg/scripts/backup-db.sh
+# 출력은 journal로 간다: journalctl -u dngg-backup-db.service

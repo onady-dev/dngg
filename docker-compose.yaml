@@ -15,7 +15,6 @@ services:
       - TZ=Asia/Seoul
     container_name: postgres
     volumes:
-      - ./postgresql.conf:/etc/postgresql.conf
       - ./pg-data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
@@ -65,6 +64,11 @@ services:
       - SUBSCRIPTION_PRICE_YEARLY=${SUBSCRIPTION_PRICE_YEARLY:-99000}
       - FREE_GAME_LIMIT=${FREE_GAME_LIMIT:-10}
       - TOSS_WEBHOOK_SECRET=${TOSS_WEBHOOK_SECRET}
+      # L1 확장(t3.small) 시 20으로 올린다 — docs/runbooks/scaling.md 참고
+      - DB_POOL_MAX=${DB_POOL_MAX:-10}
+      # 전역 로그인 한도(5분 창). 전역 단일 버킷이라 스파이크 때 정상 사용자를
+      # 429로 잠글 수 있다 — 그때 서버 .env에서 올리고 컨테이너만 재시작한다.
+      - SITEWIDE_LOGIN_THROTTLE_LIMIT=${SITEWIDE_LOGIN_THROTTLE_LIMIT:-300}
     depends_on:
       - db
     restart: always
