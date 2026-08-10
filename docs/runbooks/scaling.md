@@ -1,0 +1,240 @@
+# 확장 런북
+
+최종 갱신: 2026-08-10
+
+관련 문서: [확장 전략 설계](../superpowers/specs/2026-08-10-scaling-strategy-design.md) · [백업·복구 런북](./backup-restore.md)
+
+## 요약 — 부하 테스트가 뒤집은 전제
+
+설계 단계에서는 스파이크 시 **CPU 크레딧 소진**과 **메모리 부족(OOM)**이 서비스를 죽일
+것으로 보고, 그에 맞춰 L1(수직 확장) 트리거를 잡았다. 실측 결과는 달랐다.
+
+**동시 100명까지 태워도 CPU는 최대 12.7%, 크레딧은 144에서 1도 줄지 않았고, swap은 14MB만
+썼다. 그런데도 p95는 7.2초였고 요청이 타임아웃됐다.** 병목은 하드웨어가 아니라
+**DB 커넥션 풀 크기(10)**였다.
+
+풀을 40으로 올리자 같은 조건에서 p95가 **3.118초 → 37ms**로 떨어졌다.
+
+→ **수직 확장(L1)은 이 병목을 고치지 못한다.** 트리거와 대응을 아래와 같이 고쳤다.
+
+## 부하 테스트 실측 (2026-08-10)
+
+도구: k6 (`loadtest/k6-read-paths.js`), 로컬 → `https://dngg.one`.
+경로: `/api/group/all`, `/api/health/ready`, `/` (SSR). 로그인은 전역 rate limit을
+소진시키므로 제외.
+
+> 테스트 출발 IP는 `infra/nginx/nginx.conf`의 `geo` 예외 목록에 있어야 한다.
+> 아니면 측정되는 건 서버 한계가 아니라 nginx의 429다.
+
+### 커넥션 풀 10 (기본값)
+
+| 동시 사용자 | median | p95 | p99 | max | 5xx |
+|---|---|---|---|---|---|
+| ~10 | 2ms | **7ms** | 14ms | 48ms | 0 |
+| ~25 | 2ms | **1.03초** | 3.17초 | 32초 | 0 |
+| ~50 | 2ms | **3.12초** | 15.8초 | 60초 | 2 |
+| ~100 | 2ms | **7.23초** | 60초 | 60초 | 26 |
+
+**median이 전 구간 2ms로 일정한데 p95만 폭발한다.** 용량 부족이 아니라 고정 크기 큐
+뒤에서 대기가 쌓이는 신호이고, 꺾이는 지점이 풀 크기 10과 일치한다.
+
+같은 구간의 자원 사용률:
+
+| 지표 | 최대치 | 판단 |
+|---|---|---|
+| CPU (CloudWatch) | **12.7%** | 여유 |
+| CPU (컨테이너 합계) | 31.3% | 여유 |
+| CPU 크레딧 | 144 → 144 (**소모 없음**) | 여유 |
+| CPUSurplusCreditBalance | 0 | 과금 없음 |
+| available 메모리 | 최저 189MB | 여유 |
+| swap | 최대 14MB | 거의 미사용 |
+
+### 커넥션 풀 40 (현재 운영값)
+
+동시 50명, 3분:
+
+| | 풀 10 | 풀 40 |
+|---|---|---|
+| p95 | 3.118초 | **37ms** |
+| p90 | — | 19.9ms |
+| 처리량 | 27.5 req/s | **36.2 req/s** |
+| 메모리 영향 | — | 없음 (available 231MB) |
+
+잔여: 전체의 약 1.5%가 여전히 5초를 넘는다(`/api/group/all` 위주). p95가 37ms라
+당장은 문제가 아니지만, 다음 병목 후보로 남겨둔다 — 아래 "미해결" 참고.
+
+## L1~L3 레버와 트리거 (실측 반영)
+
+```
+[L0] 현재 + 완충장치         t2.micro 1대, nginx, 컨테이너 3개        $0 추가
+      ↓ p95 > 1초가 지속 (아래 판단 순서를 먼저 따를 것)
+[L1] 수직 확장               t3.small (2 vCPU / 2GB)                 +$9/월
+      ↓ t3.small에서도 CPU 평균 > 40%
+[L2] DB 분리                 RDS db.t4g.micro 또는 별도 EC2           +$15~25/월
+      ↓ 수직 확장으로 감당 불가
+[L3] 앱 다중화               ASG + 코드 제약 3종 해결                 +$20~/월
+```
+
+### p95가 1초를 넘었을 때 — 판단 순서
+
+**바로 L1으로 가지 말 것.** 실측상 이 서비스는 CPU가 남는 상태에서 먼저 느려진다.
+
+1. **CPU와 메모리를 먼저 본다.**
+   - CPU 평균 < 30%이고 available 메모리 > 200MB인데 느리다 → **하드웨어 문제가 아니다.** 2번으로.
+   - CPU가 실제로 높다(평균 > 40%) → L1이 맞다.
+2. **커넥션 풀 포화를 의심한다.** 지금까지 확인된 유일한 실제 병목이다.
+   ```bash
+   # 대기 중인 커넥션이 있는지
+   ssh dngg 'cd /usr/local/project/dngg && set -a && . ./.env && set +a && \
+     docker exec -e PGPASSWORD="$DB_PASSWORD" postgres psql -U "$DB_USERNAME" -d "$DB_DATABASE" \
+     -tAc "select state, count(*) from pg_stat_activity group by state"'
+   ```
+   활성 커넥션이 `DB_POOL_MAX`에 붙어 있으면 풀을 올린다 (아래 절차).
+3. 풀을 올려도 안 되면 L1 → L2 순으로 간다.
+
+### 지표별 트리거 (CloudWatch·자체 모니터링)
+
+| 지표 | 임계 | 알람 | 의미 |
+|---|---|---|---|
+| p95 응답시간 | > 1초 | 자체 스크립트 | **1차 신호.** 위 판단 순서를 따른다 |
+| available 메모리 | < 150MB | 자체 스크립트 | 실측상 100 VU에서도 189MB — 도달하면 이례적 |
+| swap 사용량 | > 512MB | 자체 스크립트 | 메모리 압박 선행 신호 |
+| CPUCreditBalance | < 50 | `dngg-cpu-credit-low` | **의미 변경**: `unlimited` 전환 후에는 스로틀 임박이 아니라 "baseline 초과 지속 → 과금 시작" 조기 경보 |
+| StatusCheckFailed | >= 1 | `dngg-status-check-failed` | 인스턴스 자체 장애 |
+| 5xx 비율 | > 5% | 자체 스크립트 | |
+| 429 발생 | > 50건/5분 | 자체 스크립트 | rate limit이 CGNAT 뒤 정상 사용자를 막고 있을 수 있다 |
+
+## 커넥션 풀 조정 (가장 효과가 큰 레버)
+
+```bash
+ssh dngg
+cd /usr/local/project/dngg
+sudo sed -i 's/^DB_POOL_MAX=.*/DB_POOL_MAX=60/' .env   # 없으면 새 줄로 추가
+sudo docker compose up -d backend
+docker exec dngg-backend-1 printenv DB_POOL_MAX        # 반영 확인
+curl -sf http://127.0.0.1:3010/health/ready
+```
+
+재빌드·재배포가 필요 없다. 컨테이너 재시작만으로 몇 초 안에 적용된다.
+
+**상한:** Postgres `max_connections`가 100이다. 앱 인스턴스가 하나뿐인 지금은 60까지
+여유가 있지만, L3(다중화)로 가면 `인스턴스 수 × DB_POOL_MAX < 100`을 지켜야 한다.
+넘기면 `too many clients already`로 **전체 장애**가 난다.
+
+**현재 운영값: 40** (서버 `.env`).
+
+## 스파이크 중 즉시 쓸 수 있는 조치
+
+재배포 없이 컨테이너 재시작만으로 되는 것들:
+
+| 증상 | 조치 |
+|---|---|
+| p95 상승, CPU 여유 | `DB_POOL_MAX` 상향 (위 절차) |
+| 정상 사용자가 로그인 429 | `.env`에 `SITEWIDE_LOGIN_THROTTLE_LIMIT=1000` 후 `docker compose up -d backend` |
+| 특정 IP 폭주 | nginx `limit_req` zone rate 조정 후 `nginx -t && systemctl reload nginx` |
+| 관리자·테스트가 429에 걸림 | `infra/nginx/nginx.conf`의 `geo` 예외 목록에 IP 추가 후 reload |
+
+## L1 수직 확장 절차 (t2.micro → t3.small)
+
+**선행 조건:** 인스턴스 타입 변경은 stop/start이고, 그건 백엔드 재시작이며,
+`synchronize: true`는 재시작마다 스키마를 실제 DB에 맞춘다. **배포 스큐가 없는
+상태에서만** 진행한다.
+
+```bash
+# 0) 선행 확인 — .env의 sha가 origin/main 최신 커밋과 일치하는지
+ssh dngg 'grep -E "^FRONTEND_VERSION|^BACKEND_VERSION" /usr/local/project/dngg/.env'
+git log --oneline -1 origin/main
+ssh dngg 'sudo systemctl start dngg-backup-db.service'   # 백업 먼저
+
+# 1) 정지
+ssh dngg 'cd /usr/local/project/dngg && docker compose stop'
+aws ec2 stop-instances --instance-ids i-0bb00c849769dcb7e --region ap-northeast-2
+aws ec2 wait instance-stopped --instance-ids i-0bb00c849769dcb7e --region ap-northeast-2
+
+# 2) 타입 변경
+aws ec2 modify-instance-attribute --instance-id i-0bb00c849769dcb7e --region ap-northeast-2 \
+  --instance-type '{"Value":"t3.small"}'
+
+# 3) 기동 — EIP가 유지되는지 반드시 확인 (3.34.242.163)
+aws ec2 start-instances --instance-ids i-0bb00c849769dcb7e --region ap-northeast-2
+aws ec2 wait instance-running --instance-ids i-0bb00c849769dcb7e --region ap-northeast-2
+aws ec2 describe-instances --instance-ids i-0bb00c849769dcb7e --region ap-northeast-2 \
+  --query 'Reservations[].Instances[].PublicIpAddress' --output text
+
+# 4) 복구 확인
+sleep 60
+curl -sf https://dngg.one/api/health/ready
+ssh dngg 'docker logs dngg-backend-1 --since 5m 2>&1 | grep -icE "query: (ALTER|CREATE|DROP)"'  # 0이어야 정상
+ssh dngg 'swapon --show; nproc; free -m | head -2'
+
+# 5) 함께 올릴 값
+ssh dngg 'cd /usr/local/project/dngg && sudo sed -i "s/^DB_POOL_MAX=.*/DB_POOL_MAX=60/" .env && sudo docker compose up -d backend'
+
+# 6) 크레딧 모드 재확인 (t3는 기본이 unlimited, t2로 되돌리면 standard로 돌아갈 수 있음)
+aws ec2 describe-instance-credit-specifications --instance-ids i-0bb00c849769dcb7e --region ap-northeast-2
+```
+
+**되돌리기:** 같은 절차에서 `t3.small`을 `t2.micro`로 바꾼다.
+크레딧 모드가 `standard`로 돌아갔으면 다시 `unlimited`로 설정한다.
+
+**실측 다운타임:** (Task 14 리허설에서 기록 예정)
+
+## L2·L3의 선행 조건
+
+지금은 문서만 있고 실행 준비는 되어 있지 않다.
+
+**L2 (DB 분리)** — `pg-data` 바인드 마운트에서 관리형 DB로 옮기는 절차는 별도 설계가 필요하다.
+`Log.player`·`InGamePlayer.player`의 FK가 의도적으로 제거된 상태라 이전 시 재생성되지
+않도록 주의해야 한다.
+
+**L3 (앱 다중화)** — 백엔드를 2대 이상으로 늘리면 다음이 깨진다:
+
+- `LoginThrottlerGuard` — `@nestjs/throttler` 기본 스토리지가 프로세스 메모리 `Map`이라
+  인스턴스마다 카운터가 따로 돈다. 유효 한도가 N배로 느슨해지는데 **코드상 감지 신호가
+  전혀 없다.** 공유 스토리지(Redis 등)로 옮겨야 한다.
+- `subscription-renewal.cron.ts`의 `@Cron(EVERY_DAY_AT_4AM)` — 인스턴스 수만큼 중복 발화.
+- `synchronize: true` — 여러 인스턴스가 동시 부팅하며 스키마를 고치려 든다.
+- `DB_POOL_MAX × 인스턴스 수 < 100` (Postgres `max_connections`).
+
+## 인프라 참고
+
+```
+dngg.one ──DNS(Namecheap)──→ EIP 3.34.242.163 ──→ EC2 t2.micro (ap-northeast-2c)
+                                                    └─ nginx (호스트, 80/443, certbot)
+                                                         ├─ /      → :3000 frontend (docker)
+                                                         └─ /api/  → :3010 backend  (docker)
+                                                                       └─ postgres (docker, ./pg-data)
+```
+
+**로드밸런서는 없다.** `start-dngg.sh` 등이 참조하는 ALB는 삭제된 지 오래다.
+
+| 항목 | 값 |
+|---|---|
+| 인스턴스 | `i-0bb00c849769dcb7e` |
+| EBS 볼륨 | `vol-090d42ef7023a685e` (gp3 30GB) |
+| 보안 그룹 | `sg-035e49b91ab5412e2` |
+| EIP | `3.34.242.163` / `eipalloc-00be290ccda3d7421` |
+| SNS 알림 토픽 | `arn:aws:sns:ap-northeast-2:691967102238:dngg-alerts` |
+| 예산 알람 | `dngg-monthly` ($50, 실제 80% + 예측 100%) |
+
+**SSH는 작업 PC IP에서만 열려 있다.** IP가 바뀌면 접속이 막히는데, 복구는 SSH가 필요 없다:
+
+```bash
+MYIP=$(curl -s https://checkip.amazonaws.com)
+aws ec2 authorize-security-group-ingress --group-id sg-035e49b91ab5412e2 --region ap-northeast-2 \
+  --ip-permissions "IpProtocol=tcp,FromPort=22,ToPort=22,IpRanges=[{CidrIp=${MYIP}/32,Description=workstation}]"
+```
+
+> AWS의 `Description` 필드는 **ASCII만** 받는다(SG 규칙, DLM 정책 모두). 한글을 넣으면
+> `InvalidParameterValue`로 거부되고, 실패해도 뒤따르는 명령이 성공한 것처럼 보일 수 있으니
+> 반드시 실제 상태를 조회해 확인한다. 보안 그룹 변경은 **전파에 십수 초** 걸린다.
+
+## 미해결 / 다음 병목 후보
+
+- 풀 40에서도 요청의 약 1.5%가 5초를 넘는다(`/api/group/all` 위주). 풀을 더 올려서
+  해결되는지, 아니면 그 엔드포인트 자체가 무거운지 확인이 필요하다.
+- `worker_processes auto`가 1 vCPU에서 nginx 워커 1개를 만든다. L1으로 2 vCPU가 되면
+  자동으로 2개가 되지만, 그전까지는 단일 워커가 상한이다.
+- 컨테이너 포트가 docker 유저랜드 프록시(`docker-proxy`)를 거친다. 이 오버헤드는
+  `docker stats`에 잡히지 않으므로 컨테이너 CPU 측정에서 누락된다.
+- 백엔드 Dockerfile이 `node:20`인데 CI는 Node 22다.

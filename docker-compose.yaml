@@ -65,7 +65,11 @@ services:
       - FREE_GAME_LIMIT=${FREE_GAME_LIMIT:-10}
       - TOSS_WEBHOOK_SECRET=${TOSS_WEBHOOK_SECRET}
       # L1 확장(t3.small) 시 20으로 올린다 — docs/runbooks/scaling.md 참고
-      - DB_POOL_MAX=${DB_POOL_MAX:-10}
+      # 기본값 10은 부하 테스트에서 실제 병목으로 확인됐다 — 동시 25명부터 p95가
+      # 1초를 넘고, 40으로 올리자 동시 50명에서 p95가 3.1초 → 37ms로 떨어졌다.
+      # 상한은 Postgres max_connections(100) — 앱을 다중화하면 인스턴스 수를 곱해 넘지 말 것.
+      # 자세한 실측은 docs/runbooks/scaling.md 참고.
+      - DB_POOL_MAX=${DB_POOL_MAX:-40}
       # 전역 로그인 한도(5분 창). 전역 단일 버킷이라 스파이크 때 정상 사용자를
       # 429로 잠글 수 있다 — 그때 서버 .env에서 올리고 컨테이너만 재시작한다.
       - SITEWIDE_LOGIN_THROTTLE_LIMIT=${SITEWIDE_LOGIN_THROTTLE_LIMIT:-300}
