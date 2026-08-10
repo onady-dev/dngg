@@ -26,13 +26,22 @@ ssh dngg 'sudo /usr/local/project/dngg/scripts/weekly-report.sh'
 scp scripts/weekly-report.sh dngg:/tmp/
 scp infra/systemd/dngg-weekly-report.* dngg:/tmp/
 ssh dngg 'sudo mv /tmp/weekly-report.sh /usr/local/project/dngg/scripts/ && \
+  sudo chown root:root /usr/local/project/dngg/scripts/weekly-report.sh && \
   sudo chmod +x /usr/local/project/dngg/scripts/weekly-report.sh && \
   sudo mv /tmp/dngg-weekly-report.* /etc/systemd/system/ && \
+  sudo chown root:root /etc/systemd/system/dngg-weekly-report.service /etc/systemd/system/dngg-weekly-report.timer && \
   sudo systemctl daemon-reload && \
   sudo systemctl enable --now dngg-weekly-report.timer'
 ```
 
 > `scp`로 `/etc`·`/usr/local`에 직접 쓰면 Permission denied가 난다. `/tmp`를 거쳐 `sudo mv`한다.
+>
+> 유닛 파일 `chown root:root`는 `docs/runbooks/backup-restore.md`의 기존 설치 절차와 동일한
+> 컨벤션이다. 스크립트(`weekly-report.sh`)의 `chown root:root`는 그 절차에는 없는 추가
+> 단계다 — `Type=oneshot`/`User=root` 서비스가 실행하는 파일의 소유권을 유닛과 일관되게
+> 맞추기 위함이며(기능적으로는 디렉터리가 이미 root 소유라 실행 여부에는 영향 없다),
+> 기존 스크립트들(`backup-db.sh` 등)은 여전히 `ec2-user` 소유로 남아 있어 저장소
+> 전체의 확정된 컨벤션은 아니다.
 
 ## 상태 확인
 
