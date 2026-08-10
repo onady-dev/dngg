@@ -15,7 +15,6 @@ services:
       - TZ=Asia/Seoul
     container_name: postgres
     volumes:
-      - ./postgresql.conf:/etc/postgresql.conf
       - ./pg-data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
@@ -65,6 +64,8 @@ services:
       - SUBSCRIPTION_PRICE_YEARLY=${SUBSCRIPTION_PRICE_YEARLY:-99000}
       - FREE_GAME_LIMIT=${FREE_GAME_LIMIT:-10}
       - TOSS_WEBHOOK_SECRET=${TOSS_WEBHOOK_SECRET}
+      # L1 확장(t3.small) 시 20으로 올린다 — docs/runbooks/scaling.md 참고
+      - DB_POOL_MAX=${DB_POOL_MAX:-10}
     depends_on:
       - db
     restart: always
