@@ -4,6 +4,81 @@
 
 관련 문서: [확장 전략 설계](../superpowers/specs/2026-08-10-scaling-strategy-design.md) · [백업·복구 런북](./backup-restore.md)
 
+---
+
+# 🚨 트래픽이 늘었다 — 지금 뭘 해야 하는가
+
+> 이 절만 읽어도 대응이 된다. 배경과 근거는 아래 본문에 있다.
+
+## 0. 상태부터 본다 (1분)
+
+```bash
+# 서비스가 살아 있는가
+curl -s https://dngg.one/api/health/ready        # {"status":"ok","db":"up"} 여야 정상
+
+# 자원이 실제로 모자란가
+ssh dngg 'free -m | head -2; uptime; nproc'
+ssh dngg 'docker stats --no-stream --format "{{.Name}} {{.CPUPerc}} {{.MemPerc}}"'
+
+# 최근 5분 응답시간 p95와 에러 (nginx 실측)
+ssh dngg 'sudo tail -n 5000 /var/log/nginx/access.log | grep -E "\[$(date +%d/%b/%Y:%H:%M)" | \
+  grep -o "rt=[0-9.]*" | cut -d= -f2 | sort -n | awk "{a[NR]=\$1} END{printf \"건수=%d p95=%.3fs max=%.3fs\n\", NR, a[int(NR*0.95)], a[NR]}"'
+ssh dngg 'sudo tail -n 5000 /var/log/nginx/access.log | grep -cE "\" (50[0-9]|429) "'
+```
+
+## 1. 판단 — 이 서비스는 CPU가 남는 상태에서 먼저 느려진다
+
+**p95가 1초를 넘는데 CPU 평균이 30% 미만이면 하드웨어를 늘려도 소용없다.**
+2026-08-10 실측에서 동시 100명에 CPU 12.7%, 크레딧 무소모인데 p95가 7.2초였다.
+범인은 DB 커넥션 풀이었다.
+
+```
+p95 > 1초?
+├─ CPU 평균 > 40%  ────────────→ [B] 인스턴스를 키운다 (L1)
+└─ CPU 여유 (< 30%) ───────────→ [A] 커넥션 풀부터 올린다  ← 대부분 이쪽
+```
+
+## [A] 커넥션 풀 올리기 — 재배포 없이 10초, 가장 효과 큰 조치
+
+```bash
+ssh dngg
+cd /usr/local/project/dngg
+sudo sed -i 's/^DB_POOL_MAX=.*/DB_POOL_MAX=60/' .env    # 없으면 새 줄 추가
+sudo docker compose up -d backend
+docker exec dngg-backend-1 printenv DB_POOL_MAX          # 반영 확인
+curl -sf http://127.0.0.1:3010/health/ready
+```
+
+현재값 **40**. 실측: 10 → 40으로 올렸을 때 동시 50명 p95가 **3.118초 → 37ms**.
+**상한은 Postgres `max_connections`(100).** 앱이 1대인 지금은 60~80까지 여유가 있다.
+
+## [B] 인스턴스 키우기 (L1) — 다운타임 2~3분
+
+t3.small(2 vCPU/2GB)이면 동시 100명에서 p95 10ms, 실패 0건이 실측으로 확인됐다. +$9/월.
+
+**시작 전 반드시:** 배포 스큐 확인(`.env`의 sha == `origin/main` 최신) + 백업.
+절차 전문은 아래 "L1 수직 확장 절차" 절. **기동 후 `docker compose up -d`를 잊지 말 것**
+(`docker compose stop`으로 내린 컨테이너는 `restart: always`로 살아나지 않는다).
+
+## [C] 그 외 즉시 조치 — 전부 컨테이너 재시작만으로 적용
+
+| 증상 | 조치 |
+|---|---|
+| 정상 사용자가 로그인에서 **429** | 전역 로그인 한도가 IP별이 아니라 **전역 1버킷**(5분 300회)이다. 스파이크가 스스로를 잠근다.<br>`sudo sed -i 's/^SITEWIDE_LOGIN_THROTTLE_LIMIT=.*/SITEWIDE_LOGIN_THROTTLE_LIMIT=2000/' .env && sudo docker compose up -d backend`<br>(줄이 없으면 추가) |
+| 일반 요청에서 **429** 다발 | nginx `limit_req` (api 50r/s, web 100r/s)가 CGNAT 뒤 사용자들을 막는 중일 수 있다. `infra/nginx/nginx.conf`에서 rate를 올리고 `nginx -t && sudo systemctl reload nginx` |
+| **502** | 컨테이너가 죽었다. `ssh dngg 'cd /usr/local/project/dngg && sudo docker compose up -d'` |
+| 메모리 부족 | swap 2GB가 이미 있어 즉사하지는 않는다. available < 150MB면 L1로 간다 |
+
+## 하지 말 것
+
+- **스파이크가 예상될 때 인스턴스를 껐다 켜지 말 것.** T2는 정지하면 CPU 크레딧을
+  전부 잃고 시간당 6씩만 회복한다(최대치까지 하루). 버스트 여력이 없는 상태로 맞게 된다.
+- **보안 그룹의 22번을 좁히지 말 것.** CI 배포가 SSH로 서버에 붙는다. 좁히면 배포가
+  통째로 막히는데, 백엔드 잡은 초록불이라 **조용히 구버전이 계속 돈다.**
+- **`docker compose down -v` 절대 금지.** Postgres 볼륨이 삭제된다.
+
+---
+
 ## 요약 — 부하 테스트가 뒤집은 전제
 
 설계 단계에서는 스파이크 시 **CPU 크레딧 소진**과 **메모리 부족(OOM)**이 서비스를 죽일
