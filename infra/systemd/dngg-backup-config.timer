@@ -1,0 +1,11 @@
+[Unit]
+Description=dngg 설정 백업을 매주 일요일 04:30(KST)에 실행
+
+[Timer]
+OnCalendar=Sun *-*-* 04:30:00
+# 인스턴스가 꺼져 있어 놓친 실행은 다음 부팅 직후 따라잡는다.
+Persistent=true
+RandomizedDelaySec=120
+
+[Install]
+WantedBy=timers.target

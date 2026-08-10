@@ -116,6 +116,34 @@ order by t;
 
 > `group`과 `user`는 SQL 예약어라 큰따옴표가 필요하다.
 
+## EBS 스냅샷 (시스템 전체 복구)
+
+**DLM 정책:** `policy-0a42eab911836ecc5` — 대상은 `Backup=dngg` 태그가 붙은 볼륨
+(현재 `vol-090d42ef7023a685e` 하나). 매주 일요일 19:00 UTC = **월요일 04:00 KST**,
+4개 보관(4주). `CopyTags=true`라 볼륨 태그가 스냅샷에도 복사된다.
+
+```bash
+# 정책 상태
+aws dlm get-lifecycle-policy --policy-id policy-0a42eab911836ecc5 --region ap-northeast-2
+
+# 생성된 스냅샷 목록
+aws ec2 describe-snapshots --owner-ids self --region ap-northeast-2 \
+  --query 'sort_by(Snapshots,&StartTime)[].{Id:SnapshotId,Time:StartTime,State:State}' --output table
+```
+
+> DLM의 `--description`은 **ASCII만 받는다.** 한글을 넣으면
+> `InvalidRequestException: The following parameter(s) are invalid: Description`으로 거부된다.
+
+### 스냅샷에서 복구
+
+스냅샷은 인스턴스 전체가 날아갔을 때 쓴다. DB만 되돌리려면 위의 `pg_dump` 복구가
+훨씬 빠르다(수 초 vs 수십 분).
+
+1. 스냅샷에서 볼륨 생성 (같은 AZ: `ap-northeast-2c`)
+2. 인스턴스 정지 → 기존 루트 볼륨 분리 → 새 볼륨을 `/dev/xvda`로 연결 → 기동
+3. EIP는 인스턴스에 붙어 있으므로 그대로 유지된다
+4. `curl -sf https://dngg.one/api/health/ready`로 확인
+
 ## 복구 리허설 기록
 
 | 실시일 | 덤프 | 결과 |
