@@ -86,6 +86,20 @@ CHRONIC_STUCK="$(q "
    group by g.id, g.name
    order by g.id;")"
 
+# 2-2) 셋업 미완료 그룹 — 가입은 했는데 선수가 0명 (창 없음)
+#    위 두 쿼리는 전부 `join game`이라 **경기를 만든 적 없는 그룹은 구조적으로 안 잡힌다.**
+#    실제 이탈은 두 유형이다: (a) 기록하다 막힘 → STUCK이 잡는다 (b) 셋업조차 안 함 →
+#    지금까지 아무도 안 봤다. 과거 86ers·NE가 (b)로 사라졌고, 2026-08-10 아웃리치로
+#    들어온 그룹 16도 가입 다음날까지 선수 0명이었다. 유입이 늘면 (b)가 더 흔해진다.
+#    선수 0명이면 경기도 못 만들므로 선수 수만 보면 충분하다.
+SETUP_STALLED="$(q "
+  select g.id, g.name, min(u.\"createdAt\")::date as signup
+    from \"group\" g join \"user\" u on u.\"groupId\" = g.id
+   where not exists (select 1 from player p where p.\"groupId\" = g.id)
+     and g.id not in (${EXCLUDE_GROUPS})
+   group by g.id, g.name
+   order by min(u.\"createdAt\");")"
+
 # 3) 주간 기록 활동 — 지난 7일 로그를 남긴 그룹
 ACTIVE="$(q "
   select g.id, g.name, count(*) as logs
@@ -111,6 +125,11 @@ ${STUCK:-없음}
 ■ 누적 막힌 그룹 — 경기는 있는데 로그 0 (생성 시점 무관, 창 없음)
 ${CHRONIC_STUCK:-없음}
   → 위 "막힌 그룹"보다 넓은 전수 스캔. 14일을 넘겨 막힌 팀도 여기서는 계속 잡힌다.
+
+■ ⚠️ 셋업 미완료 그룹 — 가입했는데 선수 0명
+${SETUP_STALLED:-없음}
+  → 가입 직후일수록 살릴 확률이 높다. 셋업 지원 1:1 연락 대상.
+     경기를 만든 적이 없어 위 "막힌 그룹" 항목에는 절대 안 잡히는 유형이다.
 
 ■ 기록 활동 (최근 7일)
 ${ACTIVE:-없음}
