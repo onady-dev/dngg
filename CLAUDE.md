@@ -98,7 +98,8 @@ dngg.one ──DNS(Namecheap)──→ EIP 3.34.242.163 ──→ EC2 t2.micro (
 - **CI 배포는 SSH 인바운드(22번)에 의존한다.** GitHub Actions 러너 IP는 매번 달라지므로 22번을 특정 IP로 좁히면 배포가 통째로 막힌다 — 이미지는 빌드되지만 서버에 반영되지 않아 조용히 구버전이 계속 돈다.
 - `docker`·`nginx`는 부팅 자동 시작이 등록되어 있다. 이게 풀리면 재부팅 후 사이트가 스스로 복구되지 않는다.
 
-운영 확장·부하 대응은 `docs/runbooks/scaling.md`, 백업·복구는 `docs/runbooks/backup-restore.md`를 본다.
+운영 확장·부하 대응은 `docs/runbooks/scaling.md`, 백업·복구는 `docs/runbooks/backup-restore.md`,
+매주 월요일 자동 발송되는 마케팅 지표(신규 그룹·막힌 그룹) 해석은 `docs/runbooks/marketing-metrics.md`를 본다.
 
 ## 환경 변수
 

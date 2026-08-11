@@ -1,0 +1,11 @@
+[Unit]
+Description=dngg 주간 마케팅 지표를 매주 월요일 09:00(KST)에 발송
+
+[Timer]
+OnCalendar=Mon *-*-* 09:00:00
+# 인스턴스가 꺼져 있어 놓친 실행은 다음 부팅 직후 따라잡는다.
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target
