@@ -27,7 +27,9 @@ export const metadata: Metadata = {
     type: "website",
     siteName: "DN.GG",
     title: "DN.GG — 동호회 농구 경기 기록·랭킹",
-    description: "터치 몇 번이면 랭킹·능력치가 자동으로. 무료 경기 기록 앱.",
+    // 가격 표현을 넣지 않는다 — 유료화 계획이 있고, 크롤러(카카오·밴드)는 미리보기를
+    // 오래 캐시해서 요금제가 바뀌어도 옛 카드가 계속 돌아다닌다.
+    description: "터치 몇 번이면 랭킹·능력치가 자동으로. 동호회 팀을 위한 경기 기록 앱.",
     locale: "ko_KR",
     url: "/",
   },

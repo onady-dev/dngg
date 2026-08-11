@@ -1,6 +1,15 @@
 import { ImageResponse } from "next/og";
 import { readFile } from "fs/promises";
 import { join } from "path";
+import {
+  ACCENT,
+  INK,
+  MUTED,
+  basketballSvg,
+  dataUri,
+  labelPositions,
+  radarSvg,
+} from "@/lib/ogCard";
 
 // 선수 능력치 공유 카드 (OG 이미지). 링크 공유 시 카카오톡/밴드 미리보기로 노출된다.
 export const runtime = "nodejs";
@@ -8,75 +17,11 @@ export const alt = "선수 능력치 카드 - dn.gg";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-const ACCENT = "#2563eb";
-const GRID = "#dbe3ef";
-const INK = "#0f172a";
-const MUTED = "#64748b";
-
 interface Axis {
   key: string;
   label: string;
   score: number | null;
   rawPerGame: number;
-}
-
-const R_RATIO = 0.3; // 폴리곤 반경 비율 (라벨 공간 확보 위해 작게)
-const LABEL_RATIO = 0.3 * 1.34; // 라벨 링 반경 비율
-
-// i번째 축 각도(12시 시작, 시계방향)
-const axisAngle = (i: number, n: number) => -Math.PI / 2 + (i * 2 * Math.PI) / n;
-
-// 각 축 라벨의 중심 좌표(RADAR_BOX 좌표계)
-function labelPositions(n: number, box: number): { x: number; y: number }[] {
-  const c = box / 2;
-  const rl = box * LABEL_RATIO;
-  return Array.from({ length: n }, (_, i) => ({
-    x: c + rl * Math.cos(axisAngle(i, n)),
-    y: c + rl * Math.sin(axisAngle(i, n)),
-  }));
-}
-
-// 레이더 도형만(텍스트 없음) SVG 문자열로 생성 → data URI로 <img> 삽입.
-// 텍스트가 없으므로 SVG 래스터화에 한글 폰트가 필요 없다.
-function radarSvg(scores: number[], px: number): string {
-  const n = scores.length;
-  const cx = px / 2;
-  const cy = px / 2;
-  const r = px * R_RATIO;
-  const ang = (i: number) => -Math.PI / 2 + (i * 2 * Math.PI) / n;
-  const pt = (i: number, f: number) => [
-    cx + r * f * Math.cos(ang(i)),
-    cy + r * f * Math.sin(ang(i)),
-  ];
-  const rings = [0.25, 0.5, 0.75, 1]
-    .map(
-      (f) =>
-        `<polygon points="${scores
-          .map((_, i) => pt(i, f).join(","))
-          .join(" ")}" fill="none" stroke="${GRID}" stroke-width="2"/>`,
-    )
-    .join("");
-  const spokes = scores
-    .map((_, i) => {
-      const [x, y] = pt(i, 1);
-      return `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="${GRID}" stroke-width="2"/>`;
-    })
-    .join("");
-  const data = scores
-    .map((s, i) => pt(i, Math.max(0, Math.min(100, s)) / 100).join(","))
-    .join(" ");
-  const dots = scores
-    .map((s, i) => {
-      const [x, y] = pt(i, Math.max(0, Math.min(100, s)) / 100);
-      return `<circle cx="${x}" cy="${y}" r="6" fill="${ACCENT}"/>`;
-    })
-    .join("");
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${px}" height="${px}" viewBox="0 0 ${px} ${px}">${rings}${spokes}<polygon points="${data}" fill="${ACCENT}" fill-opacity="0.28" stroke="${ACCENT}" stroke-width="4"/>${dots}</svg>`;
-}
-
-function dataUri(svg: string): string {
-  const base64 = Buffer.from(svg).toString("base64");
-  return `data:image/svg+xml;base64,${base64}`;
 }
 
 export default async function Image({ params }: { params: { id: string } }) {
@@ -187,7 +132,8 @@ export default async function Image({ params }: { params: { id: string } }) {
                 ))}
               </div>
             ) : (
-              <div style={{ display: "flex", fontSize: 200 }}>🏀</div>
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img src={dataUri(basketballSvg(240))} width={240} height={240} alt="" />
             )}
           </div>
         </div>

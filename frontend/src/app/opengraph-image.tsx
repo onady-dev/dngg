@@ -1,39 +1,26 @@
 import { ImageResponse } from "next/og";
 import { readFile } from "fs/promises";
 import { join } from "path";
+import {
+  ACCENT,
+  INK,
+  MUTED,
+  SAMPLE_ABILITY,
+  dataUri,
+  labelPositions,
+  radarSvg,
+} from "@/lib/ogCard";
 
 // 루트 URL(dngg.one) 공유 카드. 카톡·밴드 링크 미리보기로 노출된다.
-// 특정 팀에 속하지 않는 URL이므로 동적 데이터 없이 브랜드 카드로 고정한다.
+// 특정 팀에 속하지 않는 URL이므로 동적 데이터 없이 브랜드 카드로 고정하되,
+// 제품의 핵심 산출물인 6각 능력치 그래프를 샘플로 보여준다 — 이 카드가 하는 일은
+// "무슨 서비스인지" 설명이 아니라 "쓰면 이게 나온다"를 한눈에 보이는 것이다.
 export const runtime = "nodejs";
 export const alt = "dn.gg — 동호회 농구 경기 기록·랭킹";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-const ACCENT = "#2563eb";
-const INK = "#0f172a";
-const MUTED = "#64748b";
-
-// 🏀 이모지 대신 인라인 SVG를 쓴다. next/og의 기본 이모지 로더는 렌더 시점에
-// cdn.jsdelivr.net(twemoji)을 fetch하는데, 이 라우트는 정적 프리렌더라 next build
-// 중에 렌더된다 — 즉 이 이모지 하나 때문에 프론트엔드 CI 빌드 전체가 jsdelivr
-// 가용성에 묶인다(실패하면 OG 카드가 아니라 배포 자체가 막힌다). 농구공은 원 +
-// 곡선 몇 개로 충분해 SVG로 대체한다. 패턴 출처: player/[id]/opengraph-image.tsx.
-function basketballSvg(px: number): string {
-  const c = px / 2;
-  const r = px * 0.46;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${px}" height="${px}" viewBox="0 0 ${px} ${px}">
-    <circle cx="${c}" cy="${c}" r="${r}" fill="#f97316" stroke="${INK}" stroke-width="${px * 0.02}"/>
-    <line x1="${c}" y1="${c - r}" x2="${c}" y2="${c + r}" stroke="${INK}" stroke-width="${px * 0.02}"/>
-    <line x1="${c - r}" y1="${c}" x2="${c + r}" y2="${c}" stroke="${INK}" stroke-width="${px * 0.02}"/>
-    <path d="M ${c - r} ${c} Q ${c} ${c - r * 0.55} ${c + r} ${c}" fill="none" stroke="${INK}" stroke-width="${px * 0.02}"/>
-    <path d="M ${c - r} ${c} Q ${c} ${c + r * 0.55} ${c + r} ${c}" fill="none" stroke="${INK}" stroke-width="${px * 0.02}"/>
-  </svg>`;
-}
-
-function dataUri(svg: string): string {
-  const base64 = Buffer.from(svg).toString("base64");
-  return `data:image/svg+xml;base64,${base64}`;
-}
+const RADAR_BOX = 380;
 
 export default async function Image() {
   const fontDir = join(process.cwd(), "public", "fonts");
@@ -46,6 +33,16 @@ export default async function Image() {
     { name: "Pretendard", data: bold, weight: 700 as const, style: "normal" as const },
   ];
 
+  const radar = radarSvg(
+    SAMPLE_ABILITY.map((a) => a.score),
+    RADAR_BOX,
+  );
+  const labels = labelPositions(SAMPLE_ABILITY.length, RADAR_BOX).map((pos, i) => ({
+    ...pos,
+    label: SAMPLE_ABILITY[i].label,
+    score: SAMPLE_ABILITY[i].score,
+  }));
+
   return new ImageResponse(
     (
       <div
@@ -55,7 +52,7 @@ export default async function Image() {
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
-          padding: 72,
+          padding: 64,
           background: "#ffffff",
           fontFamily: "Pretendard",
         }}
@@ -69,23 +66,51 @@ export default async function Image() {
               style={{
                 display: "flex",
                 flexDirection: "column",
-                fontSize: 64,
+                fontSize: 60,
                 fontWeight: 700,
                 color: INK,
-                marginTop: 24,
+                marginTop: 22,
                 lineHeight: 1.25,
               }}
             >
               <div style={{ display: "flex" }}>동호회 농구,</div>
               <div style={{ display: "flex" }}>기억이 아니라 기록으로</div>
             </div>
-            <div style={{ display: "flex", fontSize: 32, color: MUTED, marginTop: 28 }}>
+            <div style={{ display: "flex", fontSize: 30, color: MUTED, marginTop: 24 }}>
               터치 몇 번이면 랭킹·능력치가 자동으로
             </div>
           </div>
-          <div style={{ display: "flex", width: 240, height: 240 }}>
+          <div
+            style={{
+              position: "relative",
+              display: "flex",
+              width: RADAR_BOX,
+              height: RADAR_BOX,
+            }}
+          >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={dataUri(basketballSvg(240))} width={240} height={240} alt="" />
+            <img src={dataUri(radar)} width={RADAR_BOX} height={RADAR_BOX} alt="" />
+            {labels.map((l) => (
+              <div
+                key={l.label}
+                style={{
+                  position: "absolute",
+                  left: l.x,
+                  top: l.y,
+                  transform: "translate(-50%, -50%)",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                }}
+              >
+                <div style={{ display: "flex", fontSize: 22, fontWeight: 700, color: INK }}>
+                  {l.label}
+                </div>
+                <div style={{ display: "flex", fontSize: 20, fontWeight: 700, color: ACCENT }}>
+                  {String(l.score)}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
