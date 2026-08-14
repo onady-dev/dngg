@@ -18,8 +18,6 @@ export interface Team {
 export interface PlayerRanking {
   playerId: string;
   playerName: string;
-  teamId: string;
-  position: string;
   number: string;
   value: number;
   totalCount?: number;
