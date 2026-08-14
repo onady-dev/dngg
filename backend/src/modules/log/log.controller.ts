@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  ParseIntPipe,
   Post,
   Query,
   Request,
@@ -58,12 +59,10 @@ export class LogController {
   @Get('/player/:id')
   async getLogByPlayerId(
     @Param('id') id: number,
-    @Query('seasonId') seasonId?: string,
+    @Query('seasonId', new ParseIntPipe({ optional: true }))
+    seasonId?: number,
   ) {
-    return this.logService.getLogByPlayerId(
-      id,
-      seasonId ? Number(seasonId) : undefined,
-    );
+    return this.logService.getLogByPlayerId(id, seasonId);
   }
 
   @Get('/logitem')

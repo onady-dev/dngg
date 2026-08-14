@@ -35,23 +35,19 @@ export class PlayerController {
   @Get(':id/ability')
   async getPlayerAbility(
     @Param('id', ParseIntPipe) id: number,
-    @Query('seasonId') seasonId?: string,
+    @Query('seasonId', new ParseIntPipe({ optional: true }))
+    seasonId?: number,
   ) {
-    return this.playerService.getPlayerAbility(
-      id,
-      seasonId ? Number(seasonId) : undefined,
-    );
+    return this.playerService.getPlayerAbility(id, seasonId);
   }
 
   @Get(':id/team-impact')
   async getPlayerTeamImpact(
     @Param('id', ParseIntPipe) id: number,
-    @Query('seasonId') seasonId?: string,
+    @Query('seasonId', new ParseIntPipe({ optional: true }))
+    seasonId?: number,
   ) {
-    return this.playerService.getPlayerTeamImpact(
-      id,
-      seasonId ? Number(seasonId) : undefined,
-    );
+    return this.playerService.getPlayerTeamImpact(id, seasonId);
   }
 
   @Post()
