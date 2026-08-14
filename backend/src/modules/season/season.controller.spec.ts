@@ -64,4 +64,15 @@ describe('SeasonController 그룹 소유권 검증', () => {
       name: '2026 봄',
     });
   });
+
+  test('seasonId가 null이면 서비스에 null을 그대로 전달한다 (현재 시즌 해제)', async () => {
+    const { controller, service } = createController();
+
+    await controller.setCurrentSeason(req(OWN_GROUP), {
+      groupId: OWN_GROUP,
+      seasonId: null,
+    } as any);
+
+    expect(service.setCurrentSeason).toHaveBeenCalledWith(OWN_GROUP, null);
+  });
 });
