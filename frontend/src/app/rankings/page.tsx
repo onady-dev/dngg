@@ -142,24 +142,6 @@ export default function Rankings() {
     return <NoGroupSelected />;
   }
 
-  // 로딩 중인 경우의 UI
-  if (loading) {
-    return (
-      <S.Container>
-        <S.LoadingSpinner>로딩 중...</S.LoadingSpinner>
-      </S.Container>
-    );
-  }
-
-  // 에러가 발생한 경우의 UI
-  if (error) {
-    return (
-      <S.Container>
-        <S.ErrorMessage>{error}</S.ErrorMessage>
-      </S.Container>
-    );
-  }
-
   const filteredRankings = rankings.map((ranking) => ({
     ...ranking,
     players: [...ranking.players].sort((a, b) => {
@@ -198,11 +180,15 @@ export default function Rankings() {
         </S.TabContainer>
       </S.Header>
 
-      {filteredRankings.length === 0 && (
+      {loading && <S.LoadingSpinner>로딩 중...</S.LoadingSpinner>}
+
+      {!loading && error && <S.ErrorMessage>{error}</S.ErrorMessage>}
+
+      {!loading && !error && filteredRankings.length === 0 && (
         <EmptyState message="이 기간에는 기록이 없습니다." />
       )}
 
-      {filteredRankings.map((ranking) => (
+      {!loading && !error && filteredRankings.map((ranking) => (
         <S.RankingCard key={ranking.id}>
           <S.RankingHeader isExpanded={expandedItems.has(ranking.id)} onClick={() => toggleExpand(ranking.id)}>
             <S.RankingTitle>
