@@ -132,9 +132,9 @@ export class GameService {
     if (existingSeasonId !== undefined) {
       return existingSeasonId;
     }
-    const group = await manager.findOne(Group, {
+    const group = (await manager.findOne(Group, {
       where: { id: Number(groupId) },
-    });
+    })) as Group | null;
     return group?.currentSeasonId ?? null;
   }
 
