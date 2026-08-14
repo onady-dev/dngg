@@ -222,27 +222,11 @@ export default function PlayerDetail({ params }: PlayerDetailProps) {
     if (groupId !== null) persistSelection(groupId, next);
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">데이터를 불러오는 중...</h2>
-        </div>
-      </div>
-    );
-  }
-
-  if (error || !player) {
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">데이터를 불러오는데 실패했습니다</h2>
-          <p className="text-gray-600">잠시 후 다시 시도해주세요.</p>
-        </div>
-      </div>
-    );
-  }
-
+  // 로딩·에러·본문을 조기 반환으로 나누면 시즌 선택기까지 함께 가려진다
+  // (2단계 useEffect가 setLoading(true)를 부를 때마다 방금 조작한 선택기가
+  // 사라졌다 나타나고, 조회 실패 시엔 선택기가 없어 다른 시즌으로 되돌릴
+  // 방법이 없다). 선택기는 항상 렌더하고, 그 아래 본문만 배타적으로 분기한다.
+  // (rankings/page.tsx와 동일한 구조 — 커밋 bae7423 참고)
   return (
     <div className="min-h-screen bg-white">
       {groupId !== null && (
@@ -262,14 +246,34 @@ export default function PlayerDetail({ params }: PlayerDetailProps) {
           />
         </div>
       )}
-      <PlayerDetailClient
-        player={player}
-        gameRecords={gameRecords}
-        allLogItemNames={allLogItemNames}
-        ability={ability}
-        teamImpact={teamImpact}
-        groupPlayers={groupPlayers}
-      />
+
+      {loading && (
+        <div className="flex items-center justify-center" style={{ minHeight: "50vh" }}>
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">데이터를 불러오는 중...</h2>
+          </div>
+        </div>
+      )}
+
+      {!loading && (error || !player) && (
+        <div className="flex items-center justify-center" style={{ minHeight: "50vh" }}>
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">데이터를 불러오는데 실패했습니다</h2>
+            <p className="text-gray-600">잠시 후 다시 시도해주세요.</p>
+          </div>
+        </div>
+      )}
+
+      {!loading && !error && player && (
+        <PlayerDetailClient
+          player={player}
+          gameRecords={gameRecords}
+          allLogItemNames={allLogItemNames}
+          ability={ability}
+          teamImpact={teamImpact}
+          groupPlayers={groupPlayers}
+        />
+      )}
     </div>
   );
 }
