@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
 import { plainToInstance } from 'class-transformer';
 import { DataSource, Repository } from 'typeorm';
 import { assertSameGroup } from 'src/common/group-access';
@@ -11,6 +12,7 @@ import { SeasonRepository } from 'src/repository/season.repository';
 export class SeasonService {
   constructor(
     private readonly seasonRepository: SeasonRepository,
+    @InjectRepository(Group)
     private readonly groupRepository: Repository<Group>,
     private readonly dataSource: DataSource,
   ) {}
