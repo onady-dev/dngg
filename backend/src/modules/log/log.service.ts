@@ -120,8 +120,8 @@ export class LogService {
     return this.logRepository.findLogsByGameId(gameId);
   }
 
-  async getLogByPlayerId(playerId: number) {
-    return this.logRepository.findByPlayerId(playerId);
+  async getLogByPlayerId(playerId: number, seasonId?: number) {
+    return this.logRepository.findByPlayerId(playerId, seasonId);
   }
 
   async getLogByLogitemId(logitemId: number) {

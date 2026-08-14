@@ -33,7 +33,7 @@ describe('PlayerService.getPlayerTeamImpact', () => {
   it('완료 경기 집계로 팀 기여도를 계산해 반환', async () => {
     const { service, teamImpactRepository } = makeService();
     const result = await service.getPlayerTeamImpact(1);
-    expect(teamImpactRepository.findFinishedGames).toHaveBeenCalledWith(1);
+    expect(teamImpactRepository.findFinishedGames).toHaveBeenCalledWith(1, undefined);
     expect(teamImpactRepository.aggregateTeamByItem).toHaveBeenCalledWith([1]);
     expect(result.playerId).toBe(1);
     expect(result.groupId).toBe(7);

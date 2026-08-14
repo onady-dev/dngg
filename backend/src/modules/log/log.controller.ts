@@ -56,8 +56,14 @@ export class LogController {
   }
 
   @Get('/player/:id')
-  async getLogByPlayerId(@Param('id') id: number) {
-    return this.logService.getLogByPlayerId(id);
+  async getLogByPlayerId(
+    @Param('id') id: number,
+    @Query('seasonId') seasonId?: string,
+  ) {
+    return this.logService.getLogByPlayerId(
+      id,
+      seasonId ? Number(seasonId) : undefined,
+    );
   }
 
   @Get('/logitem')
