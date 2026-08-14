@@ -10,6 +10,10 @@ import { Logitem } from 'src/entities/Logitem.entity';
 import { InGamePlayer } from 'src/entities/InGamePlayer.entity';
 import { GameSummary, Player } from './types';
 import { assertIdsInGroup, findOwnedGame } from 'src/common/group-access';
+import { RankingsRepository } from 'src/repository/rankings.repository';
+import { AbilityRepository } from 'src/repository/ability.repository';
+import { computeRankings } from './rankings.util';
+import { RankingsResponse } from './rankings.types';
 
 @Injectable()
 export class LogService {
@@ -17,6 +21,8 @@ export class LogService {
     private readonly logRepository: LogRepository,
     private readonly gameRepository: GameRepository,
     private readonly dataSource: DataSource,
+    private readonly rankingsRepository: RankingsRepository,
+    private readonly abilityRepository: AbilityRepository,
   ) {}
 
   // 대상 게임이 요청자의 소속 그룹 소유인지 검증하고 게임을 반환한다.
@@ -124,6 +130,18 @@ export class LogService {
 
   async getLogByLogItemIdAndGroupId(logitemId: number, groupId: number) {
     return this.logRepository.findByLogItemIdAndGroupId(logitemId, groupId);
+  }
+
+  // 랭킹 집계. seasonId가 없으면 전체(시즌 미지정 경기 포함).
+  async getRankings(
+    groupId: number,
+    seasonId?: number,
+  ): Promise<RankingsResponse> {
+    const [rows, gamesPlayed] = await Promise.all([
+      this.rankingsRepository.aggregateRankings(groupId, seasonId),
+      this.abilityRepository.aggregateGamesPlayed(groupId, seasonId),
+    ]);
+    return computeRankings({ rows, gamesPlayed });
   }
 
   async createLog(log: PostLogRequestDto, userGroupId: number) {

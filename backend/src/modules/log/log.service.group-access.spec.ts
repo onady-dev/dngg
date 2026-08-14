@@ -27,6 +27,8 @@ const createService = (
     logRepository as any,
     gameRepository as any,
     dataSource as any,
+    {} as any,
+    {} as any,
   );
   return { service, logRepository };
 };

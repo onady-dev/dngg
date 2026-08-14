@@ -36,6 +36,8 @@ const createService = ({
     logRepository as any,
     {} as any,
     dataSource as any,
+    {} as any,
+    {} as any,
   );
   return { service, logRepository, inGamePlayerRepository };
 };

@@ -11,7 +11,12 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { LogService } from './log.service';
-import { GetLogByDailyRequestDto, GetDailyDatesRequestDto, PostLogRequestDto } from './log.request.dto';
+import {
+  GetLogByDailyRequestDto,
+  GetDailyDatesRequestDto,
+  GetRankingsRequestDto,
+  PostLogRequestDto,
+} from './log.request.dto';
 import { Player } from 'src/entities/Player.entity';
 import { AuthGuard } from '@nestjs/passport';
 import { assertSameGroup } from 'src/common/group-access';
@@ -23,6 +28,11 @@ export class LogController {
   @Get()
   async getLogByGroupId(@Query('groupId') groupId: number) {
     return this.logService.getLogByGroupId(groupId);
+  }
+
+  @Get('/rankings')
+  async getRankings(@Query(ValidationPipe) dto: GetRankingsRequestDto) {
+    return this.logService.getRankings(dto.groupId, dto.seasonId);
   }
 
   @Get('/daily')
