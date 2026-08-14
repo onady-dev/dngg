@@ -120,6 +120,24 @@ export class GameService {
     return findOwnedGame(this.gameRepository, gameId, userGroupId);
   }
 
+  // 경기의 시즌을 결정한다.
+  // 신규 경기(existingSeasonId === undefined)는 그룹의 현재 시즌을 스냅샷으로 복사하고,
+  // 기존 경기를 덮어쓰는 경우에는 원래 seasonId를 그대로 유지한다.
+  // seasonId를 DTO에서 받지 않는 이유: 클라이언트가 임의 시즌에 경기를 꽂을 수 있다.
+  private async resolveSeasonId(
+    manager: { findOne(entity: any, options: any): Promise<any> },
+    groupId: number,
+    existingSeasonId: number | null | undefined,
+  ): Promise<number | null> {
+    if (existingSeasonId !== undefined) {
+      return existingSeasonId;
+    }
+    const group = await manager.findOne(Group, {
+      where: { id: Number(groupId) },
+    });
+    return group?.currentSeasonId ?? null;
+  }
+
   async getGameById(id: number) {
     const game = await this.gameRepository.findById(id);
     if (!game) {
@@ -233,9 +251,21 @@ export class GameService {
         awayTeamName,
         logs,
       } = dto;
+
+      // 기존 경기를 덮어쓰는 경우 원래 시즌을 유지한다.
+      const existingGame = id
+        ? await queryRunner.manager.findOne(Game, { where: { id: Number(id) } })
+        : null;
+      const seasonId = await this.resolveSeasonId(
+        queryRunner.manager,
+        groupId,
+        existingGame ? (existingGame.seasonId ?? null) : undefined,
+      );
+
       const gameInstance = plainToInstance(Game, {
         id,
         groupId,
+        seasonId,
         date: new Date(),
         homeTeamName,
         awayTeamName,
