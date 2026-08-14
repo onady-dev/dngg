@@ -1876,7 +1876,9 @@ import { InGamePlayer } from 'src/entities/InGamePlayer.entity';
 cd backend && pnpm test && pnpm build
 ```
 
-Expected: 모든 테스트 PASS, 빌드 성공. 기존 `player.service.ability.spec.ts`가 `toHaveBeenCalledWith(7)`로 단언하는데 이제 인자가 하나 더 붙을 수 있다 — Task 7에서 함께 정리하므로, 여기서 실패하면 **Task 7까지 진행한 뒤 다시 확인**한다. 이 단계에서는 `aggregateGroupAbility(7)` 호출이 그대로이므로 통과해야 정상이다.
+Expected: 모든 테스트 PASS, 빌드 성공.
+
+이 태스크에서 `PlayerService`의 호출부는 건드리지 않으므로(그건 Task 7의 범위다), `aggregateGroupAbility(groupId)`는 여전히 인자 하나로 호출되고 `seasonId`는 선택 파라미터다. 따라서 기존 `player.service.ability.spec.ts`의 `toHaveBeenCalledWith(7)` 단언은 그대로 통과해야 한다. **실패하면 다음 단계로 넘어가지 말고 원인을 찾는다.**
 
 - [ ] **Step 9: 커밋**
 
