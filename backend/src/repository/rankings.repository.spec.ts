@@ -10,6 +10,7 @@ const createRepository = () => {
     andWhere: jest.fn(() => qb),
     groupBy: jest.fn(() => qb),
     addGroupBy: jest.fn(() => qb),
+    orderBy: jest.fn(() => qb),
     getRawMany: jest.fn().mockResolvedValue([]),
   };
   const inner = { createQueryBuilder: jest.fn(() => qb) };
@@ -53,6 +54,21 @@ describe('RankingsRepository.aggregateRankings', () => {
     await repository.aggregateRankings(1);
 
     expect(qb.innerJoin).toHaveBeenCalledWith('log.player', 'player');
+  });
+
+  test('logitem.id 오름차순으로 정렬해 카드 순서를 고정한다', async () => {
+    const { repository, qb } = createRepository();
+
+    await repository.aggregateRankings(1);
+
+    expect(qb.orderBy).toHaveBeenCalledWith('logitem.id', 'ASC');
+
+    const lastGroupByOrder = Math.max(
+      ...qb.groupBy.mock.invocationCallOrder,
+      ...qb.addGroupBy.mock.invocationCallOrder,
+    );
+    const orderByOrder = qb.orderBy.mock.invocationCallOrder[0];
+    expect(orderByOrder).toBeGreaterThan(lastGroupByOrder);
   });
 
   test('raw 결과를 숫자 타입으로 변환해 반환한다', async () => {

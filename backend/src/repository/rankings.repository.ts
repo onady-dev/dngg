@@ -46,6 +46,7 @@ export class RankingsRepository {
       .addGroupBy('logitem.id')
       .addGroupBy('logitem.name')
       .addGroupBy('logitem.value')
+      .orderBy('logitem.id', 'ASC')
       .getRawMany();
 
     return rows.map((r) => ({

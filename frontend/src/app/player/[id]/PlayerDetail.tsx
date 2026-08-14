@@ -239,9 +239,22 @@ export default function PlayerDetail({ params }: PlayerDetailProps) {
             canManage={canManage}
             onChange={handleSeasonChange}
             onSeasonsChanged={async () => {
-              const data = await fetchSeasons(groupId);
-              setSeasons(data.seasons);
-              setCurrentSeasonId(data.currentSeasonId);
+              try {
+                const data = await fetchSeasons(groupId);
+                setSeasons(data.seasons);
+                setCurrentSeasonId(data.currentSeasonId);
+                setSelection(
+                  resolveSeasonSelection(
+                    selectionByGroup[groupId],
+                    data.seasons,
+                    data.currentSeasonId
+                  )
+                );
+              } catch (e) {
+                // 시즌 조회 실패는 조용히 무시하지 않고 로그만 남긴다 —
+                // 화면은 기존 선택/데이터를 유지한다(1단계 로직과 동일).
+                console.error("시즌 목록을 불러오지 못했습니다:", e);
+              }
             }}
           />
         </div>
