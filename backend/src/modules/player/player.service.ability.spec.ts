@@ -35,8 +35,8 @@ describe('PlayerService.getPlayerAbility', () => {
     const { service, abilityRepository } = makeService();
     const result = await service.getPlayerAbility(1);
     // 두 집계 모두 선수의 실제 groupId(7)로 호출되어야 한다
-    expect(abilityRepository.aggregateGroupAbility).toHaveBeenCalledWith(7);
-    expect(abilityRepository.aggregateGamesPlayed).toHaveBeenCalledWith(7);
+    expect(abilityRepository.aggregateGroupAbility).toHaveBeenCalledWith(7, undefined);
+    expect(abilityRepository.aggregateGamesPlayed).toHaveBeenCalledWith(7, undefined);
     expect(result.playerId).toBe(1);
     expect(result.groupId).toBe(7);
     expect(result.axes.length).toBeGreaterThanOrEqual(3);

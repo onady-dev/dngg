@@ -69,26 +69,35 @@ export class PlayerService {
     return test;
   }
 
-  async getPlayerAbility(id: number): Promise<PlayerAbility> {
+  async getPlayerAbility(
+    id: number,
+    seasonId?: number,
+  ): Promise<PlayerAbility> {
     const player = await this.playerRepository.findById(id);
     if (!player) {
       throw new NotFoundException('선수를 찾을 수 없습니다.');
     }
     const groupId = player.groupId;
     const [rows, gamesPlayed] = await Promise.all([
-      this.abilityRepository.aggregateGroupAbility(groupId),
-      this.abilityRepository.aggregateGamesPlayed(groupId),
+      this.abilityRepository.aggregateGroupAbility(groupId, seasonId),
+      this.abilityRepository.aggregateGamesPlayed(groupId, seasonId),
     ]);
     return computeAbility({ rows, gamesPlayed, targetPlayerId: id, groupId });
   }
 
-  async getPlayerTeamImpact(id: number): Promise<PlayerTeamImpact> {
+  async getPlayerTeamImpact(
+    id: number,
+    seasonId?: number,
+  ): Promise<PlayerTeamImpact> {
     const player = await this.playerRepository.findById(id);
     if (!player) {
       throw new NotFoundException('선수를 찾을 수 없습니다.');
     }
     const groupId = player.groupId;
-    const games = await this.teamImpactRepository.findFinishedGames(id);
+    const games = await this.teamImpactRepository.findFinishedGames(
+      id,
+      seasonId,
+    );
     const gameIds = games.map((g) => g.gameId);
     const [teamAgg, selfAgg, roster] = await Promise.all([
       this.teamImpactRepository.aggregateTeamByItem(gameIds),

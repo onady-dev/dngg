@@ -10,6 +10,7 @@ import { Log } from "./entities/Log.entity";
 import { Logitem } from "./entities/Logitem.entity";
 import { Payment } from "./entities/Payment.entity";
 import { Player } from "./entities/Player.entity";
+import { Season } from "./entities/Season.entity";
 import { Subscription } from "./entities/Subscription.entity";
 import { Team } from "./entities/Team.entity";
 import { TeamPlayer } from "./entities/TeamPlayer.entity";
@@ -41,6 +42,7 @@ export const AppDataSource = new DataSource({
         Logitem,
         Payment,
         Player,
+        Season,
         Subscription,
         Team,
         TeamPlayer,

@@ -17,6 +17,7 @@ import { SubscriptionModule } from './modules/subscription/subscription.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { InquiryModule } from './modules/inquiry/inquiry.module';
 import { HealthModule } from './modules/health/health.module';
+import { SeasonModule } from './modules/season/season.module';
 import { formatLogLine } from './common/log-format';
 import { buildTypeOrmOptions } from './config/typeorm.options';
 import * as winston from 'winston';
@@ -55,6 +56,7 @@ const { combine, timestamp, printf, colorize } = winston.format;
     AdminModule,
     InquiryModule,
     HealthModule,
+    SeasonModule,
   ],
   controllers: [],
   providers: [

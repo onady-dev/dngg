@@ -13,8 +13,12 @@ export class AbilityRepository {
   ) {}
 
   // 그룹 전체를 (선수 x logitem 이름)으로 집계. 삭제 게임/삭제 선수 제외.
-  async aggregateGroupAbility(groupId: number): Promise<AbilityRow[]> {
-    const rows = await this.logRepository
+  // seasonId가 없으면 전체(시즌 미지정 경기 포함)를 집계한다.
+  async aggregateGroupAbility(
+    groupId: number,
+    seasonId?: number | null,
+  ): Promise<AbilityRow[]> {
+    const query = this.logRepository
       .createQueryBuilder('log')
       .innerJoin('log.logitem', 'logitem')
       .innerJoin('log.game', 'game')
@@ -24,7 +28,15 @@ export class AbilityRepository {
       .addSelect('COUNT(*)', 'count')
       .addSelect('SUM(logitem.value)', 'valueSum')
       .where('log.groupId = :groupId', { groupId })
-      .andWhere("game.status != 'DELETED'")
+      .andWhere("game.status != 'DELETED'");
+
+    if (seasonId !== undefined && seasonId !== null) {
+      query.andWhere('game.seasonId = :seasonId', {
+        seasonId: Number(seasonId),
+      });
+    }
+
+    const rows = await query
       .groupBy('log.playerId')
       .addGroupBy('logitem.name')
       .getRawMany();
@@ -38,17 +50,27 @@ export class AbilityRepository {
   }
 
   // 선수별 총 출전 게임 수. InGamePlayer 로스터 기준(기록 유무 무관), 삭제 게임/삭제 선수 제외.
-  async aggregateGamesPlayed(groupId: number): Promise<GamesPlayed[]> {
-    const rows = await this.logRepository.manager
+  // seasonId가 없으면 전체(시즌 미지정 경기 포함)를 집계한다.
+  async aggregateGamesPlayed(
+    groupId: number,
+    seasonId?: number | null,
+  ): Promise<GamesPlayed[]> {
+    const query = this.logRepository.manager
       .createQueryBuilder(InGamePlayer, 'igp')
       .innerJoin('igp.game', 'game')
       .innerJoin('igp.player', 'player') // FK 제거 정책: INNER JOIN으로 삭제 선수 제외
       .select('igp.playerId', 'playerId')
       .addSelect('COUNT(DISTINCT igp.gameId)', 'gamesPlayed')
       .where('igp.groupId = :groupId', { groupId })
-      .andWhere("game.status != 'DELETED'")
-      .groupBy('igp.playerId')
-      .getRawMany();
+      .andWhere("game.status != 'DELETED'");
+
+    if (seasonId !== undefined && seasonId !== null) {
+      query.andWhere('game.seasonId = :seasonId', {
+        seasonId: Number(seasonId),
+      });
+    }
+
+    const rows = await query.groupBy('igp.playerId').getRawMany();
 
     return rows.map((r) => ({
       playerId: Number(r.playerId),

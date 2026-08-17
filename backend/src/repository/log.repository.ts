@@ -81,11 +81,17 @@ export class LogRepository extends Repository<Log> {
     });
   }
 
-  async findByPlayerId(playerId: number): Promise<Log[] | null> {
+  // seasonId가 없으면 전체(시즌 미지정 경기 포함).
+  async findByPlayerId(
+    playerId: number,
+    seasonId?: number | null,
+  ): Promise<Log[] | null> {
+    const where: Record<string, unknown> = { playerId };
+    if (seasonId !== undefined && seasonId !== null) {
+      where.game = { seasonId: Number(seasonId) };
+    }
     return this.logRepository.find({
-      where: {
-        playerId,
-      },
+      where,
       relations: ['logitem', 'player', 'game'],
     });
   }

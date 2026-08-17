@@ -18,8 +18,12 @@ export class TeamImpactRepository {
   ) {}
 
   // 대상 선수의 완료(FINISHED) 경기 + 소속 팀 + 날짜
-  async findFinishedGames(playerId: number): Promise<GameRow[]> {
-    const rows = await this.logRepository.manager
+  // seasonId가 없으면 전체(시즌 미지정 경기 포함).
+  async findFinishedGames(
+    playerId: number,
+    seasonId?: number | null,
+  ): Promise<GameRow[]> {
+    const query = this.logRepository.manager
       .createQueryBuilder(InGamePlayer, 'igp')
       .innerJoin('igp.game', 'game')
       .select('igp.gameId', 'gameId')
@@ -28,8 +32,15 @@ export class TeamImpactRepository {
       // SQL에서 ISO 문자열로 포맷한다 (log.repository의 TO_CHAR 규칙과 동일).
       .addSelect("TO_CHAR(game.date, 'YYYY-MM-DD')", 'date')
       .where('igp.playerId = :playerId', { playerId })
-      .andWhere("game.status = 'FINISHED'")
-      .getRawMany();
+      .andWhere("game.status = 'FINISHED'");
+
+    if (seasonId !== undefined && seasonId !== null) {
+      query.andWhere('game.seasonId = :seasonId', {
+        seasonId: Number(seasonId),
+      });
+    }
+
+    const rows = await query.getRawMany();
     return rows.map((r) => ({
       gameId: Number(r.gameId),
       team: r.team,

@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsNotEmpty, IsNumber, IsString, Matches } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsOptional, IsString, Matches } from 'class-validator';
 
 export class PostLogRequestDto {
   @IsNotEmpty()
@@ -35,4 +35,17 @@ export class GetDailyDatesRequestDto {
   @IsNotEmpty()
   @IsNumber()
   groupId: number;
+}
+
+export class GetRankingsRequestDto {
+  @Type(() => Number)
+  @IsNotEmpty()
+  @IsNumber()
+  groupId: number;
+
+  // 생략하면 전체(시즌 미지정 경기 포함)를 집계한다.
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  seasonId?: number;
 }
