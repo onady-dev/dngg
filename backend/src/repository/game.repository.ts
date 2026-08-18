@@ -16,7 +16,13 @@ export class GameRepository extends Repository<Game> {
 
   async findByGroupId(
     groupId: number,
-    options?: { page?: number; limit?: number; status?: string },
+    options?: {
+      page?: number;
+      limit?: number;
+      status?: string;
+      from?: string;
+      to?: string;
+    },
   ): Promise<Game[]> {
     const query = this.gameRepository
       .createQueryBuilder('game')
@@ -27,6 +33,14 @@ export class GameRepository extends Repository<Game> {
 
     if (options?.status) {
       query.andWhere('game."status" = :status', { status: options.status });
+    }
+
+    // 날짜 범위는 양끝을 포함한다.
+    if (options?.from) {
+      query.andWhere('game."date" >= :from', { from: options.from });
+    }
+    if (options?.to) {
+      query.andWhere('game."date" <= :to', { to: options.to });
     }
 
     query.orderBy('game."id"', 'DESC');

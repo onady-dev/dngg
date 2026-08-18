@@ -40,7 +40,13 @@ export class GameService {
 
   async getGames(
     groupId: number,
-    options?: { page?: number; limit?: number; status?: string },
+    options?: {
+      page?: number;
+      limit?: number;
+      status?: string;
+      from?: string;
+      to?: string;
+    },
   ) {
     const limit = options?.limit;
     let games = await this.gameRepository.findByGroupId(groupId, options);
@@ -66,6 +72,8 @@ export class GameService {
       return {
         id: game.id,
         date: game.date,
+        // 목록에서 어느 경기가 어느 시즌인지 보여주려면 필요하다.
+        seasonId: game.seasonId ?? null,
         homeTeamName: game.homeTeamName,
         awayTeamName: game.awayTeamName,
         homePlayers: homePlayers?.flatMap((player) =>
