@@ -669,16 +669,20 @@ const GamesPage = () => {
     setSelectedGameIds(new Set());
   };
 
-  const exitSelectMode = () => {
-    setSelectMode(false);
+  // 선택 관련 상태를 전부 초기화하고 원래 페이징 목록으로 되돌린다.
+  // 선택 모드 취소와 배정 성공 후 둘 다 같은 정리가 필요하다 — 한쪽만
+  // 고치면 날짜 범위 상태(rangeApplied 등)가 남아 목록이 그 범위에 갇힌다.
+  const resetSelectModeState = () => {
     setSelectedGameIds(new Set());
     setRangeFrom("");
     setRangeTo("");
-    // 범위 조회로 목록을 갈아끼웠으면 원래 페이징 목록으로 되돌린다.
-    if (rangeApplied) {
-      setRangeApplied(false);
-      loadFinishedInitial();
-    }
+    setRangeApplied(false);
+    loadFinishedInitial();
+  };
+
+  const exitSelectMode = () => {
+    setSelectMode(false);
+    resetSelectModeState();
   };
 
   const toggleGame = (gameId: number) => {
@@ -753,19 +757,18 @@ const GamesPage = () => {
       );
       showToast(`${updated}건을 '${seasonName}'(으)로 배정했습니다.`, "success");
       setSelectMode(false);
-      setSelectedGameIds(new Set());
-      // 배지를 갱신하려면 목록을 다시 읽어야 한다.
-      if (rangeApplied && rangeFrom && rangeTo) {
-        const games = await fetchFinishedGamesInRange(selectedGroup, rangeFrom, rangeTo);
-        setFinishedGames(games);
-      } else {
-        loadFinishedInitial();
-      }
+      // exitSelectMode와 동일한 정리 — 날짜 범위를 적용한 채 배정했다면
+      // 그 상태로 목록이 갇히지 않도록 페이징 목록으로 되돌리고, 그 재조회가
+      // 배지도 함께 갱신해준다.
+      resetSelectModeState();
     } catch (error: any) {
-      showToast(
-        error?.response?.data?.message ?? "시즌 배정에 실패했습니다.",
-        "error"
-      );
+      const message = error?.response?.data?.message;
+      // DTO 검증 실패(400)는 ValidationPipe가 message를 string[]로 준다 —
+      // 배열을 그대로 Toast에 넘기면 구분자 없이 붙어버리므로 한 문장으로 합친다.
+      const text = Array.isArray(message)
+        ? message.join(" / ")
+        : (message ?? "시즌 배정에 실패했습니다.");
+      showToast(text, "error");
     } finally {
       setAssigning(false);
     }
@@ -1089,8 +1092,13 @@ const GamesPage = () => {
                 key={game.id}
                 onClick={selectMode ? () => toggleGame(game.id) : undefined}
                 style={
-                  selectMode && selectedGameIds.has(game.id)
-                    ? { outline: "2px solid var(--primary-color)" }
+                  selectMode
+                    ? {
+                        cursor: "pointer",
+                        outline: selectedGameIds.has(game.id)
+                          ? "2px solid var(--primary-color)"
+                          : undefined,
+                      }
                     : undefined
                 }
               >
