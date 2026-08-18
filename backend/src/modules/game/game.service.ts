@@ -7,6 +7,7 @@ import {
 } from 'src/common/group-access';
 import { Player } from 'src/entities/Player.entity';
 import { Logitem } from 'src/entities/Logitem.entity';
+import { Season } from 'src/entities/Season.entity';
 import { GameRepository } from 'src/repository/game.repository';
 import {
   PostGameAndLogsRequestDto,
@@ -164,6 +165,38 @@ export class GameService {
   async deleteGame(id: number, userGroupId: number) {
     await this.assertGameInGroup(id, userGroupId);
     return await this.gameRepository.deleteGame(id);
+  }
+
+  // 선택한 경기들의 시즌을 바꾼다. seasonId가 null이면 시즌 미지정으로 되돌린다.
+  // 경기나 시즌이 하나라도 다른 그룹 소유면 전부 거부한다 — 부분 성공을 만들지 않는다.
+  async assignSeason(dto: {
+    groupId: number;
+    gameIds: number[];
+    seasonId: number | null;
+  }): Promise<{ updated: number }> {
+    await assertIdsInGroup(
+      this.gameRepository,
+      dto.gameIds,
+      dto.groupId,
+      '다른 그룹의 경기는 배정할 수 없습니다.',
+    );
+
+    // null은 "시즌 미지정으로 되돌리기"이므로 시즌 조회 자체가 필요 없다.
+    if (dto.seasonId !== null && dto.seasonId !== undefined) {
+      await assertIdsInGroup(
+        this.dataSource.getRepository(Season),
+        [dto.seasonId],
+        dto.groupId,
+        '다른 그룹의 시즌은 사용할 수 없습니다.',
+      );
+    }
+
+    const updated = await this.gameRepository.updateSeason(
+      dto.groupId,
+      dto.gameIds,
+      dto.seasonId ?? null,
+    );
+    return { updated };
   }
 
   async saveGameAndLogs(
