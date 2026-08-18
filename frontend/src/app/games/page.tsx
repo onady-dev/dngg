@@ -21,12 +21,15 @@ import { assignGameSeason, fetchFinishedGamesInRange } from "@/lib/gameApi";
 
 const FINISHED_PAGE_SIZE = 10;
 
-const Container = styled.div`
+const Container = styled.div<{ $selectMode?: boolean }>`
   padding: 1rem;
   margin-top: calc(var(--header-height) + 4px);
+  /* 하단 고정 배정 바에 콘텐츠가 가리지 않도록 여백 확보 */
+  padding-bottom: ${(props) => (props.$selectMode ? "6rem" : "1rem")};
 
   @media (min-width: 768px) {
     padding: 1.5rem;
+    padding-bottom: ${(props) => (props.$selectMode ? "6rem" : "1.5rem")};
   }
 `;
 
@@ -174,6 +177,8 @@ const GameName = styled.h3`
   font-size: 1rem;
   font-weight: 600;
   color: var(--text-color);
+  min-width: 0;
+  overflow-wrap: anywhere;
 
   @media (min-width: 768px) {
     font-size: 1.125rem;
@@ -543,13 +548,22 @@ const GamesPage = () => {
   const finishedPageRef = useRef(0);
   const finishedLoadingRef = useRef(false);
   const finishedSentinelRef = useRef<HTMLDivElement>(null);
+  // applyRange/clearRange가 증가시키는 세대 카운터. loadMoreFinished는 응답을
+  // 커밋하기 직전에 자신이 시작할 때 읽은 값과 비교해, 그 사이 기간 적용/해제가
+  // 끼어들었으면(값이 달라졌으면) 상태를 건드리지 않고 버린다.
+  const finishedGenerationRef = useRef(0);
 
   const canManage = !!user && user.groupId === selectedGroup;
 
   const seasonNameOf = (seasonId?: number | null) =>
     seasonId == null ? null : (seasons.find((s) => s.id === seasonId)?.name ?? null);
 
+  // 그룹이 바뀌면 이전 그룹에서의 선택 모드 상태가 좀비로 남지 않도록
+  // 먼저 정리한다 — exitSelectMode·배정 성공 경로와 동일한 resetSelectModeState를
+  // 공유해야 세 경로가 어긋나지 않는다. loadFinishedInitial은 여기서 한 번만
+  // 부른다(resetSelectModeState 자체는 로드를 하지 않는다).
   useEffect(() => {
+    resetSelectModeState();
     if (selectedGroup) {
       loadInProgressGames();
       loadFinishedInitial();
@@ -626,12 +640,18 @@ const GamesPage = () => {
     if (!hasMoreFinished || finishedLoadingRef.current || !selectedGroup) return;
     finishedLoadingRef.current = true;
     setLoadingMoreFinished(true);
+    const generation = finishedGenerationRef.current;
 
     const nextPage = finishedPageRef.current + 1;
     try {
       const response = await api.get(`/game`, {
         params: { groupId: selectedGroup, status: 'FINISHED', page: nextPage, limit: FINISHED_PAGE_SIZE },
       });
+      if (finishedGenerationRef.current !== generation) {
+        // 응답을 기다리는 동안 기간 적용/해제가 끼어들었다 — 이 페이지 응답은
+        // 더 이상 현재 목록과 무관하므로 버린다(무한 스크롤 재개 방지).
+        return;
+      }
       const data = response.data;
       const games = Array.isArray(data) ? data : (data.games ?? []);
       const hasMore = Array.isArray(data) ? false : (data.hasMore ?? false);
@@ -669,20 +689,22 @@ const GamesPage = () => {
     setSelectedGameIds(new Set());
   };
 
-  // 선택 관련 상태를 전부 초기화하고 원래 페이징 목록으로 되돌린다.
-  // 선택 모드 취소와 배정 성공 후 둘 다 같은 정리가 필요하다 — 한쪽만
-  // 고치면 날짜 범위 상태(rangeApplied 등)가 남아 목록이 그 범위에 갇힌다.
+  // 선택 모드·범위 관련 상태를 전부 초기화한다. 목록 재조회는 호출부의
+  // 책임이다(그룹 전환 이펙트는 자체 로드 시퀀스가 있어 여기서 로드까지
+  // 하면 두 번 호출된다). 선택 모드 취소·배정 성공·그룹 전환 세 경로가
+  // 모두 이 함수를 공유해야 한다 — 하나만 다르게 고치면 날짜 범위 상태
+  // (rangeApplied 등)가 남아 목록이 그 범위에 갇히는 버그가 재발한다.
   const resetSelectModeState = () => {
+    setSelectMode(false);
     setSelectedGameIds(new Set());
     setRangeFrom("");
     setRangeTo("");
     setRangeApplied(false);
-    loadFinishedInitial();
   };
 
   const exitSelectMode = () => {
-    setSelectMode(false);
     resetSelectModeState();
+    loadFinishedInitial();
   };
 
   const toggleGame = (gameId: number) => {
@@ -714,6 +736,7 @@ const GamesPage = () => {
       showToast("시작일이 종료일보다 뒤일 수 없습니다.", "error");
       return;
     }
+    finishedGenerationRef.current += 1;
     try {
       const games = await fetchFinishedGamesInRange(selectedGroup, rangeFrom, rangeTo);
       setFinishedGames(games);
@@ -727,6 +750,7 @@ const GamesPage = () => {
   };
 
   const clearRange = () => {
+    finishedGenerationRef.current += 1;
     setRangeFrom("");
     setRangeTo("");
     setRangeApplied(false);
@@ -756,11 +780,11 @@ const GamesPage = () => {
         seasonId
       );
       showToast(`${updated}건을 '${seasonName}'(으)로 배정했습니다.`, "success");
-      setSelectMode(false);
       // exitSelectMode와 동일한 정리 — 날짜 범위를 적용한 채 배정했다면
       // 그 상태로 목록이 갇히지 않도록 페이징 목록으로 되돌리고, 그 재조회가
       // 배지도 함께 갱신해준다.
       resetSelectModeState();
+      loadFinishedInitial();
     } catch (error: any) {
       const message = error?.response?.data?.message;
       // DTO 검증 실패(400)는 ValidationPipe가 message를 string[]로 준다 —
@@ -947,7 +971,7 @@ const GamesPage = () => {
   }
 
   return (
-    <Container>
+    <Container $selectMode={selectMode && canManage}>
       <Header>
         <Title>게임 관리</Title>
         <CreateGameButton onClick={() => setIsCreateModalOpen(true)} disabled={!canManage}>
@@ -1050,7 +1074,7 @@ const GamesPage = () => {
               </SmallButton>
             )}
           </SectionTitle>
-          {selectMode && (
+          {selectMode && canManage && (
             <SelectToolbar>
               <RangeRow>
                 <DateInput
@@ -1090,9 +1114,9 @@ const GamesPage = () => {
             {finishedGames.map((game) => (
               <GameCard
                 key={game.id}
-                onClick={selectMode ? () => toggleGame(game.id) : undefined}
+                onClick={selectMode && canManage ? () => toggleGame(game.id) : undefined}
                 style={
-                  selectMode
+                  selectMode && canManage
                     ? {
                         cursor: "pointer",
                         outline: selectedGameIds.has(game.id)
@@ -1102,7 +1126,7 @@ const GamesPage = () => {
                     : undefined
                 }
               >
-                {selectMode && (
+                {selectMode && canManage && (
                   <SelectCheckbox
                     type="checkbox"
                     checked={selectedGameIds.has(game.id)}
@@ -1230,7 +1254,7 @@ const GamesPage = () => {
         </Modal>
       )}
 
-      {selectMode && (
+      {selectMode && canManage && (
         <GameSeasonActionBar
           count={selectedGameIds.size}
           seasons={seasons}

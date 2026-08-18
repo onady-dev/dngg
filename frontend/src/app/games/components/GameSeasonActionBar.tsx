@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import styled from "styled-components";
 import type { Season } from "@/lib/seasonApi";
 
@@ -88,6 +88,18 @@ export default function GameSeasonActionBar({
   const [value, setValue] = useState<string>(
     seasons.length > 0 ? String(seasons[0].id) : NONE_VALUE
   );
+
+  // seasons는 상위(그룹 전환 등)에서 언제든 교체될 수 있다. useState 초기값은
+  // 첫 렌더에만 적용되므로, 이전 그룹의 시즌 id가 화면(select가 보여주는 값)과
+  // 실제 전송값 사이에서 어긋나지 않도록 목록이 바뀔 때마다 재검증한다.
+  // NONE_VALUE는 항상 유효한 선택지이므로 그대로 둔다.
+  useEffect(() => {
+    if (value === NONE_VALUE) return;
+    const stillValid = seasons.some((s) => String(s.id) === value);
+    if (!stillValid) {
+      setValue(seasons.length > 0 ? String(seasons[0].id) : NONE_VALUE);
+    }
+  }, [seasons, value]);
 
   return (
     <Bar role="toolbar" aria-label="선택한 경기 시즌 배정">
