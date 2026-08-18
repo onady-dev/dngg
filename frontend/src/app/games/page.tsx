@@ -14,6 +14,7 @@ import { useConfirm } from "../components/ui/ConfirmDialog";
 import { useMounted } from "../lib/useMounted";
 import NoGroupSelected from "../components/NoGroupSelected";
 import { fetchTeams } from "@/lib/teamApi";
+import { fetchSeasons, Season } from "@/lib/seasonApi";
 import { useQuery } from "@tanstack/react-query";
 
 const FINISHED_PAGE_SIZE = 10;
@@ -185,6 +186,18 @@ const GameDate = styled.span`
   @media (min-width: 768px) {
     font-size: 0.875rem;
   }
+`;
+
+const SeasonBadge = styled.span`
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  vertical-align: middle;
 `;
 
 const TeamsContainer = styled.div`
@@ -447,6 +460,7 @@ const GamesPage = () => {
   const mounted = useMounted();
   const [inProgressGames, setInProgressGames] = useState<Game[]>([]);
   const [finishedGames, setFinishedGames] = useState<Game[]>([]);
+  const [seasons, setSeasons] = useState<Season[]>([]);
   const [hasMoreFinished, setHasMoreFinished] = useState(false);
   const [loadingMoreFinished, setLoadingMoreFinished] = useState(false);
   const [teams, setTeams] = useState<Team[]>([]);
@@ -470,6 +484,9 @@ const GamesPage = () => {
 
   const canManage = !!user && user.groupId === selectedGroup;
 
+  const seasonNameOf = (seasonId?: number | null) =>
+    seasonId == null ? null : (seasons.find((s) => s.id === seasonId)?.name ?? null);
+
   useEffect(() => {
     if (selectedGroup) {
       loadInProgressGames();
@@ -477,6 +494,21 @@ const GamesPage = () => {
       loadTeams();
     }
     setLoading(false);
+  }, [selectedGroup]);
+
+  // 경기 카드의 시즌 배지와 선택 모드 드롭다운에 쓴다.
+  useEffect(() => {
+    if (!selectedGroup) {
+      setSeasons([]);
+      return;
+    }
+    fetchSeasons(selectedGroup)
+      .then((data) => setSeasons(data.seasons))
+      .catch((e) => {
+        // 시즌 조회 실패는 배지만 사라질 뿐 경기 목록에는 영향이 없다.
+        console.error("시즌 목록을 불러오지 못했습니다:", e);
+        setSeasons([]);
+      });
   }, [selectedGroup]);
 
   const loadTeams = async () => {
@@ -843,7 +875,12 @@ const GamesPage = () => {
             {finishedGames.map((game) => (
               <GameCard key={game.id}>
                 <GameInfo>
-                  <GameName>{`${game.homeTeamName} vs ${game.awayTeamName}`}</GameName>
+                  <GameName>
+                    {`${game.homeTeamName} vs ${game.awayTeamName}`}
+                    {seasonNameOf(game.seasonId) && (
+                      <SeasonBadge>{seasonNameOf(game.seasonId)}</SeasonBadge>
+                    )}
+                  </GameName>
                   <GameDate>{new Date(game.date).toLocaleDateString("ko-KR")}</GameDate>
                 </GameInfo>
 
