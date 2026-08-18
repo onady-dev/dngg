@@ -16,6 +16,8 @@ import NoGroupSelected from "../components/NoGroupSelected";
 import { fetchTeams } from "@/lib/teamApi";
 import { fetchSeasons, Season } from "@/lib/seasonApi";
 import { useQuery } from "@tanstack/react-query";
+import GameSeasonActionBar from "./components/GameSeasonActionBar";
+import { assignGameSeason, fetchFinishedGamesInRange } from "@/lib/gameApi";
 
 const FINISHED_PAGE_SIZE = 10;
 
@@ -451,6 +453,60 @@ const LoadingContainer = styled.div`
   padding: 6rem 0;
 `;
 
+const SelectToolbar = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.5rem;
+  background: #f9fafb;
+`;
+
+const RangeRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+`;
+
+const DateInput = styled.input`
+  padding: 0.375rem 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.375rem;
+  font-size: 0.8125rem;
+`;
+
+const SmallButton = styled.button`
+  padding: 0.375rem 0.625rem;
+  border-radius: 0.375rem;
+  background: #e5e7eb;
+  color: #374151;
+  font-size: 0.8125rem;
+  white-space: nowrap;
+`;
+
+const SelectAllRow = styled.label`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+`;
+
+const MoreHint = styled.p`
+  margin: 0;
+  font-size: 0.75rem;
+  color: #b45309;
+`;
+
+const SelectCheckbox = styled.input`
+  margin-right: 0.5rem;
+  width: 1.125rem;
+  height: 1.125rem;
+`;
+
 const GamesPage = () => {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
@@ -467,6 +523,12 @@ const GamesPage = () => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedTeams, setSelectedTeams] = useState<{ teamA?: Team; teamB?: Team }>({});
   const [loading, setLoading] = useState(true);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedGameIds, setSelectedGameIds] = useState<Set<number>>(new Set());
+  const [rangeFrom, setRangeFrom] = useState("");
+  const [rangeTo, setRangeTo] = useState("");
+  const [rangeApplied, setRangeApplied] = useState(false);
+  const [assigning, setAssigning] = useState(false);
 
   const { data: subStatus } = useQuery<{
     subscribed: boolean;
@@ -601,6 +663,113 @@ const GamesPage = () => {
     observer.observe(el);
     return () => observer.disconnect();
   }, [loadMoreFinished]);
+
+  const enterSelectMode = () => {
+    setSelectMode(true);
+    setSelectedGameIds(new Set());
+  };
+
+  const exitSelectMode = () => {
+    setSelectMode(false);
+    setSelectedGameIds(new Set());
+    setRangeFrom("");
+    setRangeTo("");
+    // 범위 조회로 목록을 갈아끼웠으면 원래 페이징 목록으로 되돌린다.
+    if (rangeApplied) {
+      setRangeApplied(false);
+      loadFinishedInitial();
+    }
+  };
+
+  const toggleGame = (gameId: number) => {
+    setSelectedGameIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(gameId)) next.delete(gameId);
+      else next.add(gameId);
+      return next;
+    });
+  };
+
+  // '전체'는 항상 "지금 화면에 로드된 경기 전체"를 뜻한다.
+  const allLoadedSelected =
+    finishedGames.length > 0 && selectedGameIds.size === finishedGames.length;
+
+  const toggleSelectAll = () => {
+    setSelectedGameIds(
+      allLoadedSelected ? new Set() : new Set(finishedGames.map((g) => g.id))
+    );
+  };
+
+  const applyRange = async () => {
+    if (!selectedGroup) return;
+    if (!rangeFrom || !rangeTo) {
+      showToast("시작일과 종료일을 모두 입력해주세요.", "error");
+      return;
+    }
+    if (rangeFrom > rangeTo) {
+      showToast("시작일이 종료일보다 뒤일 수 없습니다.", "error");
+      return;
+    }
+    try {
+      const games = await fetchFinishedGamesInRange(selectedGroup, rangeFrom, rangeTo);
+      setFinishedGames(games);
+      setHasMoreFinished(false); // 범위 조회는 페이징 없이 전부 받는다
+      setRangeApplied(true);
+      setSelectedGameIds(new Set());
+    } catch (error) {
+      console.error("범위 조회에 실패했습니다:", error);
+      showToast("해당 기간의 경기를 불러오지 못했습니다.", "error");
+    }
+  };
+
+  const clearRange = () => {
+    setRangeFrom("");
+    setRangeTo("");
+    setRangeApplied(false);
+    setSelectedGameIds(new Set());
+    loadFinishedInitial();
+  };
+
+  const handleAssignSeason = async (seasonId: number | null) => {
+    if (!selectedGroup || selectedGameIds.size === 0) return;
+
+    const seasonName =
+      seasonId === null
+        ? "시즌 미지정"
+        : (seasons.find((s) => s.id === seasonId)?.name ?? "선택한 시즌");
+    const ok = await confirm({
+      title: "시즌을 배정할까요?",
+      message: `완료 경기 ${selectedGameIds.size}건을 '${seasonName}'(으)로 옮깁니다.`,
+      confirmText: "배정",
+    });
+    if (!ok) return;
+
+    setAssigning(true);
+    try {
+      const { updated } = await assignGameSeason(
+        selectedGroup,
+        Array.from(selectedGameIds),
+        seasonId
+      );
+      showToast(`${updated}건을 '${seasonName}'(으)로 배정했습니다.`, "success");
+      setSelectMode(false);
+      setSelectedGameIds(new Set());
+      // 배지를 갱신하려면 목록을 다시 읽어야 한다.
+      if (rangeApplied && rangeFrom && rangeTo) {
+        const games = await fetchFinishedGamesInRange(selectedGroup, rangeFrom, rangeTo);
+        setFinishedGames(games);
+      } else {
+        loadFinishedInitial();
+      }
+    } catch (error: any) {
+      showToast(
+        error?.response?.data?.message ?? "시즌 배정에 실패했습니다.",
+        "error"
+      );
+    } finally {
+      setAssigning(false);
+    }
+  };
 
   const handleCreateGame = async () => {
     if (!canManage) {
@@ -870,10 +1039,70 @@ const GamesPage = () => {
           </GameList>
         </Section>
         <Section>
-          <SectionTitle>최근 게임 기록</SectionTitle>
+          <SectionTitle>
+            최근 게임 기록
+            {canManage && seasons.length > 0 && !selectMode && (
+              <SmallButton style={{ marginLeft: "0.75rem" }} onClick={enterSelectMode}>
+                시즌 배정
+              </SmallButton>
+            )}
+          </SectionTitle>
+          {selectMode && (
+            <SelectToolbar>
+              <RangeRow>
+                <DateInput
+                  type="date"
+                  value={rangeFrom}
+                  onChange={(e) => setRangeFrom(e.target.value)}
+                  aria-label="시작일"
+                />
+                <span>~</span>
+                <DateInput
+                  type="date"
+                  value={rangeTo}
+                  onChange={(e) => setRangeTo(e.target.value)}
+                  aria-label="종료일"
+                />
+                <SmallButton onClick={applyRange}>기간 적용</SmallButton>
+                {rangeApplied && <SmallButton onClick={clearRange}>기간 해제</SmallButton>}
+              </RangeRow>
+
+              <SelectAllRow>
+                <input
+                  type="checkbox"
+                  checked={allLoadedSelected}
+                  onChange={toggleSelectAll}
+                />
+                전체 선택 ({finishedGames.length}건)
+              </SelectAllRow>
+
+              {!rangeApplied && hasMoreFinished && (
+                <MoreHint>
+                  아래로 더 있습니다 — 날짜 범위를 지정하면 한 번에 고를 수 있습니다.
+                </MoreHint>
+              )}
+            </SelectToolbar>
+          )}
           <GameList>
             {finishedGames.map((game) => (
-              <GameCard key={game.id}>
+              <GameCard
+                key={game.id}
+                onClick={selectMode ? () => toggleGame(game.id) : undefined}
+                style={
+                  selectMode && selectedGameIds.has(game.id)
+                    ? { outline: "2px solid var(--primary-color)" }
+                    : undefined
+                }
+              >
+                {selectMode && (
+                  <SelectCheckbox
+                    type="checkbox"
+                    checked={selectedGameIds.has(game.id)}
+                    onChange={() => toggleGame(game.id)}
+                    onClick={(e) => e.stopPropagation()}
+                    aria-label="이 경기 선택"
+                  />
+                )}
                 <GameInfo>
                   <GameName>
                     {`${game.homeTeamName} vs ${game.awayTeamName}`}
@@ -904,7 +1133,7 @@ const GamesPage = () => {
                   </TeamSection>
                 </TeamsContainer>
 
-                {canManage && (
+                {canManage && !selectMode && (
                   <GameActions style={{ marginTop: '1rem' }}>
                     <ActionButton onClick={() => handleRestartGame(game.id)}>
                       다시 진행하기
@@ -991,6 +1220,16 @@ const GamesPage = () => {
             </ModalButtons>
           </ModalContent>
         </Modal>
+      )}
+
+      {selectMode && (
+        <GameSeasonActionBar
+          count={selectedGameIds.size}
+          seasons={seasons}
+          busy={assigning}
+          onAssign={handleAssignSeason}
+          onCancel={exitSelectMode}
+        />
       )}
     </Container>
   );
