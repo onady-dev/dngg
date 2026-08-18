@@ -14,16 +14,22 @@ import { useConfirm } from "../components/ui/ConfirmDialog";
 import { useMounted } from "../lib/useMounted";
 import NoGroupSelected from "../components/NoGroupSelected";
 import { fetchTeams } from "@/lib/teamApi";
+import { fetchSeasons, Season } from "@/lib/seasonApi";
 import { useQuery } from "@tanstack/react-query";
+import GameSeasonActionBar from "./components/GameSeasonActionBar";
+import { assignGameSeason, fetchFinishedGamesInRange } from "@/lib/gameApi";
 
 const FINISHED_PAGE_SIZE = 10;
 
-const Container = styled.div`
+const Container = styled.div<{ $selectMode?: boolean }>`
   padding: 1rem;
   margin-top: calc(var(--header-height) + 4px);
+  /* 하단 고정 배정 바에 콘텐츠가 가리지 않도록 여백 확보 */
+  padding-bottom: ${(props) => (props.$selectMode ? "6rem" : "1rem")};
 
   @media (min-width: 768px) {
     padding: 1.5rem;
+    padding-bottom: ${(props) => (props.$selectMode ? "6rem" : "1.5rem")};
   }
 `;
 
@@ -171,6 +177,8 @@ const GameName = styled.h3`
   font-size: 1rem;
   font-weight: 600;
   color: var(--text-color);
+  min-width: 0;
+  overflow-wrap: anywhere;
 
   @media (min-width: 768px) {
     font-size: 1.125rem;
@@ -185,6 +193,18 @@ const GameDate = styled.span`
   @media (min-width: 768px) {
     font-size: 0.875rem;
   }
+`;
+
+const SeasonBadge = styled.span`
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  vertical-align: middle;
 `;
 
 const TeamsContainer = styled.div`
@@ -438,6 +458,60 @@ const LoadingContainer = styled.div`
   padding: 6rem 0;
 `;
 
+const SelectToolbar = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.5rem;
+  background: #f9fafb;
+`;
+
+const RangeRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+`;
+
+const DateInput = styled.input`
+  padding: 0.375rem 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.375rem;
+  font-size: 0.8125rem;
+`;
+
+const SmallButton = styled.button`
+  padding: 0.375rem 0.625rem;
+  border-radius: 0.375rem;
+  background: #e5e7eb;
+  color: #374151;
+  font-size: 0.8125rem;
+  white-space: nowrap;
+`;
+
+const SelectAllRow = styled.label`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+`;
+
+const MoreHint = styled.p`
+  margin: 0;
+  font-size: 0.75rem;
+  color: #b45309;
+`;
+
+const SelectCheckbox = styled.input`
+  margin-right: 0.5rem;
+  width: 1.125rem;
+  height: 1.125rem;
+`;
+
 const GamesPage = () => {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
@@ -447,12 +521,19 @@ const GamesPage = () => {
   const mounted = useMounted();
   const [inProgressGames, setInProgressGames] = useState<Game[]>([]);
   const [finishedGames, setFinishedGames] = useState<Game[]>([]);
+  const [seasons, setSeasons] = useState<Season[]>([]);
   const [hasMoreFinished, setHasMoreFinished] = useState(false);
   const [loadingMoreFinished, setLoadingMoreFinished] = useState(false);
   const [teams, setTeams] = useState<Team[]>([]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedTeams, setSelectedTeams] = useState<{ teamA?: Team; teamB?: Team }>({});
   const [loading, setLoading] = useState(true);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedGameIds, setSelectedGameIds] = useState<Set<number>>(new Set());
+  const [rangeFrom, setRangeFrom] = useState("");
+  const [rangeTo, setRangeTo] = useState("");
+  const [rangeApplied, setRangeApplied] = useState(false);
+  const [assigning, setAssigning] = useState(false);
 
   const { data: subStatus } = useQuery<{
     subscribed: boolean;
@@ -467,16 +548,43 @@ const GamesPage = () => {
   const finishedPageRef = useRef(0);
   const finishedLoadingRef = useRef(false);
   const finishedSentinelRef = useRef<HTMLDivElement>(null);
+  // applyRange/clearRange가 증가시키는 세대 카운터. loadMoreFinished는 응답을
+  // 커밋하기 직전에 자신이 시작할 때 읽은 값과 비교해, 그 사이 기간 적용/해제가
+  // 끼어들었으면(값이 달라졌으면) 상태를 건드리지 않고 버린다.
+  const finishedGenerationRef = useRef(0);
 
   const canManage = !!user && user.groupId === selectedGroup;
 
+  const seasonNameOf = (seasonId?: number | null) =>
+    seasonId == null ? null : (seasons.find((s) => s.id === seasonId)?.name ?? null);
+
+  // 그룹이 바뀌면 이전 그룹에서의 선택 모드 상태가 좀비로 남지 않도록
+  // 먼저 정리한다 — exitSelectMode·배정 성공 경로와 동일한 resetSelectModeState를
+  // 공유해야 세 경로가 어긋나지 않는다. loadFinishedInitial은 여기서 한 번만
+  // 부른다(resetSelectModeState 자체는 로드를 하지 않는다).
   useEffect(() => {
+    resetSelectModeState();
     if (selectedGroup) {
       loadInProgressGames();
       loadFinishedInitial();
       loadTeams();
     }
     setLoading(false);
+  }, [selectedGroup]);
+
+  // 경기 카드의 시즌 배지와 선택 모드 드롭다운에 쓴다.
+  useEffect(() => {
+    if (!selectedGroup) {
+      setSeasons([]);
+      return;
+    }
+    fetchSeasons(selectedGroup)
+      .then((data) => setSeasons(data.seasons))
+      .catch((e) => {
+        // 시즌 조회 실패는 배지만 사라질 뿐 경기 목록에는 영향이 없다.
+        console.error("시즌 목록을 불러오지 못했습니다:", e);
+        setSeasons([]);
+      });
   }, [selectedGroup]);
 
   const loadTeams = async () => {
@@ -532,12 +640,18 @@ const GamesPage = () => {
     if (!hasMoreFinished || finishedLoadingRef.current || !selectedGroup) return;
     finishedLoadingRef.current = true;
     setLoadingMoreFinished(true);
+    const generation = finishedGenerationRef.current;
 
     const nextPage = finishedPageRef.current + 1;
     try {
       const response = await api.get(`/game`, {
         params: { groupId: selectedGroup, status: 'FINISHED', page: nextPage, limit: FINISHED_PAGE_SIZE },
       });
+      if (finishedGenerationRef.current !== generation) {
+        // 응답을 기다리는 동안 기간 적용/해제가 끼어들었다 — 이 페이지 응답은
+        // 더 이상 현재 목록과 무관하므로 버린다(무한 스크롤 재개 방지).
+        return;
+      }
       const data = response.data;
       const games = Array.isArray(data) ? data : (data.games ?? []);
       const hasMore = Array.isArray(data) ? false : (data.hasMore ?? false);
@@ -569,6 +683,120 @@ const GamesPage = () => {
     observer.observe(el);
     return () => observer.disconnect();
   }, [loadMoreFinished]);
+
+  const enterSelectMode = () => {
+    setSelectMode(true);
+    setSelectedGameIds(new Set());
+  };
+
+  // 선택 모드·범위 관련 상태를 전부 초기화한다. 목록 재조회는 호출부의
+  // 책임이다(그룹 전환 이펙트는 자체 로드 시퀀스가 있어 여기서 로드까지
+  // 하면 두 번 호출된다). 선택 모드 취소·배정 성공·그룹 전환 세 경로가
+  // 모두 이 함수를 공유해야 한다 — 하나만 다르게 고치면 날짜 범위 상태
+  // (rangeApplied 등)가 남아 목록이 그 범위에 갇히는 버그가 재발한다.
+  const resetSelectModeState = () => {
+    setSelectMode(false);
+    setSelectedGameIds(new Set());
+    setRangeFrom("");
+    setRangeTo("");
+    setRangeApplied(false);
+  };
+
+  const exitSelectMode = () => {
+    resetSelectModeState();
+    loadFinishedInitial();
+  };
+
+  const toggleGame = (gameId: number) => {
+    setSelectedGameIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(gameId)) next.delete(gameId);
+      else next.add(gameId);
+      return next;
+    });
+  };
+
+  // '전체'는 항상 "지금 화면에 로드된 경기 전체"를 뜻한다.
+  const allLoadedSelected =
+    finishedGames.length > 0 && selectedGameIds.size === finishedGames.length;
+
+  const toggleSelectAll = () => {
+    setSelectedGameIds(
+      allLoadedSelected ? new Set() : new Set(finishedGames.map((g) => g.id))
+    );
+  };
+
+  const applyRange = async () => {
+    if (!selectedGroup) return;
+    if (!rangeFrom || !rangeTo) {
+      showToast("시작일과 종료일을 모두 입력해주세요.", "error");
+      return;
+    }
+    if (rangeFrom > rangeTo) {
+      showToast("시작일이 종료일보다 뒤일 수 없습니다.", "error");
+      return;
+    }
+    finishedGenerationRef.current += 1;
+    try {
+      const games = await fetchFinishedGamesInRange(selectedGroup, rangeFrom, rangeTo);
+      setFinishedGames(games);
+      setHasMoreFinished(false); // 범위 조회는 페이징 없이 전부 받는다
+      setRangeApplied(true);
+      setSelectedGameIds(new Set());
+    } catch (error) {
+      console.error("범위 조회에 실패했습니다:", error);
+      showToast("해당 기간의 경기를 불러오지 못했습니다.", "error");
+    }
+  };
+
+  const clearRange = () => {
+    finishedGenerationRef.current += 1;
+    setRangeFrom("");
+    setRangeTo("");
+    setRangeApplied(false);
+    setSelectedGameIds(new Set());
+    loadFinishedInitial();
+  };
+
+  const handleAssignSeason = async (seasonId: number | null) => {
+    if (!selectedGroup || selectedGameIds.size === 0) return;
+
+    const seasonName =
+      seasonId === null
+        ? "시즌 미지정"
+        : (seasons.find((s) => s.id === seasonId)?.name ?? "선택한 시즌");
+    const ok = await confirm({
+      title: "시즌을 배정할까요?",
+      message: `완료 경기 ${selectedGameIds.size}건을 '${seasonName}'(으)로 옮깁니다.`,
+      confirmText: "배정",
+    });
+    if (!ok) return;
+
+    setAssigning(true);
+    try {
+      const { updated } = await assignGameSeason(
+        selectedGroup,
+        Array.from(selectedGameIds),
+        seasonId
+      );
+      showToast(`${updated}건을 '${seasonName}'(으)로 배정했습니다.`, "success");
+      // exitSelectMode와 동일한 정리 — 날짜 범위를 적용한 채 배정했다면
+      // 그 상태로 목록이 갇히지 않도록 페이징 목록으로 되돌리고, 그 재조회가
+      // 배지도 함께 갱신해준다.
+      resetSelectModeState();
+      loadFinishedInitial();
+    } catch (error: any) {
+      const message = error?.response?.data?.message;
+      // DTO 검증 실패(400)는 ValidationPipe가 message를 string[]로 준다 —
+      // 배열을 그대로 Toast에 넘기면 구분자 없이 붙어버리므로 한 문장으로 합친다.
+      const text = Array.isArray(message)
+        ? message.join(" / ")
+        : (message ?? "시즌 배정에 실패했습니다.");
+      showToast(text, "error");
+    } finally {
+      setAssigning(false);
+    }
+  };
 
   const handleCreateGame = async () => {
     if (!canManage) {
@@ -743,7 +971,7 @@ const GamesPage = () => {
   }
 
   return (
-    <Container>
+    <Container $selectMode={selectMode && canManage}>
       <Header>
         <Title>게임 관리</Title>
         <CreateGameButton onClick={() => setIsCreateModalOpen(true)} disabled={!canManage}>
@@ -838,12 +1066,82 @@ const GamesPage = () => {
           </GameList>
         </Section>
         <Section>
-          <SectionTitle>최근 게임 기록</SectionTitle>
+          <SectionTitle>
+            최근 게임 기록
+            {canManage && seasons.length > 0 && !selectMode && (
+              <SmallButton style={{ marginLeft: "0.75rem" }} onClick={enterSelectMode}>
+                시즌 배정
+              </SmallButton>
+            )}
+          </SectionTitle>
+          {selectMode && canManage && (
+            <SelectToolbar>
+              <RangeRow>
+                <DateInput
+                  type="date"
+                  value={rangeFrom}
+                  onChange={(e) => setRangeFrom(e.target.value)}
+                  aria-label="시작일"
+                />
+                <span>~</span>
+                <DateInput
+                  type="date"
+                  value={rangeTo}
+                  onChange={(e) => setRangeTo(e.target.value)}
+                  aria-label="종료일"
+                />
+                <SmallButton onClick={applyRange}>기간 적용</SmallButton>
+                {rangeApplied && <SmallButton onClick={clearRange}>기간 해제</SmallButton>}
+              </RangeRow>
+
+              <SelectAllRow>
+                <input
+                  type="checkbox"
+                  checked={allLoadedSelected}
+                  onChange={toggleSelectAll}
+                />
+                전체 선택 ({finishedGames.length}건)
+              </SelectAllRow>
+
+              {!rangeApplied && hasMoreFinished && (
+                <MoreHint>
+                  아래로 더 있습니다 — 날짜 범위를 지정하면 한 번에 고를 수 있습니다.
+                </MoreHint>
+              )}
+            </SelectToolbar>
+          )}
           <GameList>
             {finishedGames.map((game) => (
-              <GameCard key={game.id}>
+              <GameCard
+                key={game.id}
+                onClick={selectMode && canManage ? () => toggleGame(game.id) : undefined}
+                style={
+                  selectMode && canManage
+                    ? {
+                        cursor: "pointer",
+                        outline: selectedGameIds.has(game.id)
+                          ? "2px solid var(--primary-color)"
+                          : undefined,
+                      }
+                    : undefined
+                }
+              >
+                {selectMode && canManage && (
+                  <SelectCheckbox
+                    type="checkbox"
+                    checked={selectedGameIds.has(game.id)}
+                    onChange={() => toggleGame(game.id)}
+                    onClick={(e) => e.stopPropagation()}
+                    aria-label="이 경기 선택"
+                  />
+                )}
                 <GameInfo>
-                  <GameName>{`${game.homeTeamName} vs ${game.awayTeamName}`}</GameName>
+                  <GameName>
+                    {`${game.homeTeamName} vs ${game.awayTeamName}`}
+                    {seasonNameOf(game.seasonId) && (
+                      <SeasonBadge>{seasonNameOf(game.seasonId)}</SeasonBadge>
+                    )}
+                  </GameName>
                   <GameDate>{new Date(game.date).toLocaleDateString("ko-KR")}</GameDate>
                 </GameInfo>
 
@@ -867,7 +1165,7 @@ const GamesPage = () => {
                   </TeamSection>
                 </TeamsContainer>
 
-                {canManage && (
+                {canManage && !selectMode && (
                   <GameActions style={{ marginTop: '1rem' }}>
                     <ActionButton onClick={() => handleRestartGame(game.id)}>
                       다시 진행하기
@@ -954,6 +1252,16 @@ const GamesPage = () => {
             </ModalButtons>
           </ModalContent>
         </Modal>
+      )}
+
+      {selectMode && canManage && (
+        <GameSeasonActionBar
+          count={selectedGameIds.size}
+          seasons={seasons}
+          busy={assigning}
+          onAssign={handleAssignSeason}
+          onCancel={exitSelectMode}
+        />
       )}
     </Container>
   );

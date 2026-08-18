@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   Request,
   ValidationPipe,
@@ -16,13 +17,30 @@ import {
   PostGameAndLogsRequestDto,
   PostGameRequestDto,
   PatchGameQuarterRequestDto,
+  PutGameSeasonRequestDto,
 } from './game.request.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { assertSameGroup } from 'src/common/group-access';
+import { assertValidDateRange } from 'src/common/date-range';
 
 @Controller('game')
 export class GameController {
   constructor(private readonly gameService: GameService) {}
+
+  // 파라미터 라우트(:id)보다 먼저 선언해야 'season'이 id로 해석되지 않는다.
+  @Put('season')
+  @UseGuards(AuthGuard('jwt'))
+  async assignSeason(
+    @Request() req,
+    @Body(ValidationPipe) dto: PutGameSeasonRequestDto,
+  ) {
+    assertSameGroup(req.user.groupId, dto.groupId);
+    return this.gameService.assignSeason({
+      groupId: dto.groupId,
+      gameIds: dto.gameIds,
+      seasonId: dto.seasonId,
+    });
+  }
 
   @Get()
   async getGameByGroupId(
@@ -30,11 +48,17 @@ export class GameController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('status') status?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
   ) {
+    // DTO가 없는 경로라 전역 ValidationPipe가 관여하지 않는다 — 여기서 막아야 한다.
+    assertValidDateRange(from, to);
     return this.gameService.getGames(groupId, {
       page: page ? +page : undefined,
       limit: limit ? +limit : undefined,
       status,
+      from,
+      to,
     });
   }
 

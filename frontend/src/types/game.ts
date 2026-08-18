@@ -10,6 +10,7 @@ export interface Game {
   homePlayers: Player[];
   awayPlayers: Player[];
   logs: Log[];
+  seasonId?: number | null; // 시즌 미지정이면 null, 구버전 백엔드면 undefined
   currentQuarter?: number; // 백엔드 미배포 시 undefined → 1로 간주
 }
 

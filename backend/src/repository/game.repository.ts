@@ -16,7 +16,13 @@ export class GameRepository extends Repository<Game> {
 
   async findByGroupId(
     groupId: number,
-    options?: { page?: number; limit?: number; status?: string },
+    options?: {
+      page?: number;
+      limit?: number;
+      status?: string;
+      from?: string;
+      to?: string;
+    },
   ): Promise<Game[]> {
     const query = this.gameRepository
       .createQueryBuilder('game')
@@ -27,6 +33,14 @@ export class GameRepository extends Repository<Game> {
 
     if (options?.status) {
       query.andWhere('game."status" = :status', { status: options.status });
+    }
+
+    // 날짜 범위는 양끝을 포함한다.
+    if (options?.from) {
+      query.andWhere('game."date" >= :from', { from: options.from });
+    }
+    if (options?.to) {
+      query.andWhere('game."date" <= :to', { to: options.to });
     }
 
     query.orderBy('game."id"', 'DESC');
@@ -63,5 +77,25 @@ export class GameRepository extends Repository<Game> {
 
   async updateGameQuarter(id: number, quarter: number) {
     return this.gameRepository.update(id, { currentQuarter: quarter });
+  }
+
+  // 여러 경기의 시즌을 한 번에 바꾼다. seasonId가 null이면 시즌 미지정으로 되돌린다.
+  // groupId를 WHERE에 다시 거는 것은 방어적 중복이다(서비스가 이미 소유권을 검증한다).
+  // 삭제된 경기는 대상에서 제외한다.
+  async updateSeason(
+    groupId: number,
+    gameIds: number[],
+    seasonId: number | null,
+  ): Promise<number> {
+    if (gameIds.length === 0) return 0;
+    const result = await this.gameRepository
+      .createQueryBuilder()
+      .update(Game)
+      .set({ seasonId })
+      .where('id IN (:...gameIds)', { gameIds })
+      .andWhere('"groupId" = :groupId', { groupId: Number(groupId) })
+      .andWhere("status <> 'DELETED'")
+      .execute();
+    return result.affected ?? 0;
   }
 }

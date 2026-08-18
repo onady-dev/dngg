@@ -7,6 +7,7 @@ import {
 } from 'src/common/group-access';
 import { Player } from 'src/entities/Player.entity';
 import { Logitem } from 'src/entities/Logitem.entity';
+import { Season } from 'src/entities/Season.entity';
 import { GameRepository } from 'src/repository/game.repository';
 import {
   PostGameAndLogsRequestDto,
@@ -39,7 +40,13 @@ export class GameService {
 
   async getGames(
     groupId: number,
-    options?: { page?: number; limit?: number; status?: string },
+    options?: {
+      page?: number;
+      limit?: number;
+      status?: string;
+      from?: string;
+      to?: string;
+    },
   ) {
     const limit = options?.limit;
     let games = await this.gameRepository.findByGroupId(groupId, options);
@@ -65,6 +72,8 @@ export class GameService {
       return {
         id: game.id,
         date: game.date,
+        // 목록에서 어느 경기가 어느 시즌인지 보여주려면 필요하다.
+        seasonId: game.seasonId ?? null,
         homeTeamName: game.homeTeamName,
         awayTeamName: game.awayTeamName,
         homePlayers: homePlayers?.flatMap((player) =>
@@ -164,6 +173,38 @@ export class GameService {
   async deleteGame(id: number, userGroupId: number) {
     await this.assertGameInGroup(id, userGroupId);
     return await this.gameRepository.deleteGame(id);
+  }
+
+  // 선택한 경기들의 시즌을 바꾼다. seasonId가 null이면 시즌 미지정으로 되돌린다.
+  // 경기나 시즌이 하나라도 다른 그룹 소유면 전부 거부한다 — 부분 성공을 만들지 않는다.
+  async assignSeason(dto: {
+    groupId: number;
+    gameIds: number[];
+    seasonId: number | null;
+  }): Promise<{ updated: number }> {
+    await assertIdsInGroup(
+      this.gameRepository,
+      dto.gameIds,
+      dto.groupId,
+      '다른 그룹의 경기는 배정할 수 없습니다.',
+    );
+
+    // null은 "시즌 미지정으로 되돌리기"이므로 시즌 조회 자체가 필요 없다.
+    if (dto.seasonId !== null && dto.seasonId !== undefined) {
+      await assertIdsInGroup(
+        this.dataSource.getRepository(Season),
+        [dto.seasonId],
+        dto.groupId,
+        '다른 그룹의 시즌은 사용할 수 없습니다.',
+      );
+    }
+
+    const updated = await this.gameRepository.updateSeason(
+      dto.groupId,
+      dto.gameIds,
+      dto.seasonId ?? null,
+    );
+    return { updated };
   }
 
   async saveGameAndLogs(
