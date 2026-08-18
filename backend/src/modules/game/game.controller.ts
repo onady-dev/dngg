@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   Request,
   ValidationPipe,
@@ -16,6 +17,7 @@ import {
   PostGameAndLogsRequestDto,
   PostGameRequestDto,
   PatchGameQuarterRequestDto,
+  PutGameSeasonRequestDto,
 } from './game.request.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { assertSameGroup } from 'src/common/group-access';
@@ -23,6 +25,21 @@ import { assertSameGroup } from 'src/common/group-access';
 @Controller('game')
 export class GameController {
   constructor(private readonly gameService: GameService) {}
+
+  // 파라미터 라우트(:id)보다 먼저 선언해야 'season'이 id로 해석되지 않는다.
+  @Put('season')
+  @UseGuards(AuthGuard('jwt'))
+  async assignSeason(
+    @Request() req,
+    @Body(ValidationPipe) dto: PutGameSeasonRequestDto,
+  ) {
+    assertSameGroup(req.user.groupId, dto.groupId);
+    return this.gameService.assignSeason({
+      groupId: dto.groupId,
+      gameIds: dto.gameIds,
+      seasonId: dto.seasonId,
+    });
+  }
 
   @Get()
   async getGameByGroupId(
